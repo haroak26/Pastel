@@ -1,0 +1,743 @@
+================================================================================
+LATTE — MEGA TASK LIST
+All-in-one customer support platform (gleap.io parity + de-bloated Zendesk/Intercom)
+Generated from a full codebase audit (frontend / backend / schema / design docs)
+Owner: Latte product team      Last updated: 2026-06-25
+================================================================================
+
+HOW TO READ THIS FILE
+  [!]  = broken / dead end / blocks users right now
+  [~]  = partial / stubbed / underwhelming
+  [+]  = needs upgrade (works but weak)
+  [N]  = new — build from scratch (parity gap vs gleap / Zendesk / Intercom)
+  [C]  = cleanup / refactor / de-duplicate
+  [U]  = UI fix (responsive / dark mode / navigation)
+
+Section legend
+  1. CRITICAL FIXES              ………… broken routes & dead ends
+  2. PARTIAL / STUBBED FEATURES  ………… finish what was started
+  3. UPGRADE EXISTING FEATURES   ………… make weak pages powerful
+  4. BUILD FROM SCRATCH (PARITY)  ………… the Gleap/Zendesk/Intercom gap
+  5. UI & NAVIGATION FIXES       ………… layout, responsive, dark mode, sidebar
+  6. CLEANUP & DE-DUPLICATION    ………… redundant pages / dead code
+  7. BACKEND / SCHEMA WORK        ………… tables, endpoints, integrations
+
+Priority key
+  P0 = blocks users / false marketing / nothing works without this
+  P1 = high UX impact or parity blocker
+  P2 = quality polish / power-user features
+  P3 = nice to have / far-out roadmap
+
+
+================================================================================
+1. CRITICAL FIXES                       (P0)
+================================================================================
+
+[!] 1.1  WIRE THE HELPDESK / KNOWLEDGE CENTER
+   - Problem: HelpdeskConfig.tsx + HelpdeskPublic.tsx + helpdesk/
+     {FaqsPage,ContactPage,FeedbackPage,TrackingPage} are fully built but NOT
+     routed in App.tsx. Link at HelpdeskConfig.tsx:138 builds /h/<slug> which
+     404s to NotFound. Backend (/api/public/helpdesk/:slug*) exists & works.
+   - Do:
+     * Add <Route path="/h/:slug/*"> -> HelpdeskPublic in App.tsx
+     * Add <Route path="/home/helpdesk"> -> HelpdeskConfig (and/or
+       /workspace/helpdesk)
+     * Add a "Helpdesk" item in PrimaryRail + a SecondaryPanel section so it
+       is reachable from the sidebar
+   - Files: client/src/App.tsx, components/sidebar/PrimaryRail.tsx,
+     components/sidebar/SecondaryPanel.tsx, pages/HelpdeskConfig.tsx,
+     pages/HelpdeskPublic.tsx
+
+[!] 1.2  IMPLEMENT HELPDESK FEEDBACK & SUBMISSIONS TABS
+   - Problem: HelpdeskConfig.tsx:638 `function SubmissionsList(){return null}`
+     and :643 `function FeedbackSettings(){return null}` render nothing despite
+     the feedback_items / contact_submissions tables + their endpoints existing.
+   - Do: Implement both components against /api/helpdesks/:id/feedback and
+     /api/helpdesks/:id/submissions (and /:subId/read). Add list, filter,
+     status change, delete.
+   - Files: pages/HelpdeskConfig.tsx, server/routes/remaining.ts (endpoints
+     already there)
+
+[!] 1.3  FIX CANNED RESPONSES / MACROS
+   - Problem: components/email/CannedResponsePicker.tsx:27 fetches
+     /api/workspaces/${workspaceId}/canned-responses — endpoint DOES NOT EXIST
+     in server/routes/remaining.ts. canned_responses table + storage exist
+     only. Picker 404s in production.
+   - Do:
+     * Add GET/POST/PATCH/DELETE /api/workspaces/:id/canned-responses (and
+       /api/spaces/:id/canned-responses for space-scoped macros)
+     * Add a "Macros" management page in Space Settings / Workspace Settings
+     * Wire the picker into the email composer with `::` shortcut insertion
+   - Files: server/routes/remaining.ts, pages/SpaceSettings.tsx,
+     components/email/CannedResponsePicker.tsx, components/email/RichTextEditor.tsx
+
+[!] 1.4  ROADMAP PAGE — MAKE IT REAL
+   - Problem: pages/Roadmap.tsx:13 `const ITEMS: RoadmapItem[] = [...]` is a
+     hardcoded literal. "Suggest a feature" button (line 73) has no onClick.
+     No /api/roadmap endpoint. No voting despite tickets.upvotes column.
+   - Do:
+     * Add roadmap_items table (id, workspaceId, title, description, status,
+       category, upvotes, position, createdAt, updatedAt) + votes table
+     * Add /api/workspaces/:id/roadmap CRUD + /:itemId/vote (anonymous vote
+       tracking by IP/email)
+     * Replace Roadmap.tsx literal with API-driven list, add upvote button,
+     status badge (Planned / In Progress / Shipped / Under Review), "Suggest
+     a feature" modal that creates a roadmap_item
+     * Mirror this into the public helpdesk (votable roadmap like gleap)
+   - Files: shared/schema.ts, server/routes/remaining.ts, pages/Roadmap.tsx,
+     pages/helpdesk/ (new RoadmapPublic component)
+
+[!] 1.5  CHANGELOG PAGE — MAKE IT REAL
+   - Problem: pages/Changelog.tsx:13 `const ENTRIES = [...]` is a hardcoded
+     literal with fake dates ("May 15, 2026"). No /api/changelog endpoint.
+   - Do:
+     * Add changelog_entries table (id, workspaceId, title, body, version,
+        tags, publishedAt, createdAt)
+     * Add /api/workspaces/:id/changelog CRUD (admin) + GET public
+     * Replace Changelog.tsx literal with API-driven feed, admin editor
+     * Surface on public helpdesk automatically
+   - Files: shared/schema.ts, server/routes/remaining.ts, pages/Changelog.tsx
+
+[!] 1.6  CUSTOMER PORTAL — ADD ENTRY POINT
+   - Problem: /portal/:workspaceId (PortalPage.tsx) works (magic-link auth,
+     ticket list/detail/reply) but is reachable ONLY by typing the URL.
+     SecondaryPanel "Portal" section (SecondaryPanel.tsx:197 PortalPanel)
+     just links to /workspace/settings.
+   - Do:
+     * Add "Customer Portal" action in Workspace Settings: "Copy portal
+       link" -> /portal/<workspaceId> with one-click copy
+     * Add portal toggle on/off + branding (logo / colors / slug) backed
+       by a portal_settings table or workspaces column
+     * Add ticket-create flow for portal visitors (currently portal can
+       only list/reply to existing tickets)
+   - Files: pages/WorkspaceSettings.tsx, pages/portal/PortalPage.tsx,
+     server/routes/remaining.ts (/api/portal/*), shared/schema.ts
+
+[!] 1.7  CONTACTS PAGE — WIRE IT OR REMOVE IT
+   - Problem: pages/Contacts.tsx and pages/Contact.tsx are orphans (not in
+     App.tsx). Contacts.tsx:53-55 FABRICATES ticket breakdown
+     (Math.floor(ticketCount * 0.4) hardcoded 40/30/30 split). "Add contact"
+     button (:242) has no handler. /api/contacts endpoint exists.
+   - Do:
+     * Add /home/contacts route -> Contacts.tsx, /home/contacts/:id ->
+       Contact.tsx, sidebar entry under Inbox/Customers
+     * Replace fabricated counts with a real /api/contacts/:id/tickets
+       endpoint (or include counts in contact list payload)
+     * Wire "Add contact" -> create dialog POST /api/contacts
+   - Files: client/src/App.tsx, pages/Contacts.tsx, pages/Contact.tsx,
+     components/sidebar/SecondaryPanel.tsx, server/routes/remaining.ts
+
+
+================================================================================
+2. PARTIAL / STUBBED FEATURES          (P0-P1)
+================================================================================
+
+[~] 2.1  AI PLAYGROUND — WIRE IT
+   - Problem: pages/AiPlayground.tsx is built, /api/workspaces/:id/ai/playground
+     exists, but AiPlayground has NO route in App.tsx.
+   - Do: Add /home/agent/playground route + sidebar link in AgentsPanel
+   - Files: App.tsx, components/sidebar/SecondaryPanel.tsx
+
+[~] 2.2  HELPDESK FEEDBACK BOARD — WIRE PUBLIC FEEDBACK
+   - Problem: feedback_items table + /api/public/helpdesk/:slug/feedback exist,
+     FeedbackPage.tsx renders feedback — but HelpdeskPublic is unrouted AND
+     Feedback config tab is null (see 1.2). Customers cannot post or upvote
+     feedback today.
+   - Do: After 1.1 + 1.2, expose a public Feedback board on /h/:slug/feedback
+     with submit + upvote (gleap-style). Admin views/manages via HelpdeskConfig
+     Feedback tab (fixed in 1.2).
+   - Files: pages/helpdesk/FeedbackPage.tsx, pages/HelpdeskConfig.tsx
+
+[~] 2.3  SPACE SETTINGS — TOO MINIMAL
+   - Problem: pages/SpaceSettings.tsx only edits name + avatar + shows read-only
+     email/type. No forwarding, signatures, inbox rules, tags, canned responses,
+     or "danger zone" / delete. Those features live in orphaned pages
+     (Forwarding.tsx, Ghosting.tsx, Advanced.tsx).
+   - Do: Make SpaceSettings a tabbed page: General | Inbox Rules | Signatures |
+     Canned Responses | Forwarding | Danger Zone. Remove orphan pages (see 6.x).
+   - Files: pages/SpaceSettings.tsx, server/routes/emails.ts (inbox-rules,
+     signatures endpoints exist)
+
+[~] 2.4  GHOSTING — MAKE IT REAL OR KILL IT
+   - Problem: pages/Ghosting.tsx:25 fakes save with setTimeout(500) then
+     toast. No API, no DB table. Duplicated in Advanced.tsx:142 GhostingTab.
+   - Do: Either implement a ghost_profiles table + API + real persistence,
+     OR remove Ghosting.tsx, Advanced.tsx GhostingTab, and the menu reference.
+     Decision needed: is ghosting (send-as proxy) a real product feature?
+   - Files: shared/schema.ts (new table if yes), pages/Ghosting.tsx,
+     pages/Advanced.tsx, server/routes/remaining.ts
+
+[~] 2.5  ANALYTICS PAGE — TOO SHALLOW
+   - Problem: pages/Analytics.tsx:67-74 fetches ALL /api/tickets (no
+     pagination, no space filter, no time range) and computes counts in the
+     browser. Doesn't use /api/analytics (which AgentAnalytics uses). Will
+     degrade with volume. No SLA / CSAT / agent / channel breakdowns.
+   - Do:
+     * Build server-side /api/workspaces/:id/analytics with date range,
+       group-by (day/week/month), dimensions (space, agent, priority, status,
+       channel) and metrics (volume, FRT, resolution time, CSAT, SLA %, breach)
+     * Rebuild Analytics.tsx into a real dashboard with chart cards, filters,
+       time-range selector, export
+     * Add saved/scheduled reports later (see 4.6)
+   - Files: pages/Analytics.tsx, server/routes/remaining.ts, server/services/
+     (new analytics.service.ts)
+
+[~] 2.6  AGENT ANALYTICS — REACHABLE
+   - Problem: pages/AgentAnalytics.tsx exists at /home/configure/agent-analytics
+     but has NO sidebar entry. Same for /home/configure/analytics.
+   - Do: Add entries in the Agents SecondaryPanel and a top-level "Analytics"
+     sidebar section.
+   - Files: components/sidebar/SecondaryPanel.tsx
+
+[~] 2.7  REVIEWS — WIRE THE "OPEN" VIEW
+   - Problem: pages/ReviewsOpen.tsx default export is imported (App.tsx:61) but
+     NO route uses defaultFilter="open". The "Open" review bucket is only
+     reachable via a pill inside another reviews page. Dead default import.
+   - Do: Add <Route path="/home/review/open"> -> ReviewsOpen, OR remove the
+     dead default export and rely on the pill toggle.
+   - Files: client/src/App.tsx
+
+[~] 2.8  TICKET THREAD "SUMMARIZE" — SURFACE IT
+   - Problem: /api/.../summarize endpoint exists (knowledge/:kid/summarize); no
+     "Summarize thread" button in TicketDetail.tsx or SpaceMailbox thread view.
+   - Do: Add "Summarize" button in TicketDetail header and EmailThreadPanel
+     that calls the endpoint and shows an AI summary panel.
+   - Files: pages/TicketDetail.tsx, components/EmailThreadPanel.tsx,
+     components/AIAssistantPanel.tsx
+
+[~] 2.9  AI DRAFT / SUGGESTED REPLIES IN INBOX
+   - Problem: /api/ai/draft endpoint exists; AIAssistantPanel exists; but the
+     composer in SpaceMailbox only surfaces a generic panel, not one-click
+     "Suggested reply" generations on the current thread/customer context.
+   - Do: Add a "Suggested replies" dropdown in the reply composer that
+     pre-generates 1-3 drafts (using KB + ticket context) and inserts one.
+   - Files: client/src/components/email/RichTextEditor.tsx,
+     pages/SpaceMailbox.tsx
+
+[~] 2.10 SNOOZE / FOLLOW-UP UI
+   - Problem: email_messages has snoozedUntil + followupAt columns but no UI
+     anywhere to schedule a snooze or follow-up.
+   - Do: Add a "Snooze until..." action in SpaceMailbox thread toolbar with a
+     date/time picker and a "Scheduled" folder view.
+   - Files: pages/SpaceMailbox.tsx, server/routes/emails.ts
+
+[~] 2.11 TASKS PAGE — STRENGTHEN
+   - Status: Tasks.tsx works (CRUD), but no due-date reminders, no assignee
+     linkage to tickets, no board view.
+   - Do: Add due-date, assignee, link-to-ticket, list/board/timeline views.
+   - Files: pages/Tasks.tsx, shared/schema.ts (add due/assignee columns),
+     server/routes/remaining.ts (/api/tasks)
+
+
+================================================================================
+3. UPGRADE EXISTING FEATURES            (P1)
+================================================================================
+
+[+] 3.1  AGENTS PAGE — REBUILD AS USEFUL
+   - Problem (the user's specific complaint): /home/configure/agents
+     (AgentSettings.tsx) is underwhelming. It is space-scoped (empty dead-end
+     if no space selected), hides analytics behind an unlinked route,
+     overlaps with the standalone /create/agent (CreateAgent.tsx), and has no
+     "playground" link.
+   - Do:
+     * Drop /create/agent route + CreateAgent.tsx; consolidate all agent
+       creation into AgentEditor (used by AgentSettings)
+     * Unify workspace-level vs space-level AI agents: show ALL workspace
+       agents in the list with the spaces they apply to as tags; allow
+       "Create agent" always (default to current space)
+     * Add per-agent row in list with: status (active/draft), replies count,
+       avg CSAT, escalation rate (from /api/agents/:id/analytics), a truncated
+       personality, quick toggle on/off, duplicate, delete
+     * Add a "Playground" button per agent -> AiPlayground (fix 2.1)
+     * Add a per-agent "Analytics" deep-link -> AgentAnalytics (fix 2.6)
+     * Add empty-state with explainer + the "New Agent" CTA always enabled
+     * Split AgentEditor tabs clearer: Setup | Knowledge | Actions | Schedule
+       | Replies | Analytics (current: setup/behavior/actions/activity — rename
+       "behavior" -> "personality & knowledge")
+   - Files: pages/AgentSettings.tsx, components/agents/AgentEditor.tsx,
+     components/agents/AgentReplies.tsx, pages/CreateAgent.tsx (DELETE),
+     client/src/App.tsx (remove /create/agent)
+
+[+] 3.2  TICKETS — MERGE VIEW INTO ONE
+   - Status: 4 routes (/home/tickets/open|in-progress|resolved|closed) all
+     render the same TicketsContent with a different defaultFilter; thin
+     wrappers in TicketsInProgress/Resolved/Closed.tsx. Duplicate Review
+     links in SecondaryPanel (:88-91 AND :106-108).
+   - Do:
+     * Keep single /home/tickets route with status tabs at the top (open /
+       in-progress / resolved / closed / all), driven by query param ?status=
+     * Delete TicketsInProgress.tsx / TicketsResolved.tsx / TicketsClosed.tsx
+     * Remove duplicate Review links from SecondaryPanel
+   - Files: App.tsx, pages/Tickets*.tsx, components/sidebar/SecondaryPanel.tsx
+
+[+] 3.3  TICKETS — ADD MORE POWER FEATURES
+   - Add: ticket merging (select N -> "Merge into primary"), snooze/schedule,
+     bulk assign-to-agent, bulk tag, custom fields (see 4.10), ticket
+     followers/watchers, "mark as awaiting customer", spam/delete with undo
+   - Files: pages/TicketsOpen.tsx, pages/TicketDetail.tsx,
+     server/routes/remaining.ts (merge endpoint)
+
+[+] 3.4  REVIEWS — COLLECT FROM PORTAL
+   - Status: reviews (bug / feature / escalated / human-review) are admin-side
+     only. Customers can't submit a bug/feature request from the portal or
+     helpdesk today (Feedback board is the closest, but it's a separate model).
+   - Do: Let portal/helpdesk feedback automatically create a `reviews` row of
+     type bug/feature based on category; show status transitions back to the
+     submitting customer.
+   - Files: pages/helpdesk/FeedbackPage.tsx, server/routes/remaining.ts,
+     shared/schema.ts
+
+[+] 3.5  KNOWLEDGE BASE — ADD PUBLISHING & SEO
+   - Current: KB has folders/tags/versions/search/OCR/scrape — strong.
+   - Add: public-facing help-center article pages (SEO meta, sitemap.xml,
+     article URL slugs), "was this helpful?" vote counter per article,
+     "related articles", article-by-section navigation on /h/:slug.
+   - Files: pages/helpdesk/FaqsPage.tsx (extend into KB renderer),
+     server/routes/remaining.ts (/api/public/helpdesk/:slug/articles)
+
+[+] 3.6  CSAT — EXPAND
+   - Status: only post-resolution 5-star email CSAT.
+   - Add: CSAT dashboard widget in Analytics (already have /api/analytics/csat
+     endpoint — surface it), CSAT text comment field, theme the survey page,
+     add per-agent CSAT leaderboard, add " Minimum responses to display"
+     threshold.
+   - Files: pages/CsatSurvey.tsx, pages/Analytics.tsx, pages/AgentAnalytics.tsx
+
+[+] 3.7  ASSIGNMENT DASHBOARD — LIVE & USEFUL
+   - Status: AssignmentDashboard.tsx works (live agent statuses).
+   - Add: per-agent queue length, current load %, SLA-at-risk indicators,
+     "rebalance" action (auto-assign overflow), filter by team/group.
+   - Files: pages/AssignmentDashboard.tsx
+
+[+] 3.8  ASSIGNMENT RULES — BETTER BUILDER
+   - Status: 40KB form-based editor at AssignmentRules.tsx.
+   - Add: visual "Trigger when ... then do ..." blocks (like Zap marker),
+     rule testing ("Dry-run on last 100 tickets"), rule order drag-handle,
+     enable/disable toggle per rule, rule execution logs.
+   - Files: pages/AssignmentRules.tsx
+
+[+] 3.9  SLA — DASHBOARD & ENFORCEMENT
+   - Status: CRUD modal works; tickets have slaDeadline/slaBreached columns.
+   - Add: Real-time "SLA at risk" + "Breached" views on tickets (sort/filter by
+     deadline countdown), SLA dashboard (compliance %, breach rate, by
+     priority, by agent, by tag), wire SLA breach -> auto escalation policy
+     trigger.
+   - Files: pages/SlaSettings.tsx (extend), pages/TicketsOpen.tsx,
+     pages/Analytics.tsx, server/sla-checker.ts
+
+[+] 3.10 FORWARDING / TEMPLATES — UNIFIED
+   - Status: templates endpoint exists; forwarding rules orphaned in
+     Forwarding.tsx.
+   - Do: Fold both into Space Settings tabs (see 2.3). Add template variable
+     preview UI (insert {{ticket.id}} etc with chips).
+   - Files: pages/SpaceSettings.tsx, pages/Forwarding.tsx (DELETE)
+
+
+================================================================================
+4. BUILD FROM SCRATCH (PARITY)          (P0-P1)
+================================================================================
+[N] 4.1  LIVE CHAT WIDGET + MESSESENGER  (P0, gleap flagship)
+   - Build: @latte/widget JS SDK (embeddable `<script>`,iframe popup). Per-
+     workspace brand color, launcher position, launcher text, proactive
+     message, handoff to AI agent first then human.
+   - Backend:
+     * Tables: chat_sessions, chat_messages, chat_typing, chat_presence
+     * Realtime: WebSocket or SSE on /api/chat/ws
+     * Reuse agents/knowledge_items for AI auto-responses, then route-to-human
+       when agent confidence low or user asks for human
+   - Console: a new "Chat" mailbox view in SpaceMailbox (extend SPACE_TYPES
+     "chat" — currently disabled at CreateSpace.tsx:15). One shared queue
+     with email.
+   - Unify: a real UnifiedInbox (today's UnifiedInbox.tsx is marketing-only)
+     spanning email + chat + (later) social.
+   - Files: new package widget/, shared/schema.ts, server/routes (new
+     chat.ts), pages/SpaceMailbox.tsx (extend), pages/UnifiedInbox.tsx (real)
+
+[N] 4.2  IN-APP BUG REPORT WIDGET       (P0, gleap flagship)
+   - Build: In the widget SDK — "Report a bug" mode that takes a screenshot
+     (html2canvas) or screen recording, captures device metadata (UA, OS,
+     viewport, console logs, recent route), and creates a `ticket` with
+     category=bug and the captured payload.
+   - Backend: extend tickets with attachments[] / metadata; tie to
+     blob storage (already used @vercel/blob).
+   - Files: widget/, server/routes/remaining.ts (/api/widget/report),
+     shared/schema.ts (ticket_attachments)
+
+[N] 4.3  CUSTOMER PORTAL — FEATURE COMPLETE  (P0)
+   - Beyond list/detail/reply (current):
+     * Create a new ticket from portal (with file attachments)
+     * Browse knowledge base articles + was-this-helpful voting
+     * View the public roadmap and upvote items (fix 1.4)
+     * View the changelog feed
+     * Submit feature/bug feedback into the roadmap/review pipeline
+     * OAuth-style SSO (Google) without magic link, email magic-link,
+       branded login page with workspace logo/colors
+   - Files: pages/portal/PortalPage.tsx (extend), pages/helpdesk/*,
+     shared/schema.ts (portal_settings), server/routes/remaining.ts
+
+[N] 4.4  AUTOMATIONS / TRIGGERS BUILDER  (P1, Zendesk parity)
+   - Build: Visual trigger builder — "When [event X] and [conditions Y]
+     then [actions Z]". Events: ticket.created, ticket.replied, ticket.
+     assigned, message.received, sla.breach-warning, status.changed.
+     Conditions: tag, priority, channel, customer, keyword, sentiment.
+     Actions: assign to agent/team, set priority, add tag, send template
+     email, call webhook, route to AI agent, snooze, escalate.
+   - Backend: triggers table + dispatcher; reuse inbox_rules /
+     assignment_rules / escalation_policies tables as one unified model.
+   - Frontend: Replace marketing Automation.tsx route with a real
+     /home/automations page + a /home/automations/new editor.
+   - Files: shared/schema.ts, server/ (new triggers-engine.ts),
+     pages/Automation.tsx (DELETE marketing), new pages/Automations.tsx,
+     client/src/App.tsx, components/sidebar/SecondaryPanel.tsx
+
+[N] 4.5  OMNICHANNEL — SOCIAL / MESSAGING  (P1)
+   - Build channels: WhatsApp Cloud API, SMS (Twilio), Twitter/X DMs,
+     Instagram DMs, Facebook Messenger — each as a "space" of type
+     "channel:<provider>" with a unified thread view alongside email/chat.
+   - Backend: per-provider adapter, providers table, channel_accounts table.
+   - Frontend: same tickets/threads UI, channel icon on each conversation.
+   - Make UnifiedInbox.tsx (currently a marketing page) the REAL unified
+     inbox across all channels.
+   - Files: shared/schema.ts, server/routes (channels/*.ts new),
+     pages/UnifiedInbox.tsx (rebuild)
+
+[N] 4.6  REPORTING SUITE                 (P1)
+   - Build: full reporting section /home/reports with:
+     * Pre-built dashboards: Volume & SLA, Agent performance, CSAT & NPS,
+       Channel mix, Tag/Priority breakdown
+     * Custom report builder (saved reports) — select metrics x dimensions x
+       time range x filter; output table + chart
+     * Scheduled email exports (PDF/CSV) via cron
+     * Per-agent leaderboard, per-team scorecard
+   - Files: pages/Reports.tsx (new), pages/Analytics.tsx (refactor into one
+     of the dashboards), server/services/analytics.service.ts (new)
+
+[N] 4.7  NPS / SURVEY BUILDER            (P1)
+   - Build: A surveys system beyond single post-resolution CSAT:
+     * Multi-channel surveys (email, in-widget, in-portal)
+     * Scheduling rules (after X resolved tickets, after N days a customer,
+       max once per 90 days)
+     * Templates: CSAT (current), NPS (0-10), CES, custom 1-question
+     * Dashboard: results over time, distribution, by agent, by tag
+   - Tables: surveys, survey_responses, survey_schedules
+   - Files: shared/schema.ts, pages/Surveys.tsx (new),
+     pages/CsatSurvey.tsx (generalize), server/routes/remaining.ts
+
+[N] 4.8  INTEGRATIONS MARKETPLACE + OUTGOING WEBHOOKS  (P1)
+   - Build:
+     * /home/integrations page listing available integrations (Slack,
+       Jira, HubSpot, Salesforce, Notion, Zapier webhook); per-integration
+       connect modal with OAuth or API key config
+     * Outgoing webhook subscriptions table (event, target URL, signing
+       secret); delivery + retries table; "Test" + "View delivery logs"
+     * Public REST API + API keys page (plans.apiAccess flag already set)
+       with developer docs (replace marketing Docs.tsx with real /docs API
+       reference)
+   - Tables: integrations, integration_credentials, webhook_subscriptions,
+     webhook_deliveries, api_keys
+   - Files: pages/Integrations.tsx (new), pages/ApiKeys.tsx (new),
+     pages/Docs.tsx (rebuild as API reference), shared/schema.ts,
+     server/routes/remaining.ts, new server/webhooks/ (delivery worker)
+
+[N] 4.9  CUSTOM FIELDS ON TICKETS / CONTACTS  (P1)
+   - Build: admin can define custom fields (text/number/select/date/
+     multiselect/checkbox) per workspace; attach schema to tickets and/or
+     contacts; visible in ticket detail + filters + automations + reports.
+   - Tables: custom_fields, custom_field_values
+   - Files: shared/schema.ts, pages/TicketDetail.tsx, pages/Contacts.tsx,
+     pages/CustomFields.tsx (new), server/routes/remaining.ts
+
+[N] 4.10 VOICE CHANNEL (-- optional P2)
+   - Twilio Voice integration: calls become tickets with audio recording +
+     AI transcript; click-to-call from ticket detail.
+   - Files: shared/schema.ts (call tables), server/routes (voice.ts),
+     pages/UnifiedInbox.tsx
+   - P2: skip in initial scope; ship text channels first.
+
+[N] 4.11 AI AGENT — GUIDED BUILDER       (P2)
+   - Today: AgentEditor is technical. Build a guided "wizard" first-run:
+     pick a goal (resolve / deflect / triage / handoff) -> pick tone ->
+     pick knowledge sources -> pick actions -> test in playground -> publish.
+   - Files: components/onboarding/AgentWizard.tsx (new),
+     pages/AgentSettings.tsx (launch wizard on empty state)
+
+[N] 4.12 INTENT / TOPIC MANAGEMENT       (P2)
+   - Topics are computed but not manageable. Build a UI to view/edit topics
+     (clusters of tickets) with the ability to attach a KB article / agent
+     flow per topic.
+   - Files: pages/Topics.tsx (new), server/routes/remaining.ts
+
+
+================================================================================
+5. UI & NAVIGATION FIXES                (P1)
+================================================================================
+
+[U] 5.1  DEAD-PAGE-REDIRECT SAFETY NET
+   - Every orphan page (HelpdeskConfig, HelpdeskPublic, AiPlayground,
+     Forwarding, Ghosting, Advanced, Contacts, Contact, CreateInbox,
+     Workspaces, CreateWorkspace, Blog) falls to NotFound when users type
+     the URL. Wire all pages we're keeping (1.x-3.x), DELETE the rest (6.x).
+   - Files: client/src/App.tsx
+
+[U] 5.2  LAYOUT WRAPPING INCONSISTENCY
+   - Many pages self-wrap with <AppLayout> (HelpdeskConfig, Forwarding,
+     Ghosting, Advanced, Contacts, CreateInbox, AiPlayground...) while the
+     route wraps them again -> would cause nested sidebars.
+   - Do: Standardize. Pages render content only; <AppLayout> comes from the
+     route. Strip self-wrapping from all content pages (and dead-import
+     lines for AppLayout in AgentChat.tsx:4, AgentAnalytics.tsx:3,
+     TicketsOpen.tsx:7, ReviewsOpen.tsx:6, CreateAgent.tsx:3,
+     AiPlayground.tsx:3, Forwarding.tsx:3, Ghosting.tsx:2, Advanced.tsx:3,
+     Contacts.tsx:3).
+   - Files: see above list
+
+[U] 5.3  DARK-MODE TOKEN VIOLATIONS
+   - Replace hardcoded colors with design tokens (DESIGN_SYSTEM.md mandate):
+     * #1e1e1e / #86868b in marketing pages (Agent.tsx:82-83, TicketTracking,
+       UnifiedInbox, etc.)
+     * bg-indigo-50 text-indigo-700 in Domains.tsx:104, CreateDomain.tsx:325
+     * bg-emerald-50 border-emerald-200 in HelpdeskConfig.tsx:275
+     * HelpdeskPublic.tsx entirely light-only (bg-white, text-gray-900) —
+       breaks dark mode
+     * bg-amber-muted in places where token may not exist
+   - Files: per above
+
+[U] 5.4  RESPONSIVE / MOBILE NAV
+   - AppLayout.tsx:11 hardcodes SIDEBAR_W=252 with min-width and a
+     mobile-body-row CSS rule. No visible mobile drawer/slide-over.
+     SlaSettings modal and HelpdeskConfig tabs horizontally overflow on
+     small widths (overflow-x-auto scrollbar-none is hidden but cramped).
+   - Do: Add a true slide-over drawer for the side rail on mobile, test
+     settings pages at <=375px, replace overflow-x-auto with proper
+     responsive tab wrapping where possible.
+   - Files: components/AppLayout.tsx, components/Sidebar.tsx,
+     pages/SlaSettings.tsx, pages/HelpdeskConfig.tsx
+
+[U] 5.5  SIDEBAR — MISSING SECTIONS
+   - Add sidebar entries for:
+     * Helpdesk                          (after 1.1)
+     * Analytics + Agent Analytics       (after 2.6)
+     * AI Playground                     (after 2.1)
+     * Contacts                          (after 1.7)
+     * Macros / Canned Responses         (after 1.3)
+     * Automations                       (after 4.4)
+     * Integrations                      (after 4.8)
+     * Custom Fields                     (after 4.9)
+     * Surveys                           (after 4.7)
+     * Reports                           (after 4.6)
+     * Roadmap + Changelog editors       (after 1.4, 1.5)
+   - Files: components/sidebar/PrimaryRail.tsx,
+     components/sidebar/SecondaryPanel.tsx
+
+[U] 5.6  DUPLICATE SECONDARY NAV LINKS
+   - SecondaryPanel.tsx renders the same "Review: Human Review / Escalated"
+     links under BOTH the Inbox panel (:88-91) AND the Tickets panel (:106-
+     108). Pick one (Tickets) and remove from Inbox.
+   - Files: components/sidebar/SecondaryPanel.tsx
+
+[U] 5.7  REVIEW DETAIL LAYOUT INCONSISTENCY
+   - ReviewDetail.tsx:51 manually wraps `ml-0 mt-3 flex flex-1` breaking the
+     ContentPanel consistency used elsewhere.
+   - Do: Use the shared ContentPanel wrapper.
+   - Files: pages/ReviewDetail.tsx
+
+[U] 5.8  EMPTY STATES — UNIFY
+   - Agent + Knowledge + Tickets have inconsistent empty states. Provide a
+     reusable <EmptyState icon title description cta> component and use it.
+   - Files: components/ui/EmptyState.tsx (new), pages: AgentSettings,
+     TicketsOpen, ReviewsOpen, Tasks, Roadmap, Changelog, Contacts
+
+
+================================================================================
+6. CLEANUP & DE-DUPLICATION              (P2)
+================================================================================
+
+[C] 6.1  DUPLICATE PAGES — CHOOSE ONE LOCATION
+   - /home/team            <-> /workspace/team           (same TeamPage)
+   - /home/settings        <-> /workspace/settings        (same SettingsContent)
+   - /home/assignment/rules<-> /workspace/assignment-rules
+   - /home/configure/sla   <-> /workspace/sla
+   - Do: Pick ONE home for each (recommend a single "Configure" rail at
+     /home/configure/* for everything admin-y, and let /workspace/* be only
+     multi-workspace management — but not duplicate config UIs). Add
+     <Redirect> from the loser route to the winner.
+   - Files: App.tsx, pages/WorkspacePage.tsx, pages/{TeamPage,Settings,
+     AssignmentRules,SlaSettings}.tsx
+
+[C] 6.2  DELETE REDUNDANT CREATION PAGES
+   - Delete: pages/CreateAgent.tsx + route /create/agent (consolidate to
+     AgentSettings -> AgentEditor).
+   - Delete: pages/CreateInbox.tsx (replaced by CreateSpace.tsx).
+   - Delete: pages/Contact.tsx (replaced by MarketingContact for marketing).
+   - Decide: pages/Forwarding.tsx vs Advanced.tsx (ForwardingTab). Keep
+     only Advanced.tabbed (after folding into SpaceSettings — see 2.3) OR
+     keep only SpaceSettings tab. Remove the orphan one.
+   - Decide: pages/Ghosting.tsx vs Advanced.tsx (GhostingTab). See 2.4 —
+     either both go (no feature) or both fold into SpaceSettings "Send as
+     proxy" tab with a real backend.
+
+[C] 6.3  DELETE / QUARANTINE ORPHAN MARKETING-LIKE PAGES
+   - pages/Workspaces.tsx, pages/CreateWorkspace.tsx, pages/Blog.tsx — not
+     routed. If unused, delete; if planned, file a separate task and don't
+     leave dead files.
+
+[C] 6.4  REVIEWS PAGE-FILE COUNT
+   - One component (ReviewsContent) shared across 5 file wrappers: delete
+     ReviewsOpen.tsx's unused default export from App.tsx:61 OR add an
+     /home/review/open route (decide in 2.7). After, you may collapse
+     Reviews{Bug,Feature,Escalated,HumanReview}.tsx into one routed page
+     with a `kind` query param (mirrors konsolidation proposed for tickets
+     in 3.2).
+
+[C] 6.5  TICKETS PAGE-FILE COUNT
+   - Same pattern: collapse Tickets{Open,InProgress,Resolved,Closed}.tsx into
+     one routed page with `?status=` (see 3.2).
+
+[C] 6.6  SERVER VERBOSE LOGS
+   - agent-reply.ts (lines 321,410,466,530,533,556,763) and imap*.ts (lines
+     172,407,427,478,509,582) have noisy console.log/console.warn telemetry.
+   - Do: Gate behind a `LOG_LEVEL=debug` env var.
+   - Files: server/agent-reply.ts, server/imap*.ts, server/config.ts
+
+[C] 6.7  NO TODO/FIXME — KEEP IT THAT WAY
+   - Audit found ZERO TODO/FIXME comments in client/server, which is good.
+     Maintain as work happens — file issues, don't litter code.
+
+[C] 6.8  MARKETING MOCKS — DOCUMENT, DON'T DELETE
+   - components/mock{messenger,domainsettings,inbox,sidebar}.tsx are
+     intentional Landing.tsx UI mockups — keep, but rename to `mocks/` to
+     signal intent (so future devs don't mistake them for stubs again).
+
+
+================================================================================
+7. BACKEND / SCHEMA WORK                 (TIED TO ABOVE TASKS)
+================================================================================
+
+NEW TABLES REQUIRED (one row per feature; create migrations as we go):
+   - roadmap_items, roadmap_votes                (1.4)
+   - changelog_entries                           (1.5)
+   - portal_settings (or workspaces portal_* cols) (1.6, 4.3)
+   - chat_sessions, chat_messages, chat_presence, chat_typing (4.1)
+   - ticket_attachments                          (4.2, 4.3)
+   - triggers / automations                      (4.4)
+   - providers, channel_accounts, channel_threads (4.5)
+   - saved_reports, report_schedules             (4.6)
+   - surveys, survey_responses, survey_schedules  (4.7)
+   - integrations, integration_credentials,
+     webhook_subscriptions, webhook_deliveries,
+     api_keys                                    (4.8)
+   - custom_fields, custom_field_values          (4.9)
+   - call_sessions, call_recordings (P2)        (4.10)
+   - topics                                      (4.12)
+   - ghost_profiles  (only if 2.4 chosen = real) (2.4)
+
+NEW ENDPOINTS REQUIRED:
+   - /api/workspaces/:id/canned-responses (CRUD)                       (1.3)
+   - /api/spaces/:id/canned-responses (CRUD, space-scoped)             (1.3)
+   - /api/workspaces/:id/roadmap (CRUD) + /:itemId/vote                (1.4)
+   - /api/workspaces/:id/changelog (CRUD) + public GET                 (1.5)
+   - /api/portal/:wid/settings (PATCH) + /tickets (POST create)       (1.6,4.3)
+   - /api/contacts (GET), /api/contacts/:id (GET), /api/contacts/:id/
+     tickets (GET), /api/contacts (POST)                              (1.7)
+   - /api/tickets/:id/merge (POST)                                     (3.3)
+   - /api/tickets/:id/summarize (POST) — wire existing KB summarize    (2.8)
+   - /api/ai/draft-contextual (POST)                                 (2.9)
+   - /api/email-messages/:id/snooze (PATCH)                          (2.10)
+   - /api/tasks (extend with due/assignee/link)                      (2.11)
+   - /api/workspaces/:id/analytics (extended, server-side)           (2.5)
+   - /api/workspaces/:id/surveys (CRUD) + /api/surveys/:id/responses (4.7)
+   - /api/workspaces/:id/triggers (CRUD) + run-engine                (4.4)
+   - /api/workspaces/:id/integrations (CRUD)                         (4.8)
+   - /api/workspaces/:id/webhooks (CRUD) + delivery worker           (4.8)
+   - /api/workspaces/:id/custom-fields (CRUD)                       (4.9)
+   - /api/workspaces/:id/reports (saved/scheduled)                   (4.6)
+   - /api/widget/* (chat, bug-report)                                (4.1, 4.2)
+   - /api/channels/:provider/* (per-provider adapters)               (4.5)
+
+SCHEMA FIXES:
+   - tickets.publicId is integer — should be a separate human-readable
+     format (LATTE-1234) or text. (shared/schema.ts)
+   - Several text status fields should be TEXT+enum (created_at statuses):
+     tickets.status, email_messages.status, agent_messages.role.
+   - Client types reference `inboxId` on Ticket/Review (e.g.
+     TicketsOpen.tsx:18) but schema uses `spaceId`. Rename client `inboxId`
+     -> `spaceId` everywhere (or add alias). This is a real bug risk.
+
+SECURITY / COMPLIANCE:
+   - Audit logs already exist; extend to capture triggers/automations
+     executions and webhook deliveries.
+   - Rate-limit /api/widget/* (chat + bug) — no auth.
+   - Sign outgoing webhooks with HMAC + retry exponential backoff.
+
+
+================================================================================
+RECOMMENDED EXECUTION ORDER
+================================================================================
+
+PHASE A — Stop the bleeding (1-2 weeks)
+   1.1  Wire the helpdesk
+   1.2  Implement Helpdesk feedback + submissions
+   1.3  Macros / canned responses endpoints + picker
+   1.7  Wire Contacts pages
+   2.1  Route AI Playground
+   2.6  Sidebar entries for Analytics
+   5.2  Strip duplicate AppLayout wraps
+   6.1  / 6.5  De-duplicate team/settings/tickets routes
+   6.6  Quiet verbose server logs
+
+PHASE B — Make key pages powerful (2-3 weeks)
+   3.1  Rebuild Agents page
+   3.2  Collapse tickets into one tabbed page
+   2.5  Real analytics page
+   2.3  Tabbed SpaceSettings
+   2.8  Ticket "Summarize" button
+   2.9  AI suggested replies in inbox
+   1.4  Real Roadmap
+   1.5  Real Changelog
+   1.6  Portal entry + ticket create flow
+
+PHASE C — Parity build-out (4-8 weeks)
+   4.1  Live chat widget + messenger (replace "Chat — coming soon")
+   4.2  Bug report widget
+   4.3  Portal feature-complete
+   4.4  Automations builder
+   4.6  Reporting suite
+   4.7  NPS / survey builder
+   4.8  Integrations marketplace + outgoing webhooks
+   4.9  Custom fields
+   4.5  Extra channels (WhatsApp, SMS, social) — start after 4.1
+
+PHASE D — Polish (2 weeks)
+   5.3  Dark-mode tokens
+   5.4  Mobile nav drawer
+   5.1  Dead-URL safety net
+   5.8  Unified empty states
+   6.2-6.8  Final cleanup sweep
+
+PHASE E — Optional / future (defer)
+   4.10 Voice channel
+   4.11 Guided agent wizard
+   4.12 Intent / topic management
+
+
+================================================================================
+METRICS FOR SUCCESS
+================================================================================
+
+   - Zero orphan pages (every file in pages/ is routed or deleted)
+   - Zero duplicate routes for the same content
+   - Zero hardcoded color values outside the design system
+   - Zero fabrications in pages (no Math.floor(currentUser.tickets * 0.4),
+     no setTimeout fake saves, no return-null stub components)
+   - Marketing pages cannot describe a feature that does not exist
+     (UnifiedInbox must become real, "Chat — coming soon" must ship or be
+     reworded)
+   - Customer can: submit a roadmap idea + vote, submit a bug via widget,
+     chat live with an agent, create a portal ticket, browse knowledge base,
+     fill a CSAT + NPS survey, and track everything
+   - Admin can: build a trigger, build an SLA, view a real dashboard, manage
+     macros, manage custom fields, install Slack, set up outgoing webhooks
+
+================================================================================
+END OF MEGA TASK LIST
+================================================================================

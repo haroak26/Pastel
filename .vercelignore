@@ -1,0 +1,17 @@
+node_modules
+.cache
+.config
+.local
+.opencode
+.git
+attached_assets
+screenshots
+skills
+uploads
+ticketinfo.png
+ticketinfo2.png
+newlattelogo
+.artificial
+.agents
+LATTE_DEV_STRATEGY.md
+LATTE_TASK_LIST.txt

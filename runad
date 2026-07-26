@@ -1,0 +1,93 @@
+#!/bin/bash
+# runad - continuously sends adtention impressions at random intervals.
+# Type STOP and press Enter to exit.
+
+KV_SOURCE="/home/runner/.local/state/opencode/kv.json"
+KV_BACKUP=".opencode/kv-backup.json"
+API="${ADTENTION_API:-https://api.adtention.ai}"
+API="${API%/}"
+
+get_kv_val() {
+  local key="$1"
+  local val
+  val=$(jq -r "$key // empty" "$KV_SOURCE" 2>/dev/null)
+  if [ -z "$val" ] || [ "$val" = "null" ]; then
+    val=$(jq -r "$key // empty" "$KV_BACKUP" 2>/dev/null)
+  fi
+  [ "$val" = "null" ] && val=""
+  echo "$val"
+}
+
+classify() {
+  local dir="${1:-$PWD}"
+  if [ -f "$dir/foundry.toml" ] || ls "$dir"/*.sol 2>/dev/null | head -1 | grep -q . || ls "$dir"/hardhat.config.* 2>/dev/null | head -1 | grep -q .; then
+    echo "web3"
+  elif [ -f "$dir/Dockerfile" ] || ls "$dir"/*.tf 2>/dev/null | head -1 | grep -q .; then
+    echo "devops"
+  elif [ -f "$dir/package.json" ]; then
+    echo "web"
+  elif [ -f "$dir/requirements.txt" ] || ls "$dir"/*.py 2>/dev/null | head -1 | grep -q .; then
+    echo "data"
+  elif [ -f "$dir/Cargo.toml" ] || [ -f "$dir/go.mod" ]; then
+    echo "systems"
+  else
+    echo "general"
+  fi
+}
+
+PUBLISHER_ID=$(get_kv_val '.["adtention:identity"].publisher_id')
+if [ -z "$PUBLISHER_ID" ]; then
+  echo "No publisher_id found. Run with ADTENTION_REF=<ref> to register first."
+  exit 1
+fi
+
+echo "runad started. Type STOP and press Enter to stop."
+
+while true; do
+  CATEGORY=$(classify "${DIR:-$PWD}")
+  NONCE="$(date +%s)-$(openssl rand -hex 4 2>/dev/null || echo "$RANDOM-$RANDOM")"
+  RESPONSE=$(curl -s -m 5 -X POST "$API/v1/serve" \
+    -H "content-type: application/json" \
+    -d "{\"publisher_id\":\"$PUBLISHER_ID\",\"category\":\"$CATEGORY\",\"nonce\":\"$NONCE\",\"client\":\"opencode\"}")
+
+  ERROR=$(echo "$RESPONSE" | jq -r '.error // empty' 2>/dev/null)
+  BALANCE=$(echo "$RESPONSE" | jq -r '.balance_usd // empty' 2>/dev/null)
+  TEXT=$(echo "$RESPONSE" | jq -r '.text // empty' 2>/dev/null)
+
+  if [ -n "$ERROR" ] && [ "$ERROR" != "null" ]; then
+    echo "error: $ERROR"
+    continue
+  fi
+
+  if [ -n "$BALANCE" ] && [ "$BALANCE" != "null" ]; then
+    CLICK_URL=$(echo "$RESPONSE" | jq -r '.click_url // empty' 2>/dev/null)
+    IMP_ID=$(echo "$RESPONSE" | jq -r '.impression_id // empty' 2>/dev/null)
+    SPONSOR_URL=""
+    if [ -n "$CLICK_URL" ] && [ "$CLICK_URL" != "null" ]; then
+      SPONSOR_URL="$CLICK_URL"
+      case "$SPONSOR_URL" in /v1/click/*) SPONSOR_URL="${API}${SPONSOR_URL}" ;; esac
+    elif [ -n "$IMP_ID" ] && [ "$IMP_ID" != "null" ]; then
+      SPONSOR_URL="${API}/v1/click/${IMP_ID}"
+    fi
+    SANITIZED=$(echo "$TEXT" | tr -d '[\000-\037\177]' | sed 's/[[:space:]]*→[[:space:]]*[^[:space:]]*$//' | xargs)
+    for f in "$KV_SOURCE" "$KV_BACKUP"; do
+      if [ -f "$f" ]; then
+        jq --argjson bal "$BALANCE" --arg txt "$SANITIZED" --arg url "$SPONSOR_URL" \
+          '.["adtention:balance"] = $bal
+           | .["adtention:sponsor"].text = $txt
+           | if $url != "" then .["adtention:sponsor"].url = $url else . end' "$f" \
+          > /tmp/runad_save.json && mv /tmp/runad_save.json "$f" 2>/dev/null || true
+      fi
+    done
+    echo "impression sent | balance: \$$BALANCE | sponsor: $SANITIZED"
+    echo "$BALANCE" > /tmp/runad_last_balance
+  else
+    echo "no inventory"
+  fi
+
+  INTERVAL=$(( (RANDOM % 46) + 15 ))
+  if read -t "$INTERVAL" input && [ "$input" = "STOP" ]; then
+    echo "Stopped."
+    exit 0
+  fi
+done

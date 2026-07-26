@@ -1,0 +1,4 @@
+- [Security fixes applied](security-fixes.md) — full security audit completed; all CRITICAL/HIGH/MEDIUM findings resolved.
+- [Replit NODE_ENV npm issue](replit-node-env-npm.md) — NODE_ENV=production globally set in Replit causes npm to skip devDependencies; fix is `include=dev` in .npmrc.
+- [Google OAuth setup](google-oauth-setup.md) — Google OAuth added alongside GitHub; both use same `googleId` column with provider prefix; GOOGLE_CLIENT_ID/SECRET needed in secrets.
+- [Credit-based AI billing](credit-billing.md) — agentCredit/assistantCredit replace reply counts; drizzle-kit push fails non-interactively on column renames—use raw SQL instead.

@@ -1,0 +1,19 @@
+{
+  "buildCommand": "npm run vercel-build",
+  "installCommand": "npm install --legacy-peer-deps --no-audit --no-fund",
+  "outputDirectory": "dist/public",
+  "rewrites": [
+    {
+      "source": "/api/(.*)",
+      "destination": "https://latte--haroak.replit.app/api/$1"
+    },
+    {
+      "source": "/uploads/(.*)",
+      "destination": "https://latte--haroak.replit.app/uploads/$1"
+    },
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

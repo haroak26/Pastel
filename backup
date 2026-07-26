@@ -1,0 +1,2 @@
+#!/bin/bash
+bash scripts/adtention-backup.sh save

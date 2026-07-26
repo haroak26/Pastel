@@ -1,0 +1,14 @@
+{
+  "id": "2026-07-01T17-16-52-551Z",
+  "startedAt": "2026-07-01T17:15:52.551Z",
+  "endedAt": "2026-07-01T17:16:52.551Z",
+  "projectRoot": "/home/runner/workspace",
+  "messageCount": 1,
+  "messages": [
+    {
+      "id": "agent_1782926212550_1",
+      "role": "user",
+      "content": "Hi"
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+Redesign the Support Router. This is the new agent that will handle incoming emails in a support inbox. This new agent is called Router Agent.
+
+Router agent will receive the following data: 
+Email
+Knowledge base file names 
+It will receive the action and route names that user has created in the knowledge base only the titles. 
+Any other emails that are from the same emails so it has context. 
+The last 24hrs ticket titles. It will get all the ticket titles that showed in the last 24hrs. (MAX 100 ticket titles). 
+List of the agents descriptions and agent id that are available in the agent team. 
+
+Router agent will then do the following:
+Find the best agent so if it is a billing issue in the email it will find a the best agent for billing.
+It will request the knowledge base files and actions + routes that it thinks will be best. 
+Tag the issue with two tags 1. Whether it is a mobile or web app issue. 2. What component so whether it is a feature or authentication or billing etc add more and it can create tags if it is a feature unique to the app and will add it as a tag in database. 
+Finally it will create a task in the new task feature for example it can create a task and the Master Tag is Bug if it is a bug or glitch. A master tag is the type of task so bug or feature request or Imrpivemnets for example add a few more. 
+It will also create a ticket name and description (detailed) it will also create the task name and description. 
+Create the status and priority in the ticket and task
+
+Router agent will then send the best agent it picked the email, knowledge base files and actions and routes  it selected and the content not just the file names. Like a normal router so that the Responder Agent can reply to the user.
+
+
+
+Redesign the auto reply ai agent. It is now called Responder Agent. You need to make it sound more professional and friendly and more like a supporting agent not just an ai that answers questions. It should not reply to emails that ask what the capita of France is because it is not a general purpose agent and it will ask the user if there is anything else it can help with. Make sure Responder Agent can read files using the mistral attachments endpoint. And make sure responder agent can use tool like update the status of the ticket update the priority automatically and also use markdown. 
+
+Redesign the organisation ai in knowledge base. This will be rebuilt as a Knowledge Agent. A Knowldge  agent will take any data, whether it is a web scrape, ocr extraction or just text input or actions and routes. and it will file it with a tag for example Product_Overview or Billing_Support. It can create folders and file tags. Each time a new piece of data will be organised it should receive all the folder and file tags so it can make sure there consistent and so it can reuse tags instead of creating millions of new ones. 
+
+Finally rebrand the data excretion agent to be Data Agent. This is the cheerio and the ocr agent. So whether the user is upload a file it will be sent to OCR for the data to be extracted. And then send to knwodlge agent. Or whether it is a web scrape it is sent to the cheerio for scraping and then sent to knwodlge agent. In the web scraping to make this more powerful. When the user enter a a domain it should use a open source package to find all the public pages and then get the url routes. Then send all these URLs to the cheerio scraper to scrape. Then send the result to the knowledge agent. 
+
+These four new agents will be more powerful and integrated into the app. They need to be better than the current two which are patched and outdated.
+
+The responder agent is powered by mistral-small-latest. The organisation agent and the router agent is powered by  ministral-14b-latest.   The data extraction is powered by cheerio and mistral-ocr-latest for document extraction. 
