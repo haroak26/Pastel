@@ -35,6 +35,7 @@ import LoadingVerificationPage from "@/pages/LoadingVerification";
 import Onboarding from "@/pages/Onboarding";
 import CompleteGithubSignup from "@/pages/CompleteGithubSignup";
 import HomePage from "@/pages/HomePage";
+import CanvasPage from "@/pages/CanvasPage";
 import ProjectsPage from "@/pages/ProjectsPage";
 import ComponentsPage from "@/pages/ComponentsPage";
 import AssetsPage from "@/pages/AssetsPage";
@@ -104,8 +105,9 @@ function Router() {
       <Route path="/status" component={MarketingStatus} />
 
       {/* Dashboard */}
-      <Route path="/home">{() => <Redirect to="/home/design" />}</Route>
-      <Route path="/home/design">{() => <ProtectedRoute component={() => <DesignAppLayout><HomePage /></DesignAppLayout>} />}</Route>
+      <Route path="/home">{() => <ProtectedRoute component={() => <DesignAppLayout><HomePage /></DesignAppLayout>} />}</Route>
+      <Route path="/home/design">{() => <ProtectedRoute component={CanvasPage} />}</Route>
+      <Route path="/canvas/:id">{() => <ProtectedRoute component={CanvasPage} />}</Route>
       <Route path="/home/projects">{() => <ProtectedRoute component={() => <DesignAppLayout><ProjectsPage /></DesignAppLayout>} />}</Route>
       <Route path="/home/components">{() => <ProtectedRoute component={() => <DesignAppLayout><ComponentsPage /></DesignAppLayout>} />}</Route>
       <Route path="/home/assets">{() => <ProtectedRoute component={() => <DesignAppLayout><AssetsPage /></DesignAppLayout>} />}</Route>

@@ -5,8 +5,10 @@ import { SidebarContent } from '@/components/Sidebar';
 import { useSpace } from '@/contexts/space-context';
 import { useWorkspace } from '@/contexts/workspace-context';
 import { useUser } from '@/hooks/use-user';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/button';
 import { OtpInput } from '@/components/otp-input';
+import { Menu, X } from 'lucide-react';
 
 function initials(name: string | null | undefined, email: string | null | undefined): string {
   const str = name || email || '?';
@@ -34,6 +36,8 @@ export function AppLayout({
   const { switchingSpace, switchingPhase, switchingSpaceName, requireTotp, totpError, verifyTotpForSpace, cancelTotp, activeSpace } = useSpace();
   const { switchingWorkspace, switchingWsPhase, switchingWsName } = useWorkspace();
   const [totpCode, setTotpCode] = useState('');
+  const isMobile = useIsMobile();
+  const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (activeSpace) {
@@ -47,18 +51,30 @@ export function AppLayout({
       <div className="lds-app-shell h-dvh bg-background flex flex-col overflow-hidden overscroll-none">
         {/* ── Body: sidebar + main ── */}
         <div className="flex-1 min-h-0 flex mobile-body-row">
-          {/* Sidebar — always visible */}
-          <aside className="h-full shrink-0" style={{ width: SIDEBAR_W, minWidth: SIDEBAR_W }}>
-            <SidebarContent location={locationPath} />
-          </aside>
+          {/* Sidebar — desktop only */}
+          {!isMobile && (
+            <aside className="h-full shrink-0" style={{ width: SIDEBAR_W, minWidth: SIDEBAR_W }}>
+              <SidebarContent location={locationPath} />
+            </aside>
+          )}
 
           {/* Main content */}
           <div className="flex-1 min-h-0 flex flex-col">
             {showHeader && (
               <div className="shrink-0 flex items-center justify-between h-[48px] px-5">
-                <div />
+                <div className="flex items-center gap-2">
+                  {isMobile && (
+                    <button
+                      onClick={() => setMobileSidebarOpen(true)}
+                      className="md:hidden flex items-center justify-center w-8 h-8 rounded-lg text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors border-none cursor-pointer"
+                      aria-label="Open menu"
+                    >
+                      <Menu size={18} />
+                    </button>
+                  )}
+                </div>
                 <div className="flex items-center gap-3">
-                  <span className="text-[14px] font-medium text-fg-muted">250 Credits Remaining</span>
+                  <Link href="/account/credits" className="text-[14px] font-medium text-fg-muted hover:text-foreground transition-colors no-underline">250 Credits Remaining</Link>
                   <div className="w-px h-4 bg-border/60" />
                   <Link href="/account/profile">
                     {user?.avatarUrl ? (
@@ -104,6 +120,28 @@ export function AppLayout({
           </div>
         </div>
       )}
+      {/* Mobile sidebar overlay */}
+      {isMobile && mobileSidebarOpen && (
+        <div className="fixed inset-0 z-50 md:hidden">
+          <div
+            className="absolute inset-0 bg-black/20 backdrop-blur-sm animate-fade-in"
+            onClick={() => setMobileSidebarOpen(false)}
+          />
+          <div className="relative h-full w-[216px] animate-slide-in-left bg-background">
+            <div className="absolute top-3 right-3 z-10">
+              <button
+                onClick={() => setMobileSidebarOpen(false)}
+                className="flex items-center justify-center w-7 h-7 rounded-lg text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors border-none cursor-pointer"
+                aria-label="Close menu"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <SidebarContent location={locationPath} onNavigate={() => setMobileSidebarOpen(false)} />
+          </div>
+        </div>
+      )}
+
       {switchingSpace && !switchingWorkspace && (
         <div className="fixed inset-0 z-[9999] bg-background flex flex-col items-center justify-center gap-4">
           {switchingPhase === 'totp' ? (

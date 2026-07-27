@@ -31,7 +31,7 @@
   --fg-muted: 225 5% 48%;
   --fg-secondary: 240 4% 54%;
   --fg-subtle: 225 6% 57%;
-  --fg-faint: 220 9% 78%;
+  --fg-faint: 220 8% 58%;
 
   --border: 220 14% 88%;
   --border-subtle: 45 8% 94%;
@@ -341,7 +341,7 @@
     @apply text-[17px] font-semibold text-foreground tracking-[-0.01em] leading-tight;
   }
 
-  /* Mobile app shell: horizontal navigation only; prevent nested vertical page drift.
+  /* Mobile app shell: sidebar becomes a slide-in drawer, body scrolls vertically.
      Scope the lock to the app shell only so marketing/landing pages keep their
      native document scroll. AppLayout's own root (h-dvh overflow-hidden) already
      constrains app pages, so we only lock body when an app shell is present. */
@@ -351,17 +351,17 @@
       @apply hidden;
     }
     .mobile-body-row {
-      overflow-x: auto;
-      overflow-y: hidden;
-      overscroll-behavior-y: none;
-      touch-action: pan-x;
-      -webkit-overflow-scrolling: touch;
+      overflow: hidden;
+      overscroll-behavior: none;
     }
     .lds-app-title {
       @apply text-[14px];
     }
     .lds-app-topbar-row {
       @apply h-12 px-4;
+    }
+    .lds-app-pad {
+      @apply px-3 py-3;
     }
   }
 
@@ -407,6 +407,8 @@
   .no-scrollbar::-webkit-scrollbar { display: none; }
 
   .page-enter { animation: pageEnter 0.05s ease-out both; }
+  .animate-fade-in { animation: fadeIn 0.15s ease-out both; }
+  .animate-slide-in-left { animation: sidebarSlideIn 0.2s ease-out both; }
   .floating-header-shadow { box-shadow: 0 2px 16px 0 rgba(0,0,0,0.05) !important; }
 }
 

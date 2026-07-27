@@ -488,7 +488,7 @@ export function Dropdown<T = string>({
       <div className="max-h-56 overflow-y-auto space-y-0.5">
         {filtered.map((opt, idx) => {
           if (opt.divider) {
-            return <div key={String(opt.value)} className="h-px bg-border/60 mx-2 my-3" />;
+            return <div key={String(opt.value)} className="h-px bg-border/60 mx-2 my-4" />;
           }
           const isSelected = opt.value === value;
           const showHeader = opt.sectionHeader && (idx === 0 || filtered[idx - 1]?.sectionHeader !== opt.sectionHeader);

@@ -8,7 +8,7 @@ import { useLocation } from "wouter";
 import { useWorkspace } from "@/contexts/workspace-context";
 import {
   Check, Clock, Download, Lock, ChevronRight, ChevronDown, ArrowLeft,
-  User, CreditCard, Globe, Hash,
+  User, CreditCard, Globe, Hash, Coins,
   Zap, Trash2, Smartphone, Key,
   Plus, Loader, AlertCircle, X, Menu,
   Users,
@@ -16,7 +16,7 @@ import {
 import { Button } from "@/components/button";
 import { TextInput } from "@/components/text-input";
 import { OtpInput } from "@/components/otp-input";
-import { AppPage, Badge, Dropdown, ListSkeleton, PageHeader, ContentPanel } from "@/components/ds";
+import { Badge, Dropdown, ListSkeleton } from "@/components/ds";
 import { Switch } from "@/components/ui/switch";
 import {
   SettingsSection,
@@ -413,93 +413,7 @@ function DeleteRow({ username }: { username: string }) {
 
 // ── Billing ────────────────────────────────────────────────────────────────
 
-function BillingPanel({
-  planInfo, isCheckingOut, checkoutPlan, isCancelling, onCancel, isOpeningPortal, onOpenPortal,
-}: any) {
-  const currentPlan: Plan = planInfo?.plan ?? "dev";
-  const planBillingPeriod: string = planInfo?.billingPeriod ?? "monthly";
-  const renewsLabel = planInfo?.renewsAt
-    ? new Date(planInfo.renewsAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
-    : null;
 
-  const planKeys: Plan[] = ["starter", "pro", "team", "enterprise"];
-
-  function priceDisplay(key: PlanTier) {
-    const limits = PLAN_LIMITS[key];
-    return (
-      <span className="text-[14px] font-bold text-foreground">
-        ${limits.prices.monthly}<span className="text-[11px] font-normal text-muted-foreground">/mo</span>
-      </span>
-    );
-  }
-
-  function handleCheckout(plan: PlanTier) {
-    checkoutPlan(plan, "monthly");
-  }
-
-  return (
-    <div className="py-4 space-y-8">
-      <SettingsSection title="Current plan" description="Your active subscription.">
-        <SettingsRow
-          label={
-            <span className="inline-flex items-center gap-2">
-              {planInfo?.limits?.label ?? "Starter"}
-              {planInfo?.billingPeriod === "annual" && (
-                <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">
-                  Annual
-                </span>
-              )}
-            </span>
-          }
-        >
-          <div className="flex items-center gap-2">
-            {!planInfo?.cancelAtPeriodEnd && (
-              <Button design="ghost" size="xs" onClick={onCancel} disabled={isCancelling}>
-                {isCancelling ? "Cancelling…" : "Cancel"}
-              </Button>
-            )}
-            <Button design="ghost" size="xs" onClick={onOpenPortal} disabled={isOpeningPortal}>
-              {isOpeningPortal ? "Opening…" : "Manage billing"}
-            </Button>
-          </div>
-        </SettingsRow>
-      </SettingsSection>
-
-      <SettingsSection title="Plans" description="Upgrade or change anytime.">
-        {planKeys.map((key) => {
-          const limits = PLAN_LIMITS[key];
-          const isCurrent = key === currentPlan;
-          const currentPrice = PLAN_LIMITS[currentPlan]?.prices?.monthly ?? 0;
-          return (
-            <SettingsRow
-              key={key}
-              label={
-                <span className="inline-flex items-center gap-2">
-                  {limits.label}
-                  {key === "pro" && !isCurrent && (
-                    <Badge tone="brand">Popular</Badge>
-                  )}
-                  {isCurrent && <Badge tone="neutral">Current</Badge>}
-                </span>
-              }
-            >
-              <div className="flex items-center gap-3">
-                {priceDisplay(key)}
-                  {isCurrent ? (
-                    <Button design="ghost" size="xs" disabled>Current</Button>
-                  ) : (
-                    <Button size="xs" onClick={() => handleCheckout(key)} disabled={isCheckingOut} isLoading={isCheckingOut}>
-                      {limits.prices.monthly > currentPrice ? 'Upgrade' : 'Downgrade'}
-                    </Button>
-                  )}
-              </div>
-            </SettingsRow>
-          );
-        })}
-      </SettingsSection>
-    </div>
-  );
-}
 
 // ── VerificationBanner ─────────────────────────────────────────────────────
 
@@ -872,18 +786,70 @@ function SecurityAuthPage() {
   );
 }
 
-function BillingPage({ planInfo, checkoutMutation, cancelMutation, portalMutation }: any) {
+function BillingPage({ planInfo, cancelMutation, portalMutation }: any) {
+  const currentPlan: Plan = planInfo?.plan ?? "dev";
+  const limits = PLAN_LIMITS[currentPlan] ?? PLAN_LIMITS.starter;
+  const price = limits.prices.monthly;
+  const renewsLabel = planInfo?.renewsAt
+    ? new Date(planInfo.renewsAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
+    : null;
+
+  const TRANSACTIONS = [
+    { id: '1', description: 'Plan subscription', amount: -20, date: 'Jul 25, 2026', status: 'completed' },
+    { id: '2', description: 'Credit top-up', amount: 100, date: 'Jul 20, 2026', status: 'completed' },
+    { id: '3', description: 'AI generations used', amount: -5, date: 'Jul 18, 2026', status: 'completed' },
+    { id: '4', description: 'Credit top-up', amount: 50, date: 'Jul 10, 2026', status: 'completed' },
+    { id: '5', description: 'Plan subscription', amount: -20, date: 'Jun 25, 2026', status: 'completed' },
+  ];
+
   return (
-    <div>
-      <BillingPanel
-        planInfo={planInfo}
-        isCheckingOut={checkoutMutation.isPending}
-        checkoutPlan={(plan: string, billingPeriod: string) => checkoutMutation.mutate({ plan, billingPeriod })}
-        isCancelling={cancelMutation.isPending}
-        onCancel={() => cancelMutation.mutate()}
-        isOpeningPortal={portalMutation.isPending}
-        onOpenPortal={() => portalMutation.mutate()}
-      />
+    <div className="py-4 space-y-6">
+      <SettingsSection
+        title="Current Plan"
+        description="Your active subscription."
+        action={
+          <div className="flex items-center gap-2">
+            {!planInfo?.cancelAtPeriodEnd && (
+              <Button design="ghost" size="xs" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
+                {cancelMutation.isPending ? "Cancelling…" : "Cancel"}
+              </Button>
+            )}
+            <Button design="ghost" size="xs" onClick={() => portalMutation.mutate()} disabled={portalMutation.isPending}>
+              {portalMutation.isPending ? "Opening…" : "Manage billing"}
+            </Button>
+          </div>
+        }
+      >
+        <div className="px-1 pt-2 pb-4">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-[36px] font-bold text-foreground tracking-tight tabular-nums">${price}</span>
+            <span className="text-[15px] font-medium text-fg-muted">/month</span>
+          </div>
+          <div className="flex items-center gap-2 mt-2">
+            <span className="text-[15px] font-medium text-foreground">{limits.label} Plan</span>
+            {planInfo?.billingPeriod === "annual" && (
+              <span className="text-[10px] font-medium text-emerald-600 bg-emerald-50 px-1.5 py-0.5 rounded-full">Annual</span>
+            )}
+          </div>
+          {renewsLabel && (
+            <p className="text-[12px] text-fg-muted mt-0.5">Renews {renewsLabel}</p>
+          )}
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Transaction History" description="Recent billing activity on your account.">
+        {TRANSACTIONS.map((t) => (
+          <div key={t.id} className="flex items-center justify-between py-2.5">
+            <div>
+              <p className="text-[13px] font-medium text-foreground">{t.description}</p>
+              <p className="text-[11px] text-fg-faint mt-0.5">{t.date}</p>
+            </div>
+            <span className={`text-[13px] font-semibold tabular-nums ${t.amount > 0 ? 'text-emerald-600' : 'text-foreground'}`}>
+              {t.amount > 0 ? '+' : ''}{t.amount}
+            </span>
+          </div>
+        ))}
+      </SettingsSection>
     </div>
   );
 }
@@ -1014,9 +980,38 @@ function UsagePage({ planInfo }: any) {
   const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.starter;
   const usage = planInfo?.usage ?? {};
 
+  const pctUsed = (current: number, limit: number | "unlimited") =>
+    limit === "unlimited" ? 0 : Math.min(Math.round((current / limit) * 100), 100);
+
+  const overall = limits.projects === "unlimited" ? 50 : pctUsed(usage.projectsCount ?? 0, limits.projects);
+
   return (
-    <div className="py-4 space-y-2">
-      <SettingsSection title={`${limits.label} Plan Usage`} description="Your current usage across all features.">
+    <div className="py-4 space-y-6">
+      <SettingsSection title="Usage Overview" description={`Your ${limits.label} plan limits and current usage.`}>
+        <div className="px-1 pt-2 pb-4">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-[32px] font-bold text-foreground tracking-tight tabular-nums">{overall}%</span>
+            <span className="text-[15px] font-medium text-fg-muted">plan used</span>
+          </div>
+          <div className="h-2 bg-muted rounded-full overflow-hidden max-w-xs mt-3">
+            <div
+              className={`h-full rounded-full transition-all ${overall >= 80 ? 'bg-red-500' : overall >= 60 ? 'bg-yellow-500' : 'bg-brand'}`}
+              style={{ width: `${overall}%` }}
+            />
+          </div>
+          <div className="flex items-center gap-1 mt-2">
+            <span className="text-[12px] text-fg-muted">
+              <span className="text-foreground font-medium">{limits.label}</span> plan
+            </span>
+            <span className="text-[11px] text-fg-faint mx-1">·</span>
+            <span className="text-[12px] text-fg-muted">
+              Resets <span className="text-foreground font-medium">{planInfo?.renewsAt ? new Date(planInfo.renewsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : 'monthly'}</span>
+            </span>
+          </div>
+        </div>
+      </SettingsSection>
+
+      <SettingsSection title="Detailed Usage" description="Breakdown by feature.">
         <UsageBar label="Projects" current={usage.projectsCount ?? 0} limit={limits.projects} />
         <UsageBar label="Design files" current={usage.designFilesCount ?? 0} limit={limits.designFiles} />
         <UsageBar label="Storage" current={usage.storageUsed ?? 0} limit={limits.storage} unit="MB" />
@@ -1039,6 +1034,52 @@ function AgentPage() {
   );
 }
 
+function CreditsPage({ planInfo }: any) {
+  const plan = (planInfo?.plan ?? "starter") as PlanTier;
+  const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.starter;
+  const usage = planInfo?.usage ?? {};
+  const remaining = 250 - (usage.assistantCreditUsed ?? 0);
+
+  return (
+    <div className="py-4 space-y-6">
+      <SettingsSection title="Credit Balance" description="Your available credits for AI generations, exports, and premium features.">
+        <div className="px-1 pt-2 pb-4">
+          <div className="flex items-baseline gap-2 mb-1">
+            <span className="text-[36px] font-bold text-foreground tracking-tight tabular-nums">{remaining}</span>
+            <span className="text-[15px] font-medium text-fg-muted">credits remaining</span>
+          </div>
+          <div className="h-2 bg-muted rounded-full overflow-hidden max-w-xs mt-3">
+            <div
+              className="h-full rounded-full bg-brand transition-all"
+              style={{ width: `${Math.min((remaining / 250) * 100, 100)}%` }}
+            />
+          </div>
+          <div className="flex items-center gap-4 mt-2">
+            <span className="text-[12px] text-fg-muted">
+              <span className="text-foreground font-medium tabular-nums">{usage.assistantCreditUsed ?? 0}</span> used this month
+            </span>
+            <span className="text-[12px] text-fg-muted">
+              <span className="text-foreground font-medium tabular-nums">250</span> total
+            </span>
+          </div>
+        </div>
+        <SettingsRow label="Purchase credits">
+          <Button size="xs">
+            <Coins className="h-3.5 w-3.5" /> Buy credits
+          </Button>
+        </SettingsRow>
+      </SettingsSection>
+
+      <SettingsSection title="Usage Breakdown" description="How your credits were used this period.">
+        <UsageBar label="AI generations" current={usage.assistantCreditUsed ?? 5} limit={100} />
+        <UsageBar label="Exports" current={usage.designFilesCount ?? 2} limit={limits.designFiles} />
+        <UsageBar label="Storage" current={usage.storageUsed ?? 0} limit={limits.storage} unit="MB" />
+      </SettingsSection>
+
+    </div>
+  );
+}
+
 // ─── Root export ───────────────────────────────────────────────────────────
 
 const SECTION_TITLES: Record<string, string> = {
@@ -1048,6 +1089,7 @@ const SECTION_TITLES: Record<string, string> = {
   "security": "Security & Auth",
   "settings": "Settings",
   "billing": "Billing",
+  "credits": "Credits",
   "usage": "Usage",
   "team": "Team",
   "actions": "Danger Zone",
@@ -1190,6 +1232,7 @@ const contentBySection: Record<string, React.ReactNode> = {
   "security": <SecurityAuthPage />,
   "settings": <SecurityAuthPage />,
   "billing": <BillingPage planInfo={planInfo} checkoutMutation={checkoutMutation} cancelMutation={cancelMutation} portalMutation={portalMutation} />,
+  "credits": <CreditsPage planInfo={planInfo} />,
   "usage": <UsagePage planInfo={planInfo} />,
   "team": <TeamPageView />,
 
@@ -1197,10 +1240,12 @@ const contentBySection: Record<string, React.ReactNode> = {
 };
 
   return (
-    <AppPage>
-      <ContentPanel header={<PageHeader title={SECTION_TITLES[section] ?? "Account"} className="[&_.lds-app-title]:text-[14px]" />} maxWidth="narrow">
-        {contentBySection[section] ?? contentBySection["profile"]}
-      </ContentPanel>
-    </AppPage>
+    <div className="flex flex-1 min-h-0">
+      <div className="flex-1 min-w-0 bg-background border-b border-border/60 overflow-hidden">
+        <div className="mx-auto w-full max-w-[720px] px-4 py-5 sm:px-6 sm:py-6 md:px-8 md:py-8">
+          {contentBySection[section] ?? contentBySection["profile"]}
+        </div>
+      </div>
+    </div>
   );
 }

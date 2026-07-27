@@ -20,7 +20,7 @@ export default function ComponentsPage() {
 
   return (
     <div className="h-full flex flex-col overflow-y-auto">
-      <div className="flex-1 px-8 py-6 max-w-5xl mx-auto w-full">
+      <div className="flex-1 px-4 sm:px-6 md:px-8 py-4 sm:py-6 max-w-5xl mx-auto w-full">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-[22px] font-semibold text-foreground tracking-tight">Components</h1>
           <Button size="sm">
@@ -39,7 +39,7 @@ export default function ComponentsPage() {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filtered.map((component) => (
             <div
               key={component.id}

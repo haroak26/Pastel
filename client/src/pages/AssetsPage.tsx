@@ -19,7 +19,7 @@ export default function AssetsPage() {
 
   return (
     <div className="h-full flex flex-col overflow-y-auto">
-      <div className="flex-1 px-8 py-6 max-w-5xl mx-auto w-full">
+      <div className="flex-1 px-4 sm:px-6 md:px-8 py-4 sm:py-6 max-w-5xl mx-auto w-full">
         <div className="flex items-center justify-between mb-6">
           <h1 className="text-[22px] font-semibold text-foreground tracking-tight">Assets</h1>
         </div>
@@ -34,7 +34,7 @@ export default function AssetsPage() {
           />
         </div>
 
-        <div className="grid grid-cols-3 gap-4">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {filtered.map((asset) => (
             <div
               key={asset.id}

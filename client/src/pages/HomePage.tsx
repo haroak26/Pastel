@@ -26,10 +26,10 @@ export default function HomePage() {
 
   return (
     <div className="h-full flex flex-col overflow-y-auto">
-      <div className="flex-1 flex flex-col items-center pt-36 pb-12 px-6 max-w-4xl mx-auto w-full">
+      <div className="flex-1 flex flex-col items-center pt-12 sm:pt-36 pb-8 sm:pb-12 px-4 sm:px-6 max-w-4xl mx-auto w-full">
         {/* Welcome */}
-        <div className="text-center mb-6 pt-6">
-          <h1 className="text-[30px] font-semibold text-foreground tracking-tight">
+        <div className="text-center mb-3 sm:mb-6 pt-3 sm:pt-6">
+          <h1 className="text-[22px] sm:text-[30px] font-semibold text-foreground tracking-tight">
             What's the vision, {firstName}?
           </h1>
         </div>
@@ -38,7 +38,7 @@ export default function HomePage() {
         <PromptInput onSubmit={handlePrompt} isLoading={loading} />
 
         {/* Recent Projects */}
-        <div className="w-full max-w-3xl mx-auto mt-36">
+        <div className="w-full max-w-3xl mx-auto mt-8 sm:mt-36">
           <div className="flex items-center justify-between mb-3">
             <h2 className="text-[18px] font-semibold text-foreground">Recent</h2>
             <button
@@ -49,11 +49,11 @@ export default function HomePage() {
             </button>
           </div>
 
-          <div className="flex gap-4 overflow-x-auto pb-2">
+          <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-4 sm:-mx-0 px-4 sm:px-0">
             {RECENT_PROJECTS.map((project) => (
               <div
                 key={project.id}
-                onClick={() => {/* TODO: navigate to project */}}
+                onClick={() => setLocation(`/canvas/${project.id}`)}
                 className="group flex-shrink-0 w-[200px] rounded-[12px] border border-border bg-background hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-all duration-150 cursor-pointer overflow-hidden"
               >
                 <div className="aspect-[16/10] bg-surface-hover flex items-center justify-center">
