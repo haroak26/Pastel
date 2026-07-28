@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useLocation } from "wouter";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, MousePointer2, Image, ZoomIn, ZoomOut, Download, Layout, Plus, ChevronLeft, Hand, Code2, Eye, PaintBucket, FileImage, Share2, ChevronDown, RotateCcw, Copy } from "lucide-react";
+import { Sparkles, MousePointer2, Image, ZoomIn, ZoomOut, Download, Layout, Plus, ChevronLeft, Hand, Code2, Eye, PaintBucket, FileImage, Share2, ChevronDown, RotateCcw, Copy, Search } from "lucide-react";
 import { ComputerIcon, SmartPhone01Icon } from "hugeicons-react";
 import { PromptInput } from "@/components/PromptInput";
 import { CanvasPromptInput } from "@/components/CanvasPromptInput";
@@ -145,6 +145,9 @@ export default function CanvasPage() {
   const [screenToolbar, setScreenToolbar] = useState(false);
   const [activeBarBtn, setActiveBarBtn] = useState<string | null>(null);
   const toolbarRef = useRef<HTMLDivElement>(null);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const [showAgent, setShowAgent] = useState(false);
   const [previewMode, setPreviewMode] = useState<"code" | "preview">("preview");
   const [pendingPrompt, setPendingPrompt] = useState("");
@@ -197,6 +200,10 @@ export default function CanvasPage() {
     if (screenToolbar) document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
   }, [screenToolbar]);
+
+  useEffect(() => {
+    if (showSearch) searchRef.current?.focus();
+  }, [showSearch]);
 
   const handlePrompt = useCallback(
     (prompt: string) => {
@@ -302,22 +309,22 @@ export default function CanvasPage() {
                 setSidebarTab(tab.id);
                 if (sidebarCollapsed) setSidebarCollapsed(false);
               }}
-              className={`flex flex-col items-center gap-0.5 w-full py-[10px] text-[11px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
+              className={`flex flex-col items-center gap-0.5 w-full py-[10px] text-[10px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
                 sidebarTab === tab.id ? "bg-brand/10 text-brand" : "text-fg-muted hover:text-foreground"
               }`}
             >
-              <tab.icon size={18} strokeWidth={1.5} />
+              <tab.icon size={16} strokeWidth={1.5} />
               {tab.label}
             </button>
           ))}
           <div className="w-[24px] h-px bg-border/50 my-1.5" />
           <button
             onClick={() => setShowAgent((v) => !v)}
-            className={`flex flex-col items-center gap-0.5 w-full py-[10px] text-[11px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
+            className={`flex flex-col items-center gap-0.5 w-full py-[10px] text-[10px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
               showAgent ? "bg-brand/10 text-brand" : "text-fg-muted hover:text-foreground"
             }`}
           >
-            <Sparkles size={18} strokeWidth={1.5} />
+            <Sparkles size={16} strokeWidth={1.5} />
             Agent
           </button>
         </motion.div>
@@ -338,28 +345,72 @@ export default function CanvasPage() {
             <div className="flex-1 overflow-y-auto px-2 py-1.5 space-y-1">
               {sidebarTab === "screens" && (
                 <>
-                  {screens.map((s) => (
+                  <div className="px-2.5 pt-1 pb-1 flex items-center justify-between">
+                    <AnimatePresence mode="wait">
+                      {showSearch ? (
+                        <motion.div
+                          key="search"
+                          initial={{ opacity: 0, width: 0 }}
+                          animate={{ opacity: 1, width: "auto" }}
+                          exit={{ opacity: 0, width: 0 }}
+                          transition={{ duration: 0.15 }}
+                          className="flex items-center gap-1.5 overflow-hidden"
+                        >
+                          <Search size={14} strokeWidth={2.5} className="text-fg-muted shrink-0" />
+                          <input
+                            ref={searchRef}
+                            autoFocus
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                            onKeyDown={(e) => { if (e.key === 'Escape') { setShowSearch(false); setSearchQuery(""); } }}
+                            placeholder="Search screens..."
+                            className="w-[140px] text-[13px] font-medium text-foreground bg-transparent border-none outline-none placeholder:text-fg-faint"
+                          />
+                        </motion.div>
+                      ) : (
+                        <motion.span
+                          key="label"
+                          initial={{ opacity: 0 }}
+                          animate={{ opacity: 1 }}
+                          exit={{ opacity: 0 }}
+                          className="text-[13px] font-medium text-fg-muted"
+                        >
+                          Screens
+                        </motion.span>
+                      )}
+                    </AnimatePresence>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => setShowSearch(true)}
+                        className="flex items-center justify-center w-[28px] h-[28px] rounded-[6px] text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer"
+                      >
+                        <Search size={14} strokeWidth={2.5} />
+                      </button>
+                      <button
+                        onClick={() => {
+                          const nextId = `s${screens.length + 1}`;
+                          setScreens(prev => [...prev, { id: nextId, label: `Screen ${prev.length + 1}`, icon: ComputerIcon }]);
+                          setScreenLabels(prev => ({ ...prev, [nextId]: `Screen ${screens.length + 1}` }));
+                          setSelectedPage(nextId);
+                        }}
+                        className="flex items-center justify-center w-[28px] h-[28px] rounded-[6px] text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer"
+                      >
+                        <Plus size={14} strokeWidth={2.5} />
+                      </button>
+                    </div>
+                  </div>
+                  {screens
+                    .filter((s) => (screenLabels[s.id] ?? s.label).toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((s) => (
                     <button
                       key={s.id}
                       onClick={() => setSelectedPage(s.id)}
-                      className="flex items-center gap-2 w-full h-[32px] px-2.5 rounded-[10px] text-left border-none bg-transparent cursor-pointer transition-colors text-fg-muted hover:text-foreground hover:bg-surface-hover"
+                      className="flex items-center gap-2 w-full h-[32px] px-2.5 rounded-[10px] text-left bg-transparent cursor-pointer transition-colors text-fg-muted hover:text-brand hover:bg-surface-hover box-border border-2 border-transparent hover:border-brand"
                     >
                       <s.icon size={12} strokeWidth={1.5} className="shrink-0" />
                       <span className="text-[13px] font-medium truncate">{screenLabels[s.id] ?? s.label}</span>
                     </button>
                   ))}
-                  <button
-                    onClick={() => {
-                      const nextId = `s${screens.length + 1}`;
-                      setScreens(prev => [...prev, { id: nextId, label: `Screen ${prev.length + 1}`, icon: ComputerIcon }]);
-                      setScreenLabels(prev => ({ ...prev, [nextId]: `Screen ${screens.length + 1}` }));
-                      setSelectedPage(nextId);
-                    }}
-                    className="flex items-center gap-2 w-full h-[32px] px-2.5 rounded-[10px] text-left border-none bg-transparent cursor-pointer text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors"
-                  >
-                    <Plus size={12} strokeWidth={1.5} />
-                    <span className="text-[13px] font-medium">Add screen</span>
-                  </button>
                 </>
               )}
 
@@ -948,14 +999,14 @@ export default function CanvasPage() {
                       ) : (
                         <button
                           onClick={() => setEditingScreenName(selectedPage)}
-                          className="text-left text-[12px] font-medium text-fg-muted hover:text-foreground transition-colors border-none bg-transparent cursor-pointer"
+                          className="text-left text-[12px] font-medium text-fg-muted hover:text-brand transition-colors border-none bg-transparent cursor-pointer"
                         >
                           {screenLabels[selectedPage] ?? "Untitled"}
                         </button>
                       )}
                     </div>
                     <div
-                      className="bg-white rounded-[6px] border border-border shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-shadow duration-200 focus:shadow-[0_4px_20px_rgba(0,0,0,0.1)] focus:border-[hsl(var(--brand)/0.3)] outline-none cursor-pointer"
+                      className="bg-white rounded-[6px] border-2 border-border hover:border-brand shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-all duration-200 focus:shadow-[0_4px_20px_rgba(0,0,0,0.1)] focus:border-brand/30 outline-none cursor-pointer"
                       tabIndex={-1}
                       style={{
                         width: 900,
