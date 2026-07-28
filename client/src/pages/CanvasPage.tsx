@@ -285,13 +285,13 @@ export default function CanvasPage() {
       <div className="flex-1 min-h-0 flex">
         {/* Icon sidebar */}
         <motion.div
-          className="w-[64px] shrink-0 border-r border-border flex flex-col bg-background items-center py-4 gap-1 relative z-10"
+          className="w-[64px] shrink-0 border-r border-border flex flex-col bg-background items-center py-4 gap-0.5 relative z-10"
           initial={isNewCanvas ? { opacity: 0, x: -16 } : false}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.3 }}
         >
           <div className="text-brand mb-1">
-            <svg viewBox="0 0 32 32" width="20" height="20" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <svg viewBox="0 0 32 32" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
               <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="currentColor" />
               <path d="M10 22L16 9L22 22H10Z" fill="white" opacity="0.92" />
               <circle cx="16" cy="24" r="2.5" fill="white" opacity="0.92" />
@@ -309,40 +309,40 @@ export default function CanvasPage() {
                 setSidebarTab(tab.id);
                 if (sidebarCollapsed) setSidebarCollapsed(false);
               }}
-              className={`flex flex-col items-center gap-0.5 w-full py-[10px] text-[10px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
+              className={`flex flex-col items-center gap-0.5 w-full py-[7px] text-[9px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
                 sidebarTab === tab.id ? "bg-brand/10 text-brand" : "text-fg-muted hover:text-foreground"
               }`}
             >
-              <tab.icon size={16} strokeWidth={1.5} />
+              <tab.icon size={14} strokeWidth={1.5} />
               {tab.label}
             </button>
           ))}
           <div className="w-[24px] h-px bg-border/50 my-1.5" />
           <button
             onClick={() => setShowAgent((v) => !v)}
-            className={`flex flex-col items-center gap-0.5 w-full py-[10px] text-[10px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
+            className={`flex flex-col items-center gap-0.5 w-full py-[7px] text-[9px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
               showAgent ? "bg-brand/10 text-brand" : "text-fg-muted hover:text-foreground"
             }`}
           >
-            <Sparkles size={16} strokeWidth={1.5} />
+            <Sparkles size={14} strokeWidth={1.5} />
             Agent
           </button>
         </motion.div>
 
         {/* Content panel (collapsible) */}
         <div
-            className={`w-[220px] shrink-0 flex flex-col bg-background transition-all duration-200 shadow-[2px_0_12px_rgba(0,0,0,0.06)] ${
+            className={`w-[200px] shrink-0 flex flex-col bg-background transition-all duration-200 shadow-[2px_0_12px_rgba(0,0,0,0.06)] ${
               sidebarCollapsed ? "w-0" : ""
             }`}
           >
-            <div className="shrink-0 px-4 pt-4 pb-3 border-b border-border">
-              <h2 className="text-[15px] font-semibold text-foreground">{project?.name ?? "Untitled"}</h2>
-              <p className="text-[12px] text-fg-faint mt-1">
+            <div className="shrink-0 px-3 pt-3 pb-2 border-b border-border">
+              <h2 className="text-[13px] font-semibold text-foreground">{project?.name ?? "Untitled"}</h2>
+              <p className="text-[11px] text-fg-faint mt-0.5">
                 {screens.length} screens · {MOCK_COMPONENTS.length + MOCK_COLOURS.length + MOCK_UPLOADS.length} assets
               </p>
             </div>
 
-            <div className="flex-1 overflow-y-auto px-2 py-1.5 space-y-1">
+            <div className="flex-1 overflow-y-auto px-1.5 py-1 space-y-1">
               {sidebarTab === "screens" && (
                 <>
                   <div className="px-2.5 pt-1 pb-1 flex items-center justify-between">
@@ -364,7 +364,7 @@ export default function CanvasPage() {
                             onChange={(e) => setSearchQuery(e.target.value)}
                             onKeyDown={(e) => { if (e.key === 'Escape') { setShowSearch(false); setSearchQuery(""); } }}
                             placeholder="Search screens..."
-                            className="w-[140px] text-[13px] font-medium text-foreground bg-transparent border-none outline-none placeholder:text-fg-faint"
+                            className="w-[140px] text-[11px] font-medium text-foreground bg-transparent border-none outline-none placeholder:text-fg-faint"
                           />
                         </motion.div>
                       ) : (
@@ -373,7 +373,7 @@ export default function CanvasPage() {
                           initial={{ opacity: 0 }}
                           animate={{ opacity: 1 }}
                           exit={{ opacity: 0 }}
-                          className="text-[13px] font-medium text-fg-muted"
+                          className="text-[11px] font-medium text-fg-muted"
                         >
                           Screens
                         </motion.span>
@@ -405,10 +405,10 @@ export default function CanvasPage() {
                     <button
                       key={s.id}
                       onClick={() => setSelectedPage(s.id)}
-                      className="flex items-center gap-2 w-full h-[32px] px-2.5 rounded-[10px] text-left bg-transparent cursor-pointer transition-colors text-fg-muted hover:text-brand hover:bg-surface-hover box-border border-2 border-transparent hover:border-brand"
+                      className="flex items-center gap-2 w-full h-[28px] px-2.5 rounded-[10px] text-left bg-transparent cursor-pointer transition-colors text-fg-muted hover:text-brand hover:bg-surface-hover box-border border-2 border-transparent hover:border-brand"
                     >
                       <s.icon size={12} strokeWidth={1.5} className="shrink-0" />
-                      <span className="text-[13px] font-medium truncate">{screenLabels[s.id] ?? s.label}</span>
+                      <span className="text-[11px] font-medium truncate">{screenLabels[s.id] ?? s.label}</span>
                     </button>
                   ))}
                 </>
@@ -416,10 +416,10 @@ export default function CanvasPage() {
 
               {sidebarTab === "design" && (
                 <>
-                  <div className="px-2.5 pt-2 pb-2">
-                    <span className="text-[13px] font-medium text-fg-muted">Fonts</span>
+                  <div className="px-2.5 pt-1.5 pb-1">
+                    <span className="text-[11px] font-medium text-fg-muted">Fonts</span>
                   </div>
-                  <div className="space-y-0.5 pb-2">
+                  <div className="space-y-0.5 pb-1.5">
                     {[
                       { role: "Heading", font: "Inter" },
                       { role: "Subheading", font: "SF Pro" },
@@ -437,7 +437,7 @@ export default function CanvasPage() {
                               setSelectedFont(item.role);
                             }
                           }}
-                          className="flex w-full items-center justify-between px-2.5 h-[32px] rounded-[10px] text-[13px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left"
+                          className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left"
                         >
                           <span>{item.role}</span>
                           <span className="flex items-center gap-1 text-fg-faint">
@@ -451,10 +451,10 @@ export default function CanvasPage() {
 
                   <div className="h-px bg-border -mx-2" />
 
-                  <div className="px-2.5 pt-2 pb-2">
-                    <span className="text-[13px] font-medium text-fg-muted">Font sizes</span>
+                  <div className="px-2.5 pt-1.5 pb-1">
+                    <span className="text-[11px] font-medium text-fg-muted">Font sizes</span>
                   </div>
-                  <div className="space-y-0.5 pb-2">
+                  <div className="space-y-0.5 pb-1.5">
                     {[
                       { label: "H1", size: "32px" },
                       { label: "H2", size: "24px" },
@@ -464,7 +464,7 @@ export default function CanvasPage() {
                     ].map((s) => (
                       <div key={s.label}>
                         {editingSize === s.label ? (
-                          <div className="flex w-full items-center justify-between px-2.5 h-[32px] rounded-[10px] text-[13px] font-medium text-foreground">
+                          <div className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground">
                             <span>{s.label}</span>
                             <div className="flex items-center gap-0.5">
                               <input
@@ -473,15 +473,15 @@ export default function CanvasPage() {
                                 onChange={(e) => setSizeValues(prev => ({ ...prev, [s.label]: e.target.value + "px" }))}
                                 onBlur={() => setEditingSize(null)}
                                 onKeyDown={(e) => { if (e.key === 'Enter') setEditingSize(null); }}
-                                className="w-[40px] text-right text-[13px] font-medium text-foreground bg-transparent border-none outline-none"
+                                className="w-[40px] text-right text-[11px] font-medium text-foreground bg-transparent border-none outline-none"
                               />
-                              <span className="text-fg-faint text-[13px]">px</span>
+                              <span className="text-fg-faint text-[11px]">px</span>
                             </div>
                           </div>
                         ) : (
                           <button
                             onClick={() => setEditingSize(s.label)}
-                            className="flex w-full items-center justify-between px-2.5 h-[32px] rounded-[10px] text-[13px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left w-full"
+                            className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left w-full"
                           >
                             <span>{s.label}</span>
                             <span className="text-fg-faint">{sizeValues[s.label]}</span>
@@ -493,10 +493,10 @@ export default function CanvasPage() {
 
                   <div className="h-px bg-border -mx-2" />
 
-                  <div className="px-2.5 pt-2 pb-2">
-                    <span className="text-[13px] font-medium text-fg-muted">Colours</span>
+                  <div className="px-2.5 pt-1.5 pb-1">
+                    <span className="text-[11px] font-medium text-fg-muted">Colours</span>
                   </div>
-                  <div className="space-y-0.5 pb-2">
+                  <div className="space-y-0.5 pb-1.5">
                     {MOCK_COLOURS.map((col) => {
                       const hex = colourValues[col.id];
                       const r = parseInt(hex.slice(1, 3), 16) || 0;
@@ -506,7 +506,7 @@ export default function CanvasPage() {
                         <div key={col.id}>
                           <button
                             onClick={() => setSelectedColor(selectedColor === col.id ? null : col.id)}
-                            className="flex w-full items-center justify-between px-2.5 h-[32px] rounded-[10px] text-[13px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left"
+                            className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left"
                           >
                             <span className="flex items-center gap-2.5">
                               <div
@@ -607,7 +607,7 @@ export default function CanvasPage() {
                           <button
                             key={font}
                             onClick={() => { setFontValues(prev => ({ ...prev, [selectedFont]: font })); setSelectedFont(null); setFontRect(null); }}
-                            className={`flex w-full items-center px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-left transition-colors border-none bg-transparent cursor-pointer ${
+                            className={`flex w-full items-center px-2.5 py-2 rounded-[14px] text-[11px] font-medium text-left transition-colors border-none bg-transparent cursor-pointer ${
                               fontValues[selectedFont] === font ? 'bg-surface-hover text-foreground' : 'text-foreground hover:text-foreground hover:bg-surface-hover'
                             }`}
                           >
@@ -620,10 +620,10 @@ export default function CanvasPage() {
 
                   <div className="h-px bg-border -mx-2" />
 
-                  <div className="px-2.5 pt-2 pb-2">
-                    <span className="text-[13px] font-medium text-fg-muted">Roundness</span>
+                  <div className="px-2.5 pt-1.5 pb-1">
+                    <span className="text-[11px] font-medium text-fg-muted">Roundness</span>
                   </div>
-                  <div className="space-y-0.5 pb-2">
+                  <div className="space-y-0.5 pb-1.5">
                     {[
                       { label: "Small", key: "Small" },
                       { label: "Medium", key: "Medium" },
@@ -635,7 +635,7 @@ export default function CanvasPage() {
                       return (
                         <div key={s.key}>
                           {editingRadius === s.key ? (
-                            <div className="flex w-full items-center justify-between px-2.5 h-[32px] rounded-[10px] text-[13px] font-medium text-foreground">
+                            <div className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground">
                               <span className="flex items-center gap-2.5">
                                 <svg width="16" height="16" viewBox="0 0 28 28" fill="none" className="shrink-0">
                                   <path
@@ -656,15 +656,15 @@ export default function CanvasPage() {
                                   onChange={(e) => setCornerRadiusValues(prev => ({ ...prev, [s.key]: e.target.value }))}
                                   onBlur={() => setEditingRadius(null)}
                                   onKeyDown={(e) => { if (e.key === 'Enter') setEditingRadius(null); }}
-                                  className="w-[40px] text-right text-[13px] font-medium text-foreground bg-transparent border-none outline-none"
+                                  className="w-[40px] text-right text-[11px] font-medium text-foreground bg-transparent border-none outline-none"
                                 />
-                                <span className="text-fg-faint text-[13px]">px</span>
+                                <span className="text-fg-faint text-[11px]">px</span>
                               </div>
                             </div>
                           ) : (
                             <button
                               onClick={() => setEditingRadius(s.key)}
-                              className="flex w-full items-center justify-between px-2.5 h-[32px] rounded-[10px] text-[13px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left w-full"
+                              className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left w-full"
                             >
                               <span className="flex items-center gap-2.5">
                                 <svg width="16" height="16" viewBox="0 0 28 28" fill="none" className="shrink-0">
@@ -692,7 +692,7 @@ export default function CanvasPage() {
               {sidebarTab === "assets" && (
                 <>
                   <div className="px-2.5 pt-1 pb-1 flex items-center justify-between">
-                    <span className="text-[13px] font-medium text-fg-muted">Components</span>
+                    <span className="text-[11px] font-medium text-fg-muted">Components</span>
                     <button className="text-[11px] font-medium text-brand hover:text-brand/80 transition-colors border-none bg-transparent cursor-pointer">See all</button>
                   </div>
                   <div className="space-y-1.5 px-2.5">
@@ -713,16 +713,16 @@ export default function CanvasPage() {
                         </div>
                       </div>
                     ))}
-                    <button className="flex items-center gap-2 w-full h-[32px] px-2.5 rounded-[10px] text-left border-none bg-transparent cursor-pointer text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors">
+                    <button className="flex items-center gap-2 w-full h-[28px] px-2.5 rounded-[10px] text-left border-none bg-transparent cursor-pointer text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors">
                       <Plus size={12} strokeWidth={1.5} />
-                      <span className="text-[13px] font-medium">Add component</span>
+                      <span className="text-[11px] font-medium">Add component</span>
                     </button>
                   </div>
 
                   <div className="h-px bg-border my-3 -mx-2" />
 
                   <div className="px-2.5 pt-1 pb-1 flex items-center justify-between">
-                    <span className="text-[13px] font-medium text-fg-muted">Uploads</span>
+                    <span className="text-[11px] font-medium text-fg-muted">Uploads</span>
                     <button className="text-[11px] font-medium text-brand hover:text-brand/80 transition-colors border-none bg-transparent cursor-pointer">See all</button>
                   </div>
                   <div className="space-y-1.5 px-2.5">
@@ -745,9 +745,9 @@ export default function CanvasPage() {
                         </div>
                       </div>
                     ))}
-                    <button className="flex items-center gap-2 w-full h-[32px] px-2.5 rounded-[10px] text-left border-none bg-transparent cursor-pointer text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors">
+                    <button className="flex items-center gap-2 w-full h-[28px] px-2.5 rounded-[10px] text-left border-none bg-transparent cursor-pointer text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors">
                       <Plus size={12} strokeWidth={1.5} />
-                      <span className="text-[13px] font-medium">Upload asset</span>
+                      <span className="text-[11px] font-medium">Upload asset</span>
                     </button>
                   </div>
                 </>
@@ -757,7 +757,7 @@ export default function CanvasPage() {
             <div className="shrink-0 px-2 py-2 border-t border-border">
               <button
                 onClick={() => setSidebarCollapsed(true)}
-                className="flex items-center gap-2 w-full h-[32px] px-2.5 rounded-[10px] text-[12px] font-medium text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer"
+                className="flex items-center gap-2 w-full h-[28px] px-2.5 rounded-[10px] text-[11px] font-medium text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer"
               >
                 <ChevronLeft size={13} strokeWidth={1.5} />
                 Collapse
