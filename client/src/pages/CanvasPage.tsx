@@ -278,7 +278,7 @@ export default function CanvasPage() {
       <div className="flex-1 min-h-0 flex">
         {/* Icon sidebar */}
         <motion.div
-          className="w-[72px] shrink-0 border-r border-border flex flex-col bg-background items-center py-4 gap-1 relative z-10"
+          className="w-[64px] shrink-0 border-r border-border flex flex-col bg-background items-center py-4 gap-1 relative z-10"
           initial={isNewCanvas ? { opacity: 0, x: -16 } : false}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.3 }}
@@ -302,22 +302,22 @@ export default function CanvasPage() {
                 setSidebarTab(tab.id);
                 if (sidebarCollapsed) setSidebarCollapsed(false);
               }}
-              className={`flex flex-col items-center gap-0.5 w-full py-[14px] text-[11px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
+              className={`flex flex-col items-center gap-0.5 w-full py-[10px] text-[11px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
                 sidebarTab === tab.id ? "bg-brand/10 text-brand" : "text-fg-muted hover:text-foreground"
               }`}
             >
-              <tab.icon size={20} strokeWidth={1.5} />
+              <tab.icon size={18} strokeWidth={1.5} />
               {tab.label}
             </button>
           ))}
           <div className="w-[24px] h-px bg-border/50 my-1.5" />
           <button
             onClick={() => setShowAgent((v) => !v)}
-            className={`flex flex-col items-center gap-0.5 w-full py-[14px] text-[11px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
+            className={`flex flex-col items-center gap-0.5 w-full py-[10px] text-[11px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
               showAgent ? "bg-brand/10 text-brand" : "text-fg-muted hover:text-foreground"
             }`}
           >
-            <Sparkles size={20} strokeWidth={1.5} />
+            <Sparkles size={18} strokeWidth={1.5} />
             Agent
           </button>
         </motion.div>
@@ -368,7 +368,7 @@ export default function CanvasPage() {
                   <div className="px-2.5 pt-2 pb-2">
                     <span className="text-[13px] font-medium text-fg-muted">Fonts</span>
                   </div>
-                  <div className="space-y-0.5 pb-6">
+                  <div className="space-y-0.5 pb-2">
                     {[
                       { role: "Heading", font: "Inter" },
                       { role: "Subheading", font: "SF Pro" },
@@ -400,10 +400,10 @@ export default function CanvasPage() {
 
                   <div className="h-px bg-border -mx-2" />
 
-                  <div className="px-2.5 pt-6 pb-2">
+                  <div className="px-2.5 pt-2 pb-2">
                     <span className="text-[13px] font-medium text-fg-muted">Font sizes</span>
                   </div>
-                  <div className="space-y-0.5 pb-6">
+                  <div className="space-y-0.5 pb-2">
                     {[
                       { label: "H1", size: "32px" },
                       { label: "H2", size: "24px" },
@@ -442,10 +442,10 @@ export default function CanvasPage() {
 
                   <div className="h-px bg-border -mx-2" />
 
-                  <div className="px-2.5 pt-6 pb-2">
+                  <div className="px-2.5 pt-2 pb-2">
                     <span className="text-[13px] font-medium text-fg-muted">Colours</span>
                   </div>
-                  <div className="space-y-0.5 pb-6">
+                  <div className="space-y-0.5 pb-2">
                     {MOCK_COLOURS.map((col) => {
                       const hex = colourValues[col.id];
                       const r = parseInt(hex.slice(1, 3), 16) || 0;
@@ -569,10 +569,10 @@ export default function CanvasPage() {
 
                   <div className="h-px bg-border -mx-2" />
 
-                  <div className="px-2.5 pt-6 pb-2">
+                  <div className="px-2.5 pt-2 pb-2">
                     <span className="text-[13px] font-medium text-fg-muted">Roundness</span>
                   </div>
-                  <div className="space-y-0.5 pb-6">
+                  <div className="space-y-0.5 pb-2">
                     {[
                       { label: "Small", key: "Small" },
                       { label: "Medium", key: "Medium" },
