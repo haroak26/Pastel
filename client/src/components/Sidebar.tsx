@@ -112,15 +112,11 @@ export function SidebarContent({ location: _location, onNavigate, collapsed }: {
         {isAccountPage ? (
           <ArrowLeft01Icon size={18} className="text-fg-muted" />
         ) : (
-          <svg viewBox="0 0 32 32" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="currentColor" />
-            <path d="M10 22L16 9L22 22H10Z" fill="white" opacity="0.92" />
-            <circle cx="16" cy="24" r="2.5" fill="white" opacity="0.92" />
-          </svg>
+          <img src="/PastelLogo.svg" alt="Pastel" height={22} className="shrink-0 w-auto" />
         )}
-        <span className="text-[15px] font-semibold text-foreground">
-          {isAccountPage ? 'Account' : 'Pastel'}
-        </span>
+        {isAccountPage && (
+          <span className="text-[15px] font-semibold text-foreground">Account</span>
+        )}
       </Link>
 
       {/* Navigation tabs */}

@@ -1,6 +1,12 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { Button } from '@/components/button';
-import { ArrowUp, Plus, Sparkles, ChevronRight, Settings2, Image, FolderOpen, Link, Box, ComponentIcon } from 'lucide-react';
+import { ArrowUp, Plus, Sparkles, ChevronRight, Settings2, Image, FolderOpen, Link, Box, ComponentIcon, X } from 'lucide-react';
+
+type Attachment = {
+  id: string;
+  type: 'image' | 'file' | 'component' | 'asset';
+  name: string;
+};
 
 type Props = {
   onSubmit: (prompt: string) => void;
@@ -64,6 +70,13 @@ function MenuRow({ label, current, onClick }: { label: string; current: React.Re
   );
 }
 
+const MOCK_ATTACHMENTS: Record<string, { name: string }> = {
+  image: { name: 'photo-2024.jpg' },
+  file: { name: 'design-specs.pdf' },
+  component: { name: 'Button' },
+  asset: { name: 'Logo.svg' },
+};
+
 export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you like to design?' }: Props) {
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState<string>(MODELS[0].value);
@@ -73,6 +86,7 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
   const [customizeOpen, setCustomizeOpen] = useState(false);
   const [panelView, setPanelView] = useState<PanelView>('main');
   const [attachOpen, setAttachOpen] = useState(false);
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
   const customizeRef = useRef<HTMLDivElement>(null);
   const attachRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -102,7 +116,6 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
     const trimmed = prompt.trim();
     if (!trimmed || isLoading) return;
     onSubmit(trimmed);
-    setPrompt('');
   }, [prompt, isLoading, onSubmit]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
@@ -111,6 +124,20 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
       handleSubmit();
     }
   }, [handleSubmit]);
+
+  const addAttachment = useCallback((type: Attachment['type']) => {
+    const mock = MOCK_ATTACHMENTS[type];
+    const newAttachment: Attachment = {
+      id: crypto.randomUUID?.() || Math.random().toString(36).slice(2, 11),
+      type,
+      name: mock.name,
+    };
+    setAttachments(prev => [...prev, newAttachment]);
+  }, []);
+
+  const removeAttachment = useCallback((id: string) => {
+    setAttachments(prev => prev.filter(a => a.id !== id));
+  }, []);
 
   return (
     <div className="w-full max-w-xl mx-auto">
@@ -122,8 +149,46 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
           onKeyDown={handleKeyDown}
           placeholder={placeholder}
           rows={2}
-          className="w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-fg-faint px-3 sm:px-3 pt-3 sm:pt-3 pb-0 sm:pb-3 outline-none border-none leading-relaxed"
+          className="w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-fg-faint px-3 sm:px-3 pt-3 sm:pt-3 pb-0 sm:pb-1 outline-none border-none leading-relaxed"
         />
+
+        {attachments.length > 0 && (
+          <div className="flex items-center gap-2 px-3 pb-2 flex-wrap">
+            {attachments.map((att) => (
+              <div key={att.id} className="relative group">
+                {att.type === 'image' && (
+                  <div className="w-9 h-9 rounded-lg bg-gradient-to-br from-blue-100 to-purple-100 border border-border overflow-hidden flex items-center justify-center">
+                    <Image size={14} className="text-blue-400" />
+                  </div>
+                )}
+                {att.type === 'file' && (
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-surface-muted border border-border">
+                    <FolderOpen size={12} />
+                    <span className="text-[11px] font-medium text-fg-muted max-w-[80px] truncate">{att.name}</span>
+                  </div>
+                )}
+                {att.type === 'component' && (
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-surface-muted border border-border">
+                    <Box size={12} />
+                    <span className="text-[11px] font-medium text-fg-muted max-w-[80px] truncate">{att.name}</span>
+                  </div>
+                )}
+                {att.type === 'asset' && (
+                  <div className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg bg-surface-muted border border-border">
+                    <ComponentIcon size={12} />
+                    <span className="text-[11px] font-medium text-fg-muted max-w-[80px] truncate">{att.name}</span>
+                  </div>
+                )}
+                <button
+                  onClick={() => removeAttachment(att.id)}
+                  className="absolute -top-1.5 -right-1.5 w-4 h-4 rounded-full bg-foreground/70 text-background flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity border-none cursor-pointer hover:bg-foreground"
+                >
+                  <X size={8} strokeWidth={3} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
 
         <div className="flex items-end justify-between px-3 pb-3">
           <div className="flex items-center gap-2">
@@ -138,21 +203,21 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
               {attachOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setAttachOpen(false)} />
-                  <div className="absolute left-0 top-full mt-1 z-20 min-w-[200px] bg-background border border-border rounded-[20px] p-1.5 shadow-lg">
-                    <button onClick={() => setAttachOpen(false)} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
+                  <div className="absolute left-0 bottom-full mb-1 z-20 min-w-[200px] bg-background border border-border rounded-[20px] p-1.5 shadow-lg">
+                    <button onClick={() => { addAttachment('image'); setAttachOpen(false); }} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
                       <Image size={15} className="text-foreground" /> Photo Library
                     </button>
-                    <button onClick={() => setAttachOpen(false)} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
+                    <button onClick={() => { addAttachment('file'); setAttachOpen(false); }} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
                       <FolderOpen size={15} className="text-foreground" /> File Library
                     </button>
                     <div className="h-px bg-border/60 mx-2 my-2" />
-                    <button onClick={() => setAttachOpen(false)} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
+                    <button onClick={() => { setAttachOpen(false); }} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
                       <Link size={15} className="text-foreground" /> Connect Project
                     </button>
-                    <button onClick={() => setAttachOpen(false)} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
+                    <button onClick={() => { addAttachment('component'); setAttachOpen(false); }} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
                       <Box size={15} className="text-foreground" /> Select Components
                     </button>
-                    <button onClick={() => setAttachOpen(false)} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
+                    <button onClick={() => { addAttachment('asset'); setAttachOpen(false); }} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
                       <ComponentIcon size={15} className="text-foreground" /> Select Assets
                     </button>
                   </div>
@@ -175,7 +240,7 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
               {customizeOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => { setCustomizeOpen(false); setPanelView('main'); }} />
-                  <div className="absolute left-0 top-full mt-1 z-20 min-w-[260px] bg-background border border-border rounded-[20px] p-1.5 shadow-lg">
+                  <div className="absolute left-0 bottom-full mb-1 z-20 min-w-[260px] bg-background border border-border rounded-[20px] p-1.5 shadow-lg">
                     {panelView === 'main' && (
                       <div>
                         <MenuRow label="Model" current={<span className="text-foreground flex items-center gap-1.5">{MODEL_META[model]?.icon}{MODEL_META[model]?.label}</span>} onClick={() => setPanelView('model')} />

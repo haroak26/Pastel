@@ -106,7 +106,6 @@ function Router() {
 
       {/* Dashboard */}
       <Route path="/home">{() => <ProtectedRoute component={() => <DesignAppLayout><HomePage /></DesignAppLayout>} />}</Route>
-      <Route path="/home/design">{() => <ProtectedRoute component={CanvasPage} />}</Route>
       <Route path="/canvas/:id">{() => <ProtectedRoute component={CanvasPage} />}</Route>
       <Route path="/home/projects">{() => <ProtectedRoute component={() => <DesignAppLayout><ProjectsPage /></DesignAppLayout>} />}</Route>
       <Route path="/home/components">{() => <ProtectedRoute component={() => <DesignAppLayout><ComponentsPage /></DesignAppLayout>} />}</Route>

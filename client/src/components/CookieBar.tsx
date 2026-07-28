@@ -19,15 +19,15 @@ export function CookieBar() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t border-[hsl(var(--border)/0.5)] bg-black">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white border-border/60">
       <div className="w-full max-w-[1060px] mx-auto px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
-        <p className="flex-1 text-[12px] font-medium leading-[1.6] text-[hsl(0 0% 70%)]">
+        <p className="flex-1 text-[12px] font-medium leading-[1.6] text-muted-foreground">
           We use cookies to keep Pastel running smoothly and improve your experience. See our{" "}
-          <Link href="/privacy" className="underline underline-offset-2 transition-colors hover:text-white text-[hsl(0 0% 80%)]">
+          <Link href="/privacy" className="underline underline-offset-2 transition-colors hover:text-foreground text-foreground/70">
             Privacy Policy
           </Link>{" "}
           and{" "}
-          <Link href="/terms" className="underline underline-offset-2 transition-colors hover:text-white text-[hsl(0 0% 80%)]">
+          <Link href="/terms" className="underline underline-offset-2 transition-colors hover:text-foreground text-foreground/70">
             Terms of Service
           </Link>{" "}
           for details.

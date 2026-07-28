@@ -11,7 +11,7 @@ import { useUser, useLogout } from '@/hooks/use-user';
 import { useWorkspace } from '@/contexts/workspace-context';
 
 export const ALL_SECTIONS: PrimarySection[] = [
-  { id: 'design',    label: 'Design',    icon: GridIcon,      href: '/home/design' },
+  { id: 'design',    label: 'Design',    icon: GridIcon,      href: '/canvas/new' },
   { id: 'projects',  label: 'Projects',  icon: InboxIcon,     href: '/home/projects' },
   { id: 'team',      label: 'Team',      icon: UserGroupIcon, href: '/workspace/team' },
   { id: 'settings',  label: 'Settings',  icon: Settings01Icon,href: '/workspace/settings' },
@@ -22,7 +22,7 @@ export const ADMIN_SECTIONS: PrimarySection[] = [];
 const ICON_SIZE = 15;
 
 export function getActivePrimaryId(location: string): string {
-  if (location.startsWith('/home/design')) return 'design';
+  if (location.startsWith('/canvas/')) return 'design';
   if (location.startsWith('/home/projects')) return 'projects';
   if (location.startsWith('/workspace/team')) return 'team';
   if (location.startsWith('/workspace')) return 'settings';
@@ -111,12 +111,8 @@ export function PrimaryRail({
 
   return (
     <div className="w-[52px] h-full min-h-0 bg-background border-r border-border flex flex-col items-center pt-3 pb-3 shrink-0 overflow-x-hidden overscroll-none">
-      <Link href="/home/design" className="mb-4 shrink-0 flex items-center justify-center w-[32px] h-[32px] text-brand">
-        <svg viewBox="0 0 32 32" width="32" height="32" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-          <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="currentColor" />
-          <path d="M10 22L16 9L22 22H10Z" fill="white" opacity="0.92" />
-          <circle cx="16" cy="24" r="2.5" fill="white" opacity="0.92" />
-        </svg>
+      <Link href="/canvas/new" className="mb-4 shrink-0 flex items-center justify-center w-[32px] h-[32px]">
+        <img src="/PastelIcon.svg" alt="Pastel" width={32} height={32} className="shrink-0" />
       </Link>
 
       <div className="flex-1 min-h-0 flex flex-col items-center gap-1 w-full px-2 overflow-y-auto scrollbar-none">

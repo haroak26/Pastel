@@ -1,0 +1,137 @@
+Please use the attached screenshots as the source of truth. The goal is not to redesign anything—only to correct the spacing so the interface feels professionally balanced and follows a consistent spacing system.
+
+1. Toolbar horizontal padding
+
+The toolbar currently has inconsistent internal padding.
+
+Issue
+
+The top and bottom padding around the buttons is correct.
+However, the first and last buttons extend too close to the outer edge of the toolbar.
+This makes the toolbar feel visually "stretched" horizontally.
+
+Required fix
+
+Increase the left and right internal padding of the toolbar.
+The first button should sit the same visual distance from the left edge as the buttons sit from the top and bottom.
+Likewise, the Export button should have the same spacing from the right edge.
+The toolbar should feel perfectly centred inside its white rounded container.
+Keep the button sizes exactly the same.
+Do not shrink the buttons to solve this.
+Do not change the spacing between toolbar controls unless absolutely necessary.
+The only change should be the toolbar's horizontal content padding.
+
+Think of the toolbar as having a single consistent padding value applied equally on all four sides.
+
+2. Sidebar section spacing
+
+The sidebar currently has inconsistent vertical rhythm between sections.
+
+There should be one consistent spacing rule used everywhere.
+
+Current hierarchy:
+
+Divider
+Section title
+Items
+Divider
+Section title
+Items
+Divider
+
+The spacing currently breaks this rhythm.
+
+3. Increase space above section titles
+
+Looking at the screenshots, the section titles (Fonts, Font sizes, Colours, Roundness) sit too close to the divider above them.
+
+Increase the gap between:
+
+Divider
+↓
+Section title
+
+This should breathe more.
+
+4. Increase space below the last item of every section
+
+Currently the last row of a section sits too close to the divider underneath.
+
+Example:
+
+Body
+Small
+Divider
+
+There should be noticeably more breathing room.
+
+Increase the spacing between:
+
+Last row
+↓
+Divider
+5. Make the spacing symmetrical
+
+This is the most important part.
+
+For every section, the whitespace should follow this structure:
+
+Divider
+
+(equal space)
+
+Section title
+
+(smaller spacing)
+
+Section content
+
+(equal space)
+
+Divider
+
+The whitespace above the title should visually match the whitespace below the final row.
+
+In other words:
+
+Divider
+   24px (example)
+
+Section title
+   16px
+
+Rows...
+
+   24px
+
+Divider
+
+The exact pixel values can be adjusted, but the top and bottom whitespace around each section must be visually identical.
+
+6. Preserve existing layout
+
+Do not:
+
+change fonts
+change colours
+change typography
+change row heights
+change control sizes
+move dividers
+redesign the sidebar
+
+Only adjust vertical spacing between existing elements.
+
+7. Validation checklist
+
+Before finishing, verify:
+
+✓ Toolbar has equal visual padding on all four sides.
+✓ First toolbar button no longer hugs the left edge.
+✓ Export button no longer hugs the right edge.
+✓ Every sidebar section has identical spacing above and below.
+✓ The distance from a divider to the next section title equals the distance from the last row to the divider below.
+✓ The sidebar now has a consistent vertical rhythm throughout.
+✓ No components have changed size or appearance—only spacing has been refined.
+
+The finished result should feel like a polished Apple, Linear, or Figma interface where the spacing system is intentional, mathematically consist

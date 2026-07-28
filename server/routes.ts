@@ -13,6 +13,7 @@ import { sendVerificationEmail, sendEmailChangeVerification, sendPasswordResetEm
 import { generateTotpSecret, verifyTotp, buildOtpauthUrl } from "./totp";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerRemainingRoutes } from "./routes/remaining";
+import { registerPastelAgentRoutes } from "./routes/pastel-agent";
 import { buildOnboardingSession } from "./onboarding-session";
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import {
@@ -326,6 +327,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   registerAuthRoutes(app);
   registerRemainingRoutes(app);
+  registerPastelAgentRoutes(app);
 
   return httpServer;
 }

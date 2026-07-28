@@ -17,9 +17,8 @@ export default function HomePage() {
 
   const handlePrompt = async (prompt: string) => {
     setLoading(true);
-    // TODO: send prompt to AI and navigate to result
-    console.log('Prompt:', prompt);
-    setLoading(false);
+    sessionStorage.setItem('pastel-prompt', prompt);
+    setLocation('/canvas/new');
   };
 
   const firstName = user?.displayName?.split(' ')[0] || user?.email?.split('@')[0] || 'there';
@@ -67,7 +66,7 @@ export default function HomePage() {
               </div>
             ))}
             <div
-              onClick={() => {/* TODO: create new project */}}
+              onClick={() => setLocation('/canvas/new')}
               className="flex-shrink-0 w-[200px] rounded-[12px] border border-dashed border-border bg-background hover:shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-all duration-150 cursor-pointer flex flex-col items-center justify-center gap-2 min-h-[160px]"
             >
               <Plus size={22} className="text-fg-faint" strokeWidth={1.5} />

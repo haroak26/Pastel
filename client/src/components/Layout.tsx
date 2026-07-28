@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from "react";
 import { Link } from "wouter";
 import { X, ArrowRight, Palette, PenTool, Layers, Share2, Sparkles, Star, BarChart3 } from "lucide-react";
-import { PastelLogoMarkDark } from "./PastelLogo";
+
 import { useUser, useLogout } from "@/hooks/use-user";
 import { CookieBar } from "./CookieBar";
 import { Button } from "@/components/button";
@@ -79,64 +79,18 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
     <header className={cn("w-full h-14 md:h-[60px] bg-background/95 backdrop-blur z-40 sticky top-0 flex items-center border-b transition-all duration-200", panel && "border-border")} style={!panel ? { borderColor: scrolled ? 'hsl(var(--border))' : 'transparent' } : undefined}>
       <div className="w-full max-w-[1280px] mx-auto px-6 md:px-8 overflow-x-hidden flex items-center justify-between">
         <Link href="/" className="flex items-center">
-          <PastelLogoMarkDark size={20} />
+          <img src="/PastelLogo.svg" alt="Pastel" width={130} className="h-auto shrink-0" />
         </Link>
-
+ 
         <div className="flex items-center justify-end gap-2.5">
-          <div className="hidden md:flex items-center gap-1"
-            onMouseLeave={handleNavLeave}
-          >
-            <div className="relative">
-              <nav className="flex items-center gap-0.5">
-                {navDropdowns.map(({ label, href }) => (
-                  <div
-                    key={label}
-                    onMouseEnter={() => handleNavEnter(label)}
-                  >
-                    <Link href={href} className="inline-flex items-center text-[14px] font-medium text-foreground px-2.5 leading-[20px] transition-colors hover:opacity-80">
-                      {label}
-                    </Link>
-                  </div>
-                ))}
-              </nav>
-
-              {activeDropdown && (
-                <div
-                  className="absolute top-full left-0 w-[440px] bg-background border border-border rounded-[16px] p-1.5 z-50 mt-3"
-                  onMouseEnter={handleDropdownEnter}
-                  onMouseLeave={handleNavLeave}
-                >
-                  <div className="relative overflow-hidden rounded-[12px]">
-                    <div
-                      className="flex transition-transform duration-500 ease-in-out"
-                      style={{ transform: `translateX(-${navDropdowns.findIndex(d => d.label === activeDropdown) * 100}%)` }}
-                    >
-                      {navDropdowns.map(({ label, items }) => (
-                        <div key={label} className="w-full shrink-0">
-                          <div className="grid grid-cols-2 gap-0.5">
-                            {items.map(item => (
-                              <Link
-                                key={item.title}
-                                href={item.href}
-                                className="flex gap-2.5 p-2.5 rounded-[10px] hover:bg-surface-hover transition-colors"
-                              >
-                                <div className="shrink-0 mt-0.5">
-                                  <item.icon className="h-[18px] w-[18px] text-foreground" />
-                                </div>
-                                <div>
-                                  <p className="text-[13px] font-semibold text-foreground leading-tight">{item.title}</p>
-                                  <p className="text-[11px] text-muted-foreground font-medium mt-0.5 leading-snug">{item.desc}</p>
-                                </div>
-                              </Link>
-                            ))}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
+          <div className="hidden md:flex items-center gap-1">
+            <nav className="flex items-center gap-0.5">
+              {navDropdowns.map(({ label, href }) => (
+                <Link key={label} href={href} className="inline-flex items-center text-[14px] font-medium text-foreground px-2.5 leading-[20px] transition-colors hover:opacity-80">
+                  {label}
+                </Link>
+              ))}
+            </nav>
 
             <div className="w-px h-5 bg-border mx-2" />
 
@@ -283,7 +237,7 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10 pb-10 border-b border-border">
               <div className="space-y-3 max-w-xs">
                 <Link href="/" className="inline-flex items-center gap-2">
-<PastelLogoMarkDark size={22} />
+<img src="/PastelLogo.svg" alt="Pastel" height={22} className="w-auto shrink-0" />
                 </Link>
                 <p className="text-[13px] text-fg-muted font-medium leading-[1.6]">
                   Design beautiful interfaces, together.
