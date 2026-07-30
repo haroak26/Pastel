@@ -442,20 +442,7 @@ function NewTaskForm({ onClose, onCreated, defaultStatus, assignees }: {
   );
 }
 
-const MOCK_TASKS: Task[] = import.meta.env.DEV ? [
-  { id: 'mock-1', userId: '', ticketId: null, masterTag: 'bug', name: 'Login page broken on Safari', description: 'Users report the login button does nothing on Safari 17', status: 'in_progress', priority: 'urgent', rank: 2000, assigneeId: null, dueDate: new Date(Date.now() + 86400000).toISOString(), createdAt: new Date(Date.now() - 3600000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-2', userId: '', ticketId: null, masterTag: 'feature', name: 'Dark mode toggle', description: 'Add a theme toggle to the settings panel', status: 'planned', priority: 'medium', rank: 1000, assigneeId: null, dueDate: null, createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-3', userId: '', ticketId: null, masterTag: 'improvement', name: 'Optimize image loading', description: 'Implement lazy loading for gallery images', status: 'reviewing', priority: 'high', rank: 1500, assigneeId: null, dueDate: new Date(Date.now() + 432000000).toISOString(), createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-4', userId: '', ticketId: null, masterTag: 'task', name: 'Update dependencies', description: 'Bump all npm packages to latest semver', status: 'pending', priority: 'low', rank: 500, assigneeId: null, dueDate: null, createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-5', userId: '', ticketId: null, masterTag: 'question', name: 'API rate limit docs unclear', description: 'Customers asking about the 429 response — needs better docs', status: 'pending', priority: 'medium', rank: 1000, assigneeId: null, dueDate: new Date(Date.now() - 86400000).toISOString(), createdAt: new Date(Date.now() - 345600000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-6', userId: '', ticketId: null, masterTag: 'bug', name: 'Notifications not sending', description: 'Push notifications fail silently on Android', status: 'in_progress', priority: 'urgent', rank: 3000, assigneeId: null, dueDate: new Date(Date.now() + 7200000).toISOString(), createdAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-7', userId: '', ticketId: null, masterTag: 'feature', name: 'Export to CSV', description: 'Allow users to export their data as CSV files', status: 'planned', priority: 'low', rank: 500, assigneeId: null, dueDate: null, createdAt: new Date(Date.now() - 432000000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-8', userId: '', ticketId: null, masterTag: 'improvement', name: 'Reduce bundle size', description: 'Code-split route components to reduce initial JS payload', status: 'reviewing', priority: 'medium', rank: 2000, assigneeId: null, dueDate: null, createdAt: new Date(Date.now() - 216000000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-9', userId: '', ticketId: null, masterTag: 'task', name: 'Write integration tests for checkout', description: 'Cover the full purchase flow with Playwright', status: 'pending', priority: 'high', rank: 2500, assigneeId: null, dueDate: new Date(Date.now() + 604800000).toISOString(), createdAt: new Date(Date.now() - 604800000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-10', userId: '', ticketId: null, masterTag: 'bug', name: 'Search returns 500 on special chars', description: 'Querying with & or % crashes the search endpoint', status: 'completed', priority: 'high', rank: 1000, assigneeId: null, dueDate: null, createdAt: new Date(Date.now() - 1209600000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-11', userId: '', ticketId: null, masterTag: 'feature', name: 'Multi-workspace support', description: 'Allow users to belong to multiple workspaces', status: 'completed', priority: 'medium', rank: 2000, assigneeId: null, dueDate: null, createdAt: new Date(Date.now() - 1814400000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 'mock-12', userId: '', ticketId: null, masterTag: 'improvement', name: 'Keyboard shortcuts cheat sheet', description: 'Add a ? shortcut to show all available keyboard shortcuts', status: 'completed', priority: 'low', rank: 500, assigneeId: null, dueDate: null, createdAt: new Date(Date.now() - 2419200000).toISOString(), updatedAt: new Date().toISOString() },
-] : [];
+
 
 export default function Tasks() {
   const [search, setSearch] = useState('');
@@ -503,10 +490,7 @@ export default function Tasks() {
     return map;
   }, [assigneesData]);
 
-  const tasks = useMemo(() => {
-    const apiTasks = data?.tasks ?? [];
-    return apiTasks.length > 0 ? apiTasks : MOCK_TASKS;
-  }, [data]);
+  const tasks = useMemo(() => data?.tasks ?? [], [data]);
 
   const grouped = useMemo(() => {
     const map: Record<string, Task[]> = {};
@@ -602,8 +586,6 @@ export default function Tasks() {
       ? targetTasks[targetTasks.length - 1].rank + 1000
       : 1000;
 
-    const isMock = taskId.startsWith('mock-');
-
     const reorderPayload: { id: string; status: string; rank: number }[] = [
       { id: taskId, status: targetStatus, rank: newRank },
     ];
@@ -625,8 +607,6 @@ export default function Tasks() {
         }),
       };
     });
-
-    if (isMock) return;
 
     try {
       await fetch('/api/tasks/reorder', {

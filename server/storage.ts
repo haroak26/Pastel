@@ -10,6 +10,11 @@ import {
   workspaceMembers,
   apiIntegrations,
   auditLogs,
+  projects,
+  designFiles,
+  userCredits,
+  creditTransactions,
+  creditHolds,
   type User,
   type OnboardingSession,
   type OnboardingStep,
@@ -17,6 +22,11 @@ import {
   type WorkspaceMember,
   type ApiIntegration,
   type Subscription,
+  type Project,
+  type DesignFile,
+  type UserCredits,
+  type CreditTransaction,
+  type CreditHold,
   userSessions,
   type UserSession,
 } from "@shared/schema";
@@ -77,6 +87,21 @@ export interface IStorage {
   deleteIntegration(userId: string, provider: string): Promise<void>;
   getUsage(userId: string): Promise<{ storageUsed: number; projectsCount: number; designFilesCount: number; versionCount: number; componentCount: number }>;
   incrementUsage(userId: string, field: string, amount?: number): Promise<void>;
+  ensureCreditRecord(userId: string): Promise<void>;
+  getCredits(userId: string): Promise<{ balance: number; dailyUsed: number; lifetimePurchased: number; lifetimeUsed: number }>;
+  getMonthlyCreditUsage(userId: string): Promise<number>;
+  deductCredits(userId: string, amount: number, description: string, metadata: Record<string, unknown>): Promise<number>;
+  addCredits(userId: string, amount: number, description: string, metadata: Record<string, unknown>): Promise<number>;
+  createCreditHold(userId: string, amount: number, runId?: string): Promise<string>;
+  releaseCreditHold(holdId: string, actualCredits: number): Promise<void>;
+  getCreditTransactions(userId: string, limit?: number, offset?: number): Promise<CreditTransaction[]>;
+  createProject(ownerId: string, workspaceId: string, data: { name: string; description?: string; color?: string; publicId?: string }): Promise<Project>;
+  getProjectById(id: string): Promise<Project | undefined>;
+  listProjects(workspaceId: string): Promise<Project[]>;
+  createDesignFile(ownerId: string, workspaceId: string, data: { projectId: string; name: string; type?: string; description?: string; metadata?: Record<string, unknown> }): Promise<DesignFile>;
+  getDesignFilesByProject(projectId: string): Promise<DesignFile[]>;
+  updateProject(id: string, data: Partial<{ name: string; description: string | null; coverUrl: string | null; color: string; isArchived: boolean }>): Promise<Project>;
+  deleteProject(id: string): Promise<void>;
   createAuditLog(userId: string, action: string, details?: string, ipAddress?: string): Promise<void>;
   getAuditLogs(userId: string, limit?: number): Promise<Array<{ id: string; action: string; details: string | null; createdAt: Date }>>;
   listUserSessions(userId: string): Promise<UserSession[]>;
@@ -362,6 +387,224 @@ class DatabaseStorage implements IStorage {
         userId, [col]: amount, periodStart, periodEnd,
       } as any);
     }
+  }
+
+  // ── Credits ────────────────────────────────────────────────────────────
+  async ensureCreditRecord(userId: string): Promise<void> {
+    const [existing] = await db.select().from(userCredits).where(eq(userCredits.userId, userId));
+    if (!existing) {
+      await db.insert(userCredits).values({ userId });
+    }
+  }
+
+  async getCredits(userId: string): Promise<{ balance: number; dailyUsed: number; lifetimePurchased: number; lifetimeUsed: number }> {
+    await this.ensureCreditRecord(userId);
+    const [row] = await db.select().from(userCredits).where(eq(userCredits.userId, userId));
+    if (!row) return { balance: 0, dailyUsed: 0, lifetimePurchased: 0, lifetimeUsed: 0 };
+    const now = new Date();
+    const todayStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+    if (!row.dailyResetAt || row.dailyResetAt < todayStart) {
+      await db.update(userCredits).set({ dailyUsed: 0, dailyResetAt: todayStart, updatedAt: new Date() }).where(eq(userCredits.userId, userId));
+      return { balance: row.balance, dailyUsed: 0, lifetimePurchased: row.lifetimePurchased, lifetimeUsed: row.lifetimeUsed };
+    }
+    return { balance: row.balance, dailyUsed: row.dailyUsed, lifetimePurchased: row.lifetimePurchased, lifetimeUsed: row.lifetimeUsed };
+  }
+
+  async getMonthlyCreditUsage(userId: string): Promise<number> {
+    const now = new Date();
+    const monthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1));
+    const result = await db.select({
+      total: sql<number>`COALESCE(SUM(CASE WHEN ${creditTransactions.type} IN ('usage','usage_hold') THEN -${creditTransactions.amount} ELSE 0 END), 0)`,
+    }).from(creditTransactions)
+      .where(and(eq(creditTransactions.userId, userId), gte(creditTransactions.createdAt, monthStart)));
+    return Number(result[0]?.total ?? 0);
+  }
+
+  async deductCredits(userId: string, amount: number, description: string, metadata: Record<string, unknown>): Promise<number> {
+    await this.ensureCreditRecord(userId);
+    return db.transaction(async (tx) => {
+      const [row] = await tx.select().from(userCredits).where(eq(userCredits.userId, userId));
+      if (!row) throw new Error("Credit record not found");
+      const newBalance = Math.round((row.balance - amount) * 100) / 100;
+      const newDailyUsed = Math.round((row.dailyUsed + amount) * 100) / 100;
+      const newLifetimeUsed = Math.round((row.lifetimeUsed + amount) * 100) / 100;
+      await tx.update(userCredits).set({
+        balance: newBalance,
+        dailyUsed: newDailyUsed,
+        lifetimeUsed: newLifetimeUsed,
+        updatedAt: new Date(),
+      }).where(eq(userCredits.userId, userId));
+      await tx.insert(creditTransactions).values({
+        userId,
+        type: "usage",
+        amount: -amount,
+        balanceAfter: newBalance,
+        description,
+        metadata,
+      });
+      return newBalance;
+    });
+  }
+
+  async addCredits(userId: string, amount: number, description: string, metadata: Record<string, unknown>): Promise<number> {
+    await this.ensureCreditRecord(userId);
+    return db.transaction(async (tx) => {
+      const [row] = await tx.select().from(userCredits).where(eq(userCredits.userId, userId));
+      if (!row) throw new Error("Credit record not found");
+      const newBalance = Math.round((row.balance + amount) * 100) / 100;
+      const newLifetimePurchased = Math.round((row.lifetimePurchased + amount) * 100) / 100;
+      const isPurchase = metadata?.type === "purchase" || (metadata as any)?.stripeSessionId;
+      await tx.update(userCredits).set({
+        balance: newBalance,
+        ...(isPurchase ? { lifetimePurchased: newLifetimePurchased } : {}),
+        updatedAt: new Date(),
+      }).where(eq(userCredits.userId, userId));
+      await tx.insert(creditTransactions).values({
+        userId,
+        type: isPurchase ? "purchase" : "grant",
+        amount,
+        balanceAfter: newBalance,
+        description,
+        metadata,
+      });
+      return newBalance;
+    });
+  }
+
+  async createCreditHold(userId: string, amount: number, runId?: string): Promise<string> {
+    await this.ensureCreditRecord(userId);
+    const [hold] = await db.insert(creditHolds).values({
+      userId,
+      runId: runId ?? null,
+      amount,
+      status: "active",
+    }).returning();
+    return hold.id;
+  }
+
+  async releaseCreditHold(holdId: string, actualCredits: number): Promise<void> {
+    await db.transaction(async (tx) => {
+      const [hold] = await tx.select().from(creditHolds).where(eq(creditHolds.id, holdId));
+      if (!hold || hold.status !== "active") return;
+      const diff = Math.round((hold.amount - actualCredits) * 100) / 100;
+      const [row] = await tx.select().from(userCredits).where(eq(userCredits.userId, hold.userId));
+      if (!row) {
+        await tx.update(creditHolds).set({ status: "released", updatedAt: new Date() }).where(eq(creditHolds.id, holdId));
+        return;
+      }
+
+      const newDailyUsed = Math.round((row.dailyUsed + actualCredits) * 100) / 100;
+      const newLifetimeUsed = Math.round((row.lifetimeUsed + actualCredits) * 100) / 100;
+
+      if (diff > 0) {
+        const newBalance = Math.round((row.balance + diff) * 100) / 100;
+        await tx.update(userCredits).set({ balance: newBalance, dailyUsed: newDailyUsed, lifetimeUsed: newLifetimeUsed, updatedAt: new Date() }).where(eq(userCredits.userId, hold.userId));
+        await tx.insert(creditTransactions).values({
+          userId: hold.userId,
+          type: "usage",
+          amount: -actualCredits,
+          balanceAfter: newBalance,
+          description: `Design generation (run: ${hold.runId ?? "unknown"})`,
+          metadata: { holdId, runId: hold.runId, originalHold: hold.amount, actualUsed: actualCredits },
+        });
+        await tx.insert(creditTransactions).values({
+          userId: hold.userId,
+          type: "usage_refund",
+          amount: diff,
+          balanceAfter: newBalance,
+          description: `Refund for unused held credits (run: ${hold.runId ?? "unknown"})`,
+          metadata: { holdId, runId: hold.runId, originalHold: hold.amount, actualUsed: actualCredits },
+        });
+      } else if (diff < 0) {
+        const overage = Math.abs(diff);
+        const newBalance = Math.round((row.balance - overage) * 100) / 100;
+        await tx.update(userCredits).set({ balance: newBalance, dailyUsed: newDailyUsed, lifetimeUsed: newLifetimeUsed, updatedAt: new Date() }).where(eq(userCredits.userId, hold.userId));
+        await tx.insert(creditTransactions).values({
+          userId: hold.userId,
+          type: "usage",
+          amount: -actualCredits,
+          balanceAfter: newBalance,
+          description: `Design generation (run: ${hold.runId ?? "unknown"})`,
+          metadata: { holdId, runId: hold.runId, originalHold: hold.amount, actualUsed: actualCredits },
+        });
+      } else {
+        await tx.update(userCredits).set({ dailyUsed: newDailyUsed, lifetimeUsed: newLifetimeUsed, updatedAt: new Date() }).where(eq(userCredits.userId, hold.userId));
+        await tx.insert(creditTransactions).values({
+          userId: hold.userId,
+          type: "usage",
+          amount: -actualCredits,
+          balanceAfter: row.balance,
+          description: `Design generation (run: ${hold.runId ?? "unknown"})`,
+          metadata: { holdId, runId: hold.runId, originalHold: hold.amount, actualUsed: actualCredits },
+        });
+      }
+
+      await tx.update(creditHolds).set({
+        status: diff >= 0 ? "refunded" : "released",
+        updatedAt: new Date(),
+      }).where(eq(creditHolds.id, holdId));
+    });
+  }
+
+  async getCreditTransactions(userId: string, limit = 50, offset = 0): Promise<CreditTransaction[]> {
+    return db.select().from(creditTransactions)
+      .where(eq(creditTransactions.userId, userId))
+      .orderBy(desc(creditTransactions.createdAt))
+      .limit(limit).offset(offset);
+  }
+
+  // ── Design Files ────────────────────────────────────────────────────────
+  async createDesignFile(ownerId: string, workspaceId: string, data: { projectId: string; name: string; type?: string; description?: string; metadata?: Record<string, unknown> }): Promise<DesignFile> {
+    const [file] = await db.insert(designFiles).values({
+      ownerId,
+      workspaceId,
+      projectId: data.projectId,
+      publicId: `df_${randomBytes(12).toString("hex")}`,
+      name: data.name,
+      type: data.type || "design",
+      description: data.description || null,
+      metadata: (data.metadata || {}) as Record<string, unknown>,
+    }).returning();
+    return file;
+  }
+
+  async getDesignFilesByProject(projectId: string): Promise<DesignFile[]> {
+    return db.select().from(designFiles)
+      .where(and(eq(designFiles.projectId, projectId), eq(designFiles.isArchived, false)))
+      .orderBy(desc(designFiles.createdAt));
+  }
+
+  // ── Projects ────────────────────────────────────────────────────────────
+  async createProject(ownerId: string, workspaceId: string, data: { name: string; description?: string; color?: string; publicId?: string }): Promise<Project> {
+    const [project] = await db.insert(projects).values({
+      ownerId,
+      workspaceId,
+      publicId: data.publicId || `proj_${randomBytes(12).toString("hex")}`,
+      name: data.name,
+      description: data.description || null,
+      color: data.color || "#8b5cf6",
+    }).returning();
+    return project;
+  }
+
+  async getProjectById(id: string): Promise<Project | undefined> {
+    const [project] = await db.select().from(projects).where(eq(projects.id, id));
+    return project;
+  }
+
+  async listProjects(workspaceId: string): Promise<Project[]> {
+    return db.select().from(projects)
+      .where(and(eq(projects.workspaceId, workspaceId), eq(projects.isArchived, false)))
+      .orderBy(desc(projects.updatedAt));
+  }
+
+  async updateProject(id: string, data: Partial<{ name: string; description: string | null; coverUrl: string | null; color: string; isArchived: boolean }>): Promise<Project> {
+    const [project] = await db.update(projects).set({ ...data, updatedAt: new Date() }).where(eq(projects.id, id)).returning();
+    return project;
+  }
+
+  async deleteProject(id: string): Promise<void> {
+    await db.delete(projects).where(eq(projects.id, id));
   }
 
   // ── Audit Logs ────────────────────────────────────────────────────────────

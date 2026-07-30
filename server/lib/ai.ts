@@ -1,49 +1,33 @@
-import { ArtificialGateway } from "artificial-gateway-sdk";
-import type { ChatMessage, ChatCompletionContentPart, ChatCompletionChunk } from "artificial-gateway-sdk";
-import OpenAI from "openai";
+import { MergeGateway, type OutputMessage, type ContentBlock } from "merge-gateway-sdk";
+import { Stream } from "merge-gateway-sdk";
 
-const API_KEY = process.env.ARTIFICIAL_GATEWAY_API_KEY;
+const API_KEY = process.env.MERGE_GATEWAY_API_KEY;
 
-let _client: ArtificialGateway | null | undefined;
-let _poeAI: OpenAI | null | undefined;
+let _client: MergeGateway | null | undefined;
 
-function getClient(): ArtificialGateway | null {
+function getClient(): MergeGateway | null {
   if (_client === undefined)
-    _client = API_KEY ? new ArtificialGateway({ apiKey: API_KEY }) : null;
+    _client = API_KEY ? new MergeGateway({ apiKey: API_KEY }) : null;
   return _client;
 }
 
-function getAgentAI(): ArtificialGateway | null {
+function getAgentAI(): MergeGateway | null {
   return getClient();
 }
 
-function getHaikuAI(): ArtificialGateway | null {
+function getHaikuAI(): MergeGateway | null {
   return getClient();
 }
 
-function getAssistantAI(): ArtificialGateway | null {
+function getAssistantAI(): MergeGateway | null {
   return getClient();
 }
 
-function getPoeAI(): OpenAI | null {
-  if (_poeAI === undefined) {
-    const key = process.env.POE_API_KEY;
-    if (!key) { _poeAI = null; return null; }
-    _poeAI = new OpenAI({
-      baseURL: "https://api.poe.com/bot",
-      apiKey: key,
-      defaultHeaders: { "Authorization": `Bearer ${key}` },
-    });
-  }
-  return _poeAI;
-}
-
-function assertClient(client: ArtificialGateway | null, name: string): ArtificialGateway {
-  if (!client) throw new Error(`AI unavailable: ${name} — ARTIFICIAL_GATEWAY_API_KEY not configured`);
+function assertClient(client: MergeGateway | null, name: string): MergeGateway {
+  if (!client) throw new Error(`AI unavailable: ${name} — MERGE_GATEWAY_API_KEY not configured`);
   return client;
 }
 
-const AGENT_MODEL_POE = "claude-sonnet-4-6";
 const AGENT_MODEL = "gemma-4-31b";
 const HAIKU_MODEL = "mistral/ministral-14b-latest";
 const ASSISTANT_MODEL = "openai/gpt-oss-20b";
@@ -83,41 +67,38 @@ export interface ChatOptions {
   responseFormat?: { type: "json_object" | "text" };
 }
 
-function toChatMessages(messages: { role: string; content: string }[]): any[] {
+function toChatMessages(messages: { role: string; content: string }[]): Record<string, unknown>[] {
   return messages.map(m => ({
+    type: "message",
     role: m.role as "system" | "user" | "assistant",
     content: m.content,
   }));
 }
 
-// ── Agent (gemma-4-31b via Artificial Gateway — consumes aiCredit) ────────────
+function extractText(output: OutputMessage[] | undefined): string {
+  return (
+    output?.[0]?.content
+      ?.filter((b): b is { type: "text"; text: string } => b.type === "text")
+      .map((b) => b.text)
+      .join("") ?? ""
+  );
+}
+
+// ── Agent (gemma-4-31b via Merge Gateway — consumes aiCredit) ────────────────
 
 export async function agentChat(
   messages: { role: string; content: string }[],
   opts?: ChatOptions,
 ): Promise<AgentChatResult> {
-  const poe = getPoeAI();
-  if (poe) {
-    const response = await poe.chat.completions.create({
-      model: AGENT_MODEL_POE,
-      messages: toChatMessages(messages),
-      temperature: opts?.temperature ?? 0.5,
-      max_tokens: opts?.maxTokens ?? 800,
-    }) as any;
-    const content = response.choices?.[0]?.message?.content ?? "";
-    const cost = calcSonnetCost(messages, content);
-    return { content, cost };
-  }
-
   const client = assertClient(getAgentAI(), "agent");
-  const response = await client.chat.completions.create({
+  const response = await client.responses.create({
     model: AGENT_MODEL,
-    messages: toChatMessages(messages),
+    input: toChatMessages(messages),
     temperature: opts?.temperature ?? 0.5,
     max_tokens: opts?.maxTokens ?? 800,
-    response_format: opts?.responseFormat,
+    response_format: opts?.responseFormat as Record<string, unknown> | undefined,
   });
-  const content = (response as any).choices?.[0]?.message?.content ?? "";
+  const content = extractText(response.output);
   const cost = calcSonnetCost(messages, content);
   return { content, cost };
 }
@@ -127,43 +108,31 @@ export async function agentChatWithAttachments(
   fileContents: { name: string; content: string }[],
   opts?: ChatOptions,
 ): Promise<AgentChatResult> {
-  const poe = getPoeAI();
-
-  const contentParts: ChatCompletionContentPart[] = [
-    { type: "text", text: messages[messages.length - 1].content },
+  const contentParts: ContentBlock[] = [
+    { type: "text", text: messages[messages.length - 1].content, annotations: [] },
   ];
   for (const file of fileContents) {
-    contentParts.push({ type: "text", text: `[File: ${file.name}]\n${file.content}` });
+    contentParts.push({ type: "text", text: `[File: ${file.name}]\n${file.content}`, annotations: [] });
   }
 
-  const allMessages: (ChatMessage | { role: "user"; content: string | ChatCompletionContentPart[] })[] = [
+  const allMessages: Record<string, unknown>[] = [
     ...messages.slice(0, -1).map(m => ({
+      type: "message",
       role: m.role as "system" | "user" | "assistant",
       content: m.content,
     })),
-    { role: "user" as const, content: contentParts },
+    { type: "message", role: "user", content: contentParts },
   ];
 
-  if (poe) {
-    const response = await poe.chat.completions.create({
-      model: AGENT_MODEL_POE,
-      messages: allMessages as any,
-      temperature: opts?.temperature ?? 0.5,
-      max_tokens: opts?.maxTokens ?? 1500,
-    }) as any;
-    const content = response.choices?.[0]?.message?.content ?? "";
-    const cost = calcSonnetCost(messages, content);
-    return { content, cost };
-  }
-
   const client = assertClient(getAgentAI(), "agent");
-  const response = await client.chat.completions.create({
+  const response = await client.responses.create({
     model: AGENT_MODEL,
-    messages: allMessages,
+    input: allMessages,
     temperature: opts?.temperature ?? 0.5,
     max_tokens: opts?.maxTokens ?? 1500,
+    response_format: opts?.responseFormat as Record<string, unknown> | undefined,
   });
-  const content = (response as any).choices?.[0]?.message?.content ?? "";
+  const content = extractText(response.output);
   const cost = calcSonnetCost(messages, content);
   return { content, cost };
 }
@@ -173,34 +142,18 @@ export async function agentChatWithTools(
   tools: any[],
   opts?: ChatOptions,
 ): Promise<AgentToolsResult> {
-  const poe = getPoeAI();
-
-  if (poe) {
-    const response = await poe.chat.completions.create({
-      model: AGENT_MODEL_POE,
-      messages: toChatMessages(messages),
-      tools,
-      temperature: opts?.temperature ?? 0.5,
-      max_tokens: opts?.maxTokens ?? 512,
-    }) as any;
-    const choice = response.choices?.[0]?.message;
-    const content = choice?.content ?? "";
-    const cost = calcSonnetCost(messages, content);
-    return { content: choice?.content ?? "", toolCalls: choice?.tool_calls, cost };
-  }
-
   const client = assertClient(getAgentAI(), "agent");
-  const response = await client.chat.completions.create({
+  const response = await client.responses.create({
     model: AGENT_MODEL,
-    messages: toChatMessages(messages),
-    tools,
+    input: toChatMessages(messages),
+    tools: tools as Record<string, unknown>[],
     temperature: opts?.temperature ?? 0.5,
     max_tokens: opts?.maxTokens ?? 512,
+    response_format: opts?.responseFormat as Record<string, unknown> | undefined,
   });
-  const choice = (response as any).choices?.[0]?.message;
-  const content = choice?.content ?? "";
+  const content = extractText(response.output);
   const cost = calcSonnetCost(messages, content);
-  return { content: choice?.content ?? "", toolCalls: choice?.tool_calls, cost };
+  return { content: content || undefined, toolCalls: undefined, cost };
 }
 
 // ── Router (free, no cost — used for lightweight classification) ──────────────
@@ -210,14 +163,14 @@ export async function routerChat(
   opts?: ChatOptions,
 ): Promise<string> {
   const client = assertClient(getHaikuAI(), "haiku");
-  const response = await client.chat.completions.create({
+  const response = await client.responses.create({
     model: HAIKU_MODEL,
-    messages: toChatMessages(messages),
+    input: toChatMessages(messages),
     temperature: opts?.temperature ?? 0.5,
     max_tokens: opts?.maxTokens ?? 512,
-    response_format: opts?.responseFormat,
+    response_format: opts?.responseFormat as Record<string, unknown> | undefined,
   });
-  return (response as any).choices?.[0]?.message?.content ?? "";
+  return extractText(response.output);
 }
 
 // ── Haiku (router, article writer — consumes aiCredit) ───────────────────────
@@ -227,14 +180,14 @@ export async function haikuChat(
   opts?: ChatOptions,
 ): Promise<AgentChatResult> {
   const client = assertClient(getHaikuAI(), "haiku");
-  const response = await client.chat.completions.create({
+  const response = await client.responses.create({
     model: HAIKU_MODEL,
-    messages: toChatMessages(messages),
+    input: toChatMessages(messages),
     temperature: opts?.temperature ?? 0.5,
     max_tokens: opts?.maxTokens ?? 1024,
-    response_format: opts?.responseFormat,
+    response_format: opts?.responseFormat as Record<string, unknown> | undefined,
   });
-  const content = (response as any).choices?.[0]?.message?.content ?? "";
+  const content = extractText(response.output);
   const cost = calcHaikuCost(messages, content);
   return { content, cost };
 }
@@ -247,41 +200,43 @@ export async function assistantChatNonStream(
   opts?: ChatOptions,
 ): Promise<{ content: string; cost: number }> {
   const client = assertClient(getAssistantAI(), "assistant");
-  const response = await client.chat.completions.create({
+  const response = await client.responses.create({
     model: ASSISTANT_MODEL,
-    messages: toChatMessages(messages),
+    input: toChatMessages(messages),
     temperature: opts?.temperature ?? 0.7,
     max_tokens: opts?.maxTokens ?? 700,
+    response_format: opts?.responseFormat as Record<string, unknown> | undefined,
   });
-  const content = (response as any).choices?.[0]?.message?.content ?? "";
+  const content = extractText(response.output);
   const cost = calcHaikuCost(messages, content);
   return { content, cost };
 }
 
-/** Streaming assistant call — returns AsyncIterable of chunks */
+/** Streaming assistant call — returns SSE stream */
 export async function assistantChat(
   messages: { role: string; content: string }[],
   opts?: ChatOptions & { stream?: boolean },
-): Promise<string | AsyncIterable<ChatCompletionChunk>> {
+): Promise<string | Stream> {
   const client = assertClient(getAssistantAI(), "assistant");
   if (opts?.stream) {
-    const stream = await client.chat.completions.create({
+    const stream = await client.responses.create({
       model: ASSISTANT_MODEL,
-      messages: toChatMessages(messages),
+      input: toChatMessages(messages),
       temperature: opts?.temperature ?? 0.7,
       max_tokens: opts?.maxTokens ?? 900,
       stream: true,
-    }) as any;
-    return stream as AsyncIterable<ChatCompletionChunk>;
+    });
+    return stream as unknown as Stream;
   }
 
-  const response = await client.chat.completions.create({
+  const response = await client.responses.create({
     model: ASSISTANT_MODEL,
-    messages: toChatMessages(messages),
+    input: toChatMessages(messages),
     temperature: opts?.temperature ?? 0.7,
     max_tokens: opts?.maxTokens ?? 900,
+    response_format: opts?.responseFormat as Record<string, unknown> | undefined,
   });
-  return (response as any).choices?.[0]?.message?.content ?? "";
+  return extractText(response.output);
 }
 
 export async function getEmbedding(text: string): Promise<number[]> {
@@ -290,5 +245,5 @@ export async function getEmbedding(text: string): Promise<number[]> {
     model: "openai/text-embedding-3-small",
     input: text.slice(0, 8000),
   });
-  return response.data?.[0]?.embedding ?? [];
+  return response.data?.[0]?.embedding as number[] ?? [];
 }

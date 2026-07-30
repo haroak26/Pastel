@@ -12,6 +12,7 @@ type Props = {
   onSubmit: (prompt: string) => void;
   isLoading?: boolean;
   placeholder?: string;
+  systemError?: boolean;
 };
 
 const MODELS = [
@@ -70,14 +71,7 @@ function MenuRow({ label, current, onClick }: { label: string; current: React.Re
   );
 }
 
-const MOCK_ATTACHMENTS: Record<string, { name: string }> = {
-  image: { name: 'photo-2024.jpg' },
-  file: { name: 'design-specs.pdf' },
-  component: { name: 'Button' },
-  asset: { name: 'Logo.svg' },
-};
-
-export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you like to design?' }: Props) {
+export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you like to design?', systemError }: Props) {
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState<string>(MODELS[0].value);
   const [mode, setMode] = useState<string>(MODES[0].value);
@@ -126,11 +120,16 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
   }, [handleSubmit]);
 
   const addAttachment = useCallback((type: Attachment['type']) => {
-    const mock = MOCK_ATTACHMENTS[type];
+    const names: Record<string, string> = {
+      image: 'Attached image',
+      file: 'Attached file',
+      component: 'Attached component',
+      asset: 'Attached asset',
+    };
     const newAttachment: Attachment = {
       id: crypto.randomUUID?.() || Math.random().toString(36).slice(2, 11),
       type,
-      name: mock.name,
+      name: names[type],
     };
     setAttachments(prev => [...prev, newAttachment]);
   }, []);
@@ -141,15 +140,21 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
 
   return (
     <div className="w-full max-w-xl mx-auto">
-      <div className="rounded-[14px] sm:rounded-[20px] border border-border bg-background shadow-[0_4px_16px_rgba(0,0,0,0.06)] transition-shadow duration-200 focus-within:shadow-[0_4px_20px_rgba(0,0,0,0.1)] focus-within:border-[hsl(var(--brand)/0.3)]">
+      <div className={`rounded-[14px] sm:rounded-[20px] border transition-shadow duration-200 ${systemError ? 'border-border/40 bg-surface-muted/30' : 'border-border bg-background shadow-[0_4px_16px_rgba(0,0,0,0.06)] focus-within:shadow-[0_4px_20px_rgba(0,0,0,0.1)] focus-within:border-[hsl(var(--brand)/0.3)]'}`}>
+        {systemError && (
+          <div className="px-3 pt-3 pb-0 flex items-center gap-2">
+            <span className="text-[12px] font-semibold text-danger">System error</span>
+            <span className="text-[11px] text-fg-faint">Please try again later</span>
+          </div>
+        )}
         <textarea
           ref={textareaRef}
-          value={prompt}
-          onChange={(e) => setPrompt(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={placeholder}
+          value={systemError ? '' : prompt}
+          onChange={(e) => { if (!systemError) setPrompt(e.target.value); }}
+          onKeyDown={systemError ? undefined : handleKeyDown}
+          placeholder={systemError ? 'System error' : placeholder}
           rows={2}
-          className="w-full resize-none bg-transparent text-[14px] text-foreground placeholder:text-fg-faint px-3 sm:px-3 pt-3 sm:pt-3 pb-0 sm:pb-1 outline-none border-none leading-relaxed"
+          className="w-full resize-none bg-transparent text-[14px] outline-none border-none leading-relaxed placeholder:text-fg-faint px-3 sm:px-3 pt-3 sm:pt-3 pb-0 sm:pb-1 text-foreground"
         />
 
         {attachments.length > 0 && (
@@ -195,12 +200,12 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
             {/* Attach dropdown */}
             <div className="relative max-md:hidden" ref={attachRef}>
               <button
-                onClick={() => { setAttachOpen(!attachOpen); }}
-                className="flex items-center gap-1.5 h-[32px] px-3 rounded-[10px] text-[13px] font-medium text-foreground bg-surface-hover hover:bg-black/[0.06] transition-colors border-none cursor-pointer"
+                onClick={() => { if (!systemError) setAttachOpen(!attachOpen); }}
+                className="flex items-center gap-1.5 h-[32px] px-3 rounded-[10px] text-[13px] font-medium transition-colors border-none cursor-pointer text-foreground bg-surface-hover hover:bg-black/[0.06]"
               >
                 <Plus size={16} className={`transition-transform duration-200 ${attachOpen ? 'rotate-45' : ''}`} />
               </button>
-              {attachOpen && (
+              {!systemError && attachOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setAttachOpen(false)} />
                   <div className="absolute left-0 bottom-full mb-1 z-20 min-w-[200px] bg-background border border-border rounded-[20px] p-1.5 shadow-lg">
@@ -225,19 +230,19 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
               )}
             </div>
 
-            <div className="w-px h-4 bg-border/60 max-md:hidden" />
+            {!systemError && <div className="w-px h-4 bg-border/60 max-md:hidden" />}
 
             {/* Customize dropdown */}
             <div className="relative max-md:hidden" ref={customizeRef}>
               <button
-                onClick={() => { setCustomizeOpen(!customizeOpen); setPanelView('main'); }}
-                className="flex items-center gap-1.5 h-[32px] px-3 rounded-[10px] text-[13px] font-medium text-foreground bg-surface-hover hover:bg-black/[0.06] transition-colors border-none cursor-pointer whitespace-nowrap"
+                onClick={() => { if (!systemError) { setCustomizeOpen(!customizeOpen); setPanelView('main'); } }}
+                className="flex items-center gap-1.5 h-[32px] px-3 rounded-[10px] text-[13px] font-medium transition-colors border-none cursor-pointer whitespace-nowrap text-foreground bg-surface-hover hover:bg-black/[0.06]"
               >
                 <Settings2 size={14} />
                 Customize
               </button>
 
-              {customizeOpen && (
+              {!systemError && customizeOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => { setCustomizeOpen(false); setPanelView('main'); }} />
                   <div className="absolute left-0 bottom-full mb-1 z-20 min-w-[260px] bg-background border border-border rounded-[20px] p-1.5 shadow-lg">
@@ -340,7 +345,7 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
 
           <Button
             onClick={handleSubmit}
-            disabled={!prompt.trim() || isLoading}
+            disabled={!prompt.trim() || isLoading || systemError}
             isLoading={isLoading}
             size="sm"
             className="rounded-[10px]"

@@ -6,7 +6,6 @@ const ASSETS = [
   { id: '2', name: 'logo.svg', type: 'SVG', size: '48 KB', updated: '2 days ago' },
   { id: '3', name: 'icon-set.png', type: 'Image', size: '1.1 MB', updated: '3 days ago' },
   { id: '4', name: 'font-regular.woff2', type: 'Font', size: '120 KB', updated: '5 days ago' },
-  { id: '5', name: 'mockup-1.jpg', type: 'Image', size: '3.8 MB', updated: '1 week ago' },
   { id: '6', name: 'pattern.svg', type: 'SVG', size: '16 KB', updated: '2 weeks ago' },
 ];
 
@@ -34,6 +33,13 @@ export default function AssetsPage() {
           />
         </div>
 
+        {filtered.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 text-center">
+            <Image size={32} className="text-fg-faint mb-3" strokeWidth={1.5} />
+            <p className="text-[14px] font-medium text-foreground">No assets yet</p>
+            <p className="text-[12px] text-fg-muted mt-1">Upload your first asset to get started.</p>
+          </div>
+        ) : (
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
           {filtered.map((asset) => (
             <div
@@ -52,6 +58,7 @@ export default function AssetsPage() {
             </div>
           ))}
         </div>
+        )}
       </div>
     </div>
   );

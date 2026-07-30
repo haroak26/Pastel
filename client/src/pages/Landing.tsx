@@ -90,8 +90,8 @@ const faqs = [
     a: "Yes, you can upgrade or downgrade whenever you need to from your billing page. Changes take effect immediately and your payment is adjusted prorata.",
   },
   {
-    q: "Is there a free trial on paid plans?",
-    a: "The free starter plan requires no payment card. Paid plans include a 7-day free trial — a payment card is required to start the trial and you can cancel anytime.",
+    q: "Is there a free plan?",
+    a: "Yes! The Free plan is available without a payment card and includes 1 project, 3 design files, 100 MB storage, and 15 AI credits per month. Paid plans start at $19/month.",
   },
   {
     q: "Can my whole team use Pastel?",

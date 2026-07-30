@@ -1,50 +1,19 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from "react";
 import { useLocation } from "wouter";
+import { useQuery } from "@tanstack/react-query";
 import { motion, AnimatePresence } from "framer-motion";
-import { Sparkles, MousePointer2, Image, ZoomIn, ZoomOut, Download, Layout, Plus, ChevronLeft, Hand, Code2, Eye, PaintBucket, FileImage, Share2, ChevronDown, RotateCcw, Copy, Search } from "lucide-react";
+import { Sparkles, MousePointer2, Image, ZoomIn, ZoomOut, Layout, Plus, Hand, Code2, Eye, PaintBucket, FileImage, Share2, ChevronDown, RotateCcw, Copy, Search, Users, Info, MoreHorizontal, FileText, Loader2, AlertTriangle } from "lucide-react";
 import { ComputerIcon, SmartPhone01Icon } from "hugeicons-react";
 import { PromptInput } from "@/components/PromptInput";
 import { CanvasPromptInput } from "@/components/CanvasPromptInput";
-import { Dropdown } from "@/components/ds";
+import { CanvasDropdown } from "@/components/CanvasDropdown";
 import { usePastelAgent } from "@/hooks/use-pastel-agent";
-
-const MOCK_PROJECTS: Record<string, { name: string }> = {
-  "a1b2c3d4-e5f6-7890-abcd-ef1234567890": { name: "Landing Page Redesign" },
-  "b2c3d4e5-f6a7-8901-bcde-f12345678901": { name: "Dashboard UI Kit" },
-  "c3d4e5f6-a7b8-9012-cdef-123456789012": { name: "Mobile App Mockups" },
-};
-
-const MOCK_SCREENS = [
-  { id: "s1", label: "Homepage", icon: ComputerIcon },
-  { id: "s2", label: "About", icon: ComputerIcon },
-  { id: "s3", label: "Pricing", icon: ComputerIcon },
-  { id: "s4", label: "Contact", icon: SmartPhone01Icon },
-  { id: "s5", label: "Blog", icon: ComputerIcon },
-];
-
-const MOCK_COMPONENTS = [
-  { id: "c1", label: "Button", icon: "box" },
-  { id: "c2", label: "Card", icon: "box" },
-  { id: "c3", label: "Navbar", icon: "box" },
-  { id: "c4", label: "Input", icon: "box" },
-  { id: "c5", label: "Modal", icon: "box" },
-];
-
-const MOCK_COLOURS = [
-  { id: "col1", label: "Primary", hex: "#0B99FF" },
-  { id: "col2", label: "Secondary", hex: "#7C3AED" },
-  { id: "col3", label: "Accent", hex: "#F59E0B" },
-  { id: "col4", label: "Background", hex: "#FFFFFF" },
-  { id: "col5", label: "Text", hex: "#1A1A1A" },
-];
-
-const MOCK_UPLOADS = [
-  { id: "u1", label: "logo.svg", type: "svg" },
-  { id: "u2", label: "hero.jpg", type: "image" },
-  { id: "u3", label: "icon-set.png", type: "image" },
-  { id: "u4", label: "font.woff2", type: "font" },
-  { id: "u5", label: "pattern.svg", type: "svg" },
-];
+import { AgentRunCard } from "@/components/agent/AgentRunCard";
+import { ScreenPreview } from "@/components/agent/ScreenPreview";
+import { ScreenPanel } from "@/components/agent/ScreenPanel";
+import { DocsPanel } from "@/components/agent/DocsPanel";
+import { DocReader } from "@/components/agent/DocReader";
+import { FilesPanel } from "@/components/agent/FilesPanel";
 
 const ALL_FONTS = [
   "Inter",
@@ -55,6 +24,35 @@ const ALL_FONTS = [
   "DM Sans",
   "Space Grotesk",
 ];
+
+const DEFAULT_FONT_VALUES: Record<string, string> = {
+  Heading: "Inter",
+  Subheading: "SF Pro",
+  Body: "Inter",
+};
+
+const DEFAULT_SIZE_VALUES: Record<string, string> = {
+  H1: "32px",
+  H2: "24px",
+  H3: "20px",
+  Body: "14px",
+  Small: "12px",
+};
+
+const DEFAULT_COLOUR_VALUES: Record<string, string> = {
+  Primary: "#0B99FF",
+  Secondary: "#7C3AED",
+  Accent: "#F59E0B",
+  Background: "#FFFFFF",
+  Text: "#1A1A1A",
+};
+
+const DEFAULT_RADIUS_VALUES: Record<string, string> = {
+  Small: "4",
+  Medium: "8",
+  Large: "12",
+  "Extra Large": "20",
+};
 
 function CanvasElement({ type, x, y, w, h, label }: { type: string; x: number; y: number; w: number; h: number; label: string }) {
   const base = "absolute rounded-[8px] border-2 border-transparent hover:border-brand/40 group cursor-default";
@@ -81,20 +79,6 @@ function CanvasElement({ type, x, y, w, h, label }: { type: string; x: number; y
       </div>
     );
   }
-  if (type === "circle") {
-    return (
-      <div className={`${base} bg-gradient-to-br from-amber-50 to-orange-50 border-amber-200 rounded-full flex items-center justify-center`} style={{ left: x, top: y, width: w, height: h }}>
-        <span className="text-[9px] font-medium text-amber-600">{label}</span>
-      </div>
-    );
-  }
-  if (type === "line") {
-    return (
-      <div className="absolute flex items-center" style={{ left: x, top: y, width: w, height: h }}>
-        <div className="w-full h-[2px] bg-border rounded-full" />
-      </div>
-    );
-  }
   return null;
 }
 
@@ -103,225 +87,284 @@ export default function CanvasPage() {
   const [activeTool, setActiveTool] = useState("select");
   const [zoom, setZoom] = useState(100);
   const [sidebarTab, setSidebarTab] = useState("screens");
-  const [selectedPage, setSelectedPage] = useState("s1");
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedScreen, setSelectedScreen] = useState<string | null>(null);
+  const [activeDocPath, setActiveDocPath] = useState<string | null>(null);
+  const [activeFilePath, setActiveFilePath] = useState<string | null>(null);
   const [selectedColor, setSelectedColor] = useState<string | null>(null);
-  const [selectedFont, setSelectedFont] = useState<string | null>(null);
-  const [fontRect, setFontRect] = useState<{ top: number; left: number } | null>(null);
+
   const [editingSize, setEditingSize] = useState<string | null>(null);
   const [editingRadius, setEditingRadius] = useState<string | null>(null);
-  const [cornerRadiusValues, setCornerRadiusValues] = useState<Record<string, string>>({
-    Small: "4",
-    Medium: "8",
-    Large: "12",
-    "Extra Large": "20",
-  });
-  const [sizeValues, setSizeValues] = useState<Record<string, string>>({
-    H1: "32px",
-    H2: "24px",
-    H3: "20px",
-    Body: "14px",
-    Small: "12px",
-  });
-  const [fontValues, setFontValues] = useState<Record<string, string>>({
-    Heading: "Inter",
-    Subheading: "SF Pro",
-    Body: "Inter",
-  });
-  const [colourValues, setColourValues] = useState<Record<string, string>>({
-    col1: "#0B99FF",
-    col2: "#7C3AED",
-    col3: "#F59E0B",
-    col4: "#FFFFFF",
-    col5: "#1A1A1A",
-  });
+  const [cornerRadiusValues, setCornerRadiusValues] = useState<Record<string, string>>(DEFAULT_RADIUS_VALUES);
+  const [sizeValues, setSizeValues] = useState<Record<string, string>>(DEFAULT_SIZE_VALUES);
+  const [fontValues, setFontValues] = useState<Record<string, string>>(DEFAULT_FONT_VALUES);
+  const [colourValues, setColourValues] = useState<Record<string, string>>(DEFAULT_COLOUR_VALUES);
   const [sliderHues, setSliderHues] = useState<Record<string, number>>({});
-  const [screens, setScreens] = useState(MOCK_SCREENS);
-  const [screenLabels, setScreenLabels] = useState<Record<string, string>>(
-    Object.fromEntries(MOCK_SCREENS.map(s => [s.id, s.label]))
-  );
-  const [editingScreenName, setEditingScreenName] = useState<string | null>(null);
-  const [screenModes, setScreenModes] = useState<Record<string, 'web' | 'mobile'>>({});
-  const [screenToolbar, setScreenToolbar] = useState(false);
-  const [activeBarBtn, setActiveBarBtn] = useState<string | null>(null);
-  const toolbarRef = useRef<HTMLDivElement>(null);
+  const [mockScreens, setMockScreens] = useState<{ id: string; label: string; icon: React.ElementType }[]>([]);
+  const [selectedMockScreen, setSelectedMockScreen] = useState<string | null>(null);
+  const [projectName, setProjectName] = useState("Untitled");
+  const [editingProjectName, setEditingProjectName] = useState(false);
+  const prevProjectName = useRef(projectName);
+  const [inviteEmail, setInviteEmail] = useState("");
+  const [invitedUsers, setInvitedUsers] = useState<{ name: string; email: string; status: "pending" | "accepted" | "declined" }[]>([]);
+  const [isCreating, setIsCreating] = useState(false);
+
   const searchRef = useRef<HTMLInputElement>(null);
+  const iconHeaderRef = useRef<HTMLDivElement>(null);
+  const sidebarHeaderRef = useRef<HTMLDivElement>(null);
+
+  useLayoutEffect(() => {
+    if (iconHeaderRef.current && sidebarHeaderRef.current) {
+      iconHeaderRef.current.style.height = `${sidebarHeaderRef.current.offsetHeight}px`;
+    }
+  }, []);
+
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [showAgent, setShowAgent] = useState(false);
   const [previewMode, setPreviewMode] = useState<"code" | "preview">("preview");
-  const [pendingPrompt, setPendingPrompt] = useState("");
   const [initialized, setInitialized] = useState(false);
 
+  const projectId = location.startsWith("/canvas/") ? location.replace("/canvas/", "").split("/")[0] : null;
+  const isNewCanvas = projectId === "new";
+  const agentProjectId = projectId && !isNewCanvas ? projectId : null;
+
+  const agent = usePastelAgent(agentProjectId);
   const {
     phases,
+    status,
     isGenerating,
-    code,
     error,
-    cancel,
-    reset,
-    activePhase,
-    currentPhaseIndex,
     phaseOrder,
-    result,
-    clarify,
-    skipClarify,
-    setAnswer,
-    submitAnswers,
+    phaseLabels,
+    docs,
+    files,
+    screens: agentScreens,
+    brandKit,
+    title: agentTitle,
+    activity,
+    failedScreens,
+    originalPrompt,
+    runId,
     questions,
     answers,
     awaitingAnswers,
-  } = usePastelAgent();
+    pendingPrompt,
+    isClarifying,
+    clarify,
+    setAnswer,
+    submitAnswers,
+    skipClarify,
+    reset,
+  } = agent;
 
-  const projectId = location.startsWith("/canvas/") ? location.replace("/canvas/", "").split("/")[0] : null;
-  const project = projectId ? MOCK_PROJECTS[projectId] : null;
-  const isNewCanvas = projectId === "new";
-  const hasActiveSession = !!code || isGenerating || awaitingAnswers || initialized;
+  const hasSession = status !== "idle" || awaitingAnswers;
 
-  useEffect(() => {
-    if (isNewCanvas) {
-      const storedPrompt = sessionStorage.getItem("pastel-prompt");
-      if (storedPrompt) {
-        sessionStorage.removeItem("pastel-prompt");
-        setShowAgent(true);
-        setPendingPrompt(storedPrompt);
-        setTimeout(() => clarify(storedPrompt), 200);
-      }
+  // Screens to display in the sidebar: live spec'd screens during a run,
+  // verified screens once done, mock screens when there's no session.
+  const specScreens = useMemo(
+    () =>
+      docs
+        .filter((d) => d.kind === "screen-spec")
+        .map((d) => d.path.replace(/^docs\/screens\//, "").replace(/\.md$/, "")),
+    [docs],
+  );
+
+  const displayScreens = useMemo(() => {
+    if (status === "done" && agentScreens.length > 0) {
+      return agentScreens.map((name) => ({ name, ready: true, failed: failedScreens.includes(name) }));
     }
-  }, [isNewCanvas]);
+    if (hasSession && specScreens.length > 0) {
+      return specScreens.map((name) => ({
+        name,
+        ready: status === "done" && agentScreens.includes(name),
+        failed: failedScreens.includes(name),
+      }));
+    }
+    return [];
+  }, [status, agentScreens, specScreens, failedScreens, hasSession]);
+
+  const componentFiles = useMemo(
+    () => Object.keys(files).filter((p) => /^src\/components\/[^/]+\.jsx$/.test(p)),
+    [files],
+  );
+
+  const activeDoc = useMemo(
+    () => docs.find((d) => d.path === activeDocPath) ?? null,
+    [docs, activeDocPath],
+  );
+
+  const activeFile = activeFilePath ? files[activeFilePath] ?? null : null;
+
+  // ── Effects ──
+
+  // Project name (API projects only, not mocks)
+  const { data: apiProject } = useQuery({
+    queryKey: ["/api/projects", projectId],
+    queryFn: async () => {
+      if (!projectId || isNewCanvas) return null;
+      const res = await fetch(`/api/projects`, { credentials: "include" });
+      if (!res.ok) return null;
+      const projects: Array<{ id: string; name: string }> = await res.json();
+      return projects.find((p) => p.id === projectId) || null;
+    },
+    enabled: !!projectId && !isNewCanvas,
+    staleTime: 5 * 60 * 1000,
+  });
 
   useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (toolbarRef.current && !toolbarRef.current.contains(e.target as Node)) {
-        setScreenToolbar(false);
-        setActiveBarBtn(null);
+    if (apiProject) setProjectName(apiProject.name);
+  }, [apiProject, projectId]);
+
+  // Agent-generated title wins once it lands
+  useEffect(() => {
+    if (agentTitle && !editingProjectName) setProjectName(agentTitle);
+  }, [agentTitle, editingProjectName]);
+
+  // Prompt handoff from the home page
+  useEffect(() => {
+    const storedPrompt = sessionStorage.getItem("pastel-prompt");
+    if (storedPrompt && !hasSession && !initialized) {
+      sessionStorage.removeItem("pastel-prompt");
+      setShowAgent(true);
+      setInitialized(true);
+      setTimeout(() => clarify(storedPrompt), 200);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [projectId]);
+
+  // Brand kit → design tab
+  useEffect(() => {
+    if (brandKit) {
+      setColourValues(brandKit.colors);
+      setFontValues(brandKit.fonts);
+      setSizeValues(brandKit.sizes);
+      const radius: Record<string, string> = {};
+      for (const [k, v] of Object.entries(brandKit.radius)) {
+        radius[k] = String(v).replace(/px$/, "");
       }
-    };
-    if (screenToolbar) document.addEventListener("mousedown", handler);
-    return () => document.removeEventListener("mousedown", handler);
-  }, [screenToolbar]);
+      setCornerRadiusValues(radius);
+    }
+  }, [brandKit]);
+
+  // Auto-select the first screen when the run completes
+  useEffect(() => {
+    if (status === "done" && agentScreens.length > 0 && !selectedScreen) {
+      setSelectedScreen(agentScreens[0]);
+    }
+  }, [status, agentScreens, selectedScreen]);
 
   useEffect(() => {
     if (showSearch) searchRef.current?.focus();
   }, [showSearch]);
 
+  // ── Handlers ──
+
   const handlePrompt = useCallback(
-    (prompt: string) => {
-      if (!hasActiveSession) {
-        setShowAgent(true);
-        setPendingPrompt(prompt);
-        setInitialized(true);
-        clarify(prompt);
-      } else {
-        setShowAgent(true);
-        setPendingPrompt(prompt);
-        clarify(prompt);
+    async (prompt: string) => {
+      if (isNewCanvas) {
+        setIsCreating(true);
+        try {
+          const res = await fetch("/api/projects", {
+            method: "POST",
+            credentials: "include",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              name: prompt.length > 200 ? prompt.slice(0, 197) + "..." : prompt,
+              description: prompt,
+            }),
+          });
+          if (res.ok) {
+            const project = await res.json();
+            sessionStorage.setItem("pastel-prompt", prompt);
+            setLocation(`/canvas/${project.id}`);
+            return;
+          }
+        } catch {}
+        setIsCreating(false);
       }
+
+      setShowAgent(true);
+      setInitialized(true);
+      setActiveDocPath(null);
+      clarify(prompt);
     },
-    [clarify, hasActiveSession],
+    [clarify, isNewCanvas, setLocation],
   );
-
-  const handleSubmitAnswers = useCallback(() => {
-    submitAnswers(pendingPrompt);
-  }, [submitAnswers, pendingPrompt]);
-
-  const handleSkipClarify = useCallback(() => {
-    skipClarify(pendingPrompt);
-  }, [skipClarify, pendingPrompt]);
 
   const handleReset = useCallback(() => {
     reset();
     setInitialized(false);
-    setPendingPrompt("");
-    setShowAgent(false);
+    setSelectedScreen(null);
+    setActiveDocPath(null);
+    setActiveFilePath(null);
+    setIsCreating(false);
   }, [reset]);
 
-  const canvasElements =
-    projectId === "a1b2c3d4-e5f6-7890-abcd-ef1234567890"
-      ? [
-          { id: "nav", type: "rect", x: 40, y: 30, w: 560, h: 40, label: "Navigation" },
-          { id: "hero-img", type: "image", x: 340, y: 100, w: 260, h: 200, label: "Hero Image" },
-          { id: "hero-title", type: "text", x: 40, y: 110, w: 280, h: 80, label: "Build Beautiful Products" },
-          { id: "hero-sub", type: "text", x: 40, y: 195, w: 280, h: 60, label: "A modern platform for design teams" },
-          { id: "cta", type: "rect", x: 40, y: 270, w: 140, h: 36, label: "Get Started" },
-          { id: "feature1", type: "rect", x: 40, y: 340, w: 170, h: 120, label: "Feature One" },
-          { id: "feature2", type: "rect", x: 230, y: 340, w: 170, h: 120, label: "Feature Two" },
-          { id: "feature3", type: "rect", x: 420, y: 340, w: 170, h: 120, label: "Feature Three" },
-          { id: "line1", type: "line", x: 40, y: 500, w: 550, h: 2, label: "" },
-          { id: "footer", type: "text", x: 40, y: 520, w: 560, h: 30, label: "© 2026 Pastel. All rights reserved." },
-          { id: "circle1", type: "circle", x: 590, y: 140, w: 40, h: 40, label: "" },
-          { id: "circle2", type: "circle", x: 590, y: 190, w: 40, h: 40, label: "" },
-        ]
-      : projectId === "b2c3d4e5-f6a7-8901-bcde-f12345678901"
-        ? [
-            { id: "sidebar", type: "rect", x: 10, y: 10, w: 160, h: 500, label: "Sidebar" },
-            { id: "header", type: "rect", x: 180, y: 10, w: 460, h: 50, label: "Header" },
-            { id: "card1", type: "rect", x: 180, y: 75, w: 145, h: 90, label: "Revenue" },
-            { id: "card2", type: "rect", x: 335, y: 75, w: 145, h: 90, label: "Users" },
-            { id: "card3", type: "rect", x: 490, y: 75, w: 145, h: 90, label: "Sales" },
-            { id: "chart", type: "rect", x: 180, y: 180, w: 290, h: 200, label: "Chart Area" },
-            { id: "table", type: "rect", x: 485, y: 180, w: 150, h: 200, label: "Activity" },
-            { id: "footer", type: "rect", x: 180, y: 395, w: 455, h: 40, label: "Table Footer" },
-          ]
-        : projectId === "c3d4e5f6-a7b8-9012-cdef-123456789012"
-          ? [
-              { id: "status", type: "rect", x: 180, y: 30, w: 280, h: 30, label: "Status Bar" },
-              { id: "logo", type: "image", x: 290, y: 85, w: 60, h: 60, label: "Logo" },
-              { id: "title", type: "text", x: 180, y: 160, w: 280, h: 30, label: "Welcome Back" },
-              { id: "email", type: "rect", x: 180, y: 200, w: 280, h: 36, label: "Email Input" },
-              { id: "pass", type: "rect", x: 180, y: 245, w: 280, h: 36, label: "Password Input" },
-              { id: "login", type: "rect", x: 180, y: 295, w: 280, h: 40, label: "Login Button" },
-              { id: "divider", type: "line", x: 250, y: 355, w: 140, h: 2, label: "" },
-              { id: "social", type: "rect", x: 220, y: 370, w: 200, h: 32, label: "Social Login" },
-              { id: "signup", type: "text", x: 180, y: 420, w: 280, h: 20, label: "Don't have an account? Sign Up" },
-            ]
-          : [];
+  const openDoc = useCallback((path: string) => {
+    setActiveDocPath(path);
+  }, []);
 
-  const showCanvasPreview = !!code && !isGenerating;
+  const closeDoc = useCallback(() => {
+    setActiveDocPath(null);
+  }, []);
 
-  // ── FULL CANVAS TOOL LAYOUT ──
+  const selectScreen = useCallback((name: string, ready: boolean) => {
+    if (!ready) return;
+    setSelectedScreen(name);
+    setActiveDocPath(null);
+    setPreviewMode("preview");
+  }, []);
+
+  const showPreviewToggle = hasSession && (displayScreens.length > 0 || Object.keys(files).length > 0);
+
+  // ── Render ──
   return (
     <div className="h-dvh bg-background flex flex-col overflow-hidden">
       <div className="flex-1 min-h-0 flex">
         {/* Icon sidebar */}
         <motion.div
-          className="w-[64px] shrink-0 border-r border-border flex flex-col bg-background items-center py-4 gap-0.5 relative z-10"
+          className="w-[64px] shrink-0 border-r border-border flex flex-col bg-background items-center gap-0.5 relative z-10"
           initial={isNewCanvas ? { opacity: 0, x: -16 } : false}
           animate={{ opacity: 1, x: 0 }}
           transition={{ duration: 0.4, delay: 0.3 }}
         >
-          <div className="text-brand mb-1">
-            <svg viewBox="0 0 32 32" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-              <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="currentColor" />
-              <path d="M10 22L16 9L22 22H10Z" fill="white" opacity="0.92" />
-              <circle cx="16" cy="24" r="2.5" fill="white" opacity="0.92" />
-            </svg>
+          <div ref={iconHeaderRef} className="shrink-0 border-b border-border flex items-center justify-center w-full">
+            <span className="text-brand leading-none">
+              <svg viewBox="0 0 32 32" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+                <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="currentColor" />
+                <path d="M10 22L16 9L22 22H10Z" fill="white" opacity="0.92" />
+                <circle cx="16" cy="24" r="2.5" fill="white" opacity="0.92" />
+              </svg>
+            </span>
           </div>
-          <div className="w-[24px] h-px bg-border/50 my-1.5" />
+          <div className="h-[6px]" />
           {[
             { id: "screens", icon: Layout, label: "Screens" },
             { id: "design", icon: PaintBucket, label: "Design" },
+            { id: "docs", icon: FileText, label: "Docs", badge: docs.length },
             { id: "assets", icon: Image, label: "Assets" },
+            { id: "collab", icon: Users, label: "Collab" },
+            { id: "info", icon: Info, label: "Info" },
           ].map((tab) => (
             <button
               key={tab.id}
-              onClick={() => {
-                setSidebarTab(tab.id);
-                if (sidebarCollapsed) setSidebarCollapsed(false);
-              }}
-              className={`flex flex-col items-center gap-0.5 w-full py-[7px] text-[9px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
-                sidebarTab === tab.id ? "bg-brand/10 text-brand" : "text-fg-muted hover:text-foreground"
+              onClick={() => setSidebarTab(tab.id)}
+              className={`relative flex flex-col items-center gap-0.5 w-full py-[7px] text-[9px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
+                sidebarTab === tab.id ? "bg-brand/10 text-brand" : "text-foreground"
               }`}
             >
               <tab.icon size={14} strokeWidth={1.5} />
               {tab.label}
+              {tab.id === "docs" && isGenerating && (
+                <span className="absolute top-[4px] right-[14px] w-[6px] h-[6px] rounded-full bg-brand animate-pulse" />
+              )}
             </button>
           ))}
-          <div className="w-[24px] h-px bg-border/50 my-1.5" />
+          <div className="w-full h-px bg-border my-1.5" />
           <button
             onClick={() => setShowAgent((v) => !v)}
             className={`flex flex-col items-center gap-0.5 w-full py-[7px] text-[9px] font-semibold border-none bg-transparent cursor-pointer transition-colors ${
-              showAgent ? "bg-brand/10 text-brand" : "text-fg-muted hover:text-foreground"
+              showAgent ? "bg-brand/10 text-brand" : "text-foreground"
             }`}
           >
             <Sparkles size={14} strokeWidth={1.5} />
@@ -329,441 +372,492 @@ export default function CanvasPage() {
           </button>
         </motion.div>
 
-        {/* Content panel (collapsible) */}
-        <div
-            className={`w-[200px] shrink-0 flex flex-col bg-background transition-all duration-200 shadow-[2px_0_12px_rgba(0,0,0,0.06)] ${
-              sidebarCollapsed ? "w-0" : ""
-            }`}
-          >
-            <div className="shrink-0 px-3 pt-3 pb-2 border-b border-border">
-              <h2 className="text-[13px] font-semibold text-foreground">{project?.name ?? "Untitled"}</h2>
-              <p className="text-[11px] text-fg-faint mt-0.5">
-                {screens.length} screens · {MOCK_COMPONENTS.length + MOCK_COLOURS.length + MOCK_UPLOADS.length} assets
-              </p>
-            </div>
-
-            <div className="flex-1 overflow-y-auto px-1.5 py-1 space-y-1">
-              {sidebarTab === "screens" && (
-                <>
-                  <div className="px-2.5 pt-1 pb-1 flex items-center justify-between">
-                    <AnimatePresence mode="wait">
-                      {showSearch ? (
-                        <motion.div
-                          key="search"
-                          initial={{ opacity: 0, width: 0 }}
-                          animate={{ opacity: 1, width: "auto" }}
-                          exit={{ opacity: 0, width: 0 }}
-                          transition={{ duration: 0.15 }}
-                          className="flex items-center gap-1.5 overflow-hidden"
-                        >
-                          <Search size={14} strokeWidth={2.5} className="text-fg-muted shrink-0" />
-                          <input
-                            ref={searchRef}
-                            autoFocus
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            onKeyDown={(e) => { if (e.key === 'Escape') { setShowSearch(false); setSearchQuery(""); } }}
-                            placeholder="Search screens..."
-                            className="w-[140px] text-[11px] font-medium text-foreground bg-transparent border-none outline-none placeholder:text-fg-faint"
-                          />
-                        </motion.div>
-                      ) : (
-                        <motion.span
-                          key="label"
-                          initial={{ opacity: 0 }}
-                          animate={{ opacity: 1 }}
-                          exit={{ opacity: 0 }}
-                          className="text-[11px] font-medium text-fg-muted"
-                        >
-                          Screens
-                        </motion.span>
-                      )}
-                    </AnimatePresence>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button
-                        onClick={() => setShowSearch(true)}
-                        className="flex items-center justify-center w-[28px] h-[28px] rounded-[6px] text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer"
-                      >
-                        <Search size={14} strokeWidth={2.5} />
-                      </button>
-                      <button
-                        onClick={() => {
-                          const nextId = `s${screens.length + 1}`;
-                          setScreens(prev => [...prev, { id: nextId, label: `Screen ${prev.length + 1}`, icon: ComputerIcon }]);
-                          setScreenLabels(prev => ({ ...prev, [nextId]: `Screen ${screens.length + 1}` }));
-                          setSelectedPage(nextId);
-                        }}
-                        className="flex items-center justify-center w-[28px] h-[28px] rounded-[6px] text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer"
-                      >
-                        <Plus size={14} strokeWidth={2.5} />
-                      </button>
-                    </div>
-                  </div>
-                  {screens
-                    .filter((s) => (screenLabels[s.id] ?? s.label).toLowerCase().includes(searchQuery.toLowerCase()))
-                    .map((s) => (
-                    <button
-                      key={s.id}
-                      onClick={() => setSelectedPage(s.id)}
-                      className="flex items-center gap-2 w-full h-[28px] px-2.5 rounded-[10px] text-left bg-transparent cursor-pointer transition-colors text-fg-muted hover:text-brand hover:bg-surface-hover box-border border-2 border-transparent hover:border-brand"
-                    >
-                      <s.icon size={12} strokeWidth={1.5} className="shrink-0" />
-                      <span className="text-[11px] font-medium truncate">{screenLabels[s.id] ?? s.label}</span>
-                    </button>
-                  ))}
-                </>
+        {/* Content panel */}
+        <div className="w-[200px] shrink-0 flex flex-col bg-background shadow-[2px_0_12px_rgba(0,0,0,0.06)]">
+          <div ref={sidebarHeaderRef} className="shrink-0 px-3 pt-3 pb-2 border-b border-border">
+            <div className="h-[18px] flex items-center">
+              {editingProjectName ? (
+                <input
+                  autoFocus
+                  value={projectName}
+                  onChange={(e) => setProjectName(e.target.value)}
+                  onBlur={() => { if (!projectName.trim()) setProjectName(prevProjectName.current); setEditingProjectName(false); }}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") {
+                      if (!projectName.trim()) setProjectName(prevProjectName.current);
+                      setEditingProjectName(false);
+                    }
+                  }}
+                  className="text-[13px] font-semibold text-foreground bg-transparent border-none outline-none w-full p-0 m-0"
+                />
+              ) : (
+                <span
+                  onClick={() => { prevProjectName.current = projectName; setEditingProjectName(true); }}
+                  className="text-[13px] font-semibold text-foreground cursor-pointer hover:text-brand transition-colors w-full truncate"
+                >
+                  {projectName}
+                </span>
               )}
+            </div>
+            <p className="text-[11px] text-fg-faint mt-0.5">
+              {hasSession
+                ? `${displayScreens.length} screens · ${docs.length} docs`
+                : `${mockScreens.length} screens`}
+            </p>
+          </div>
 
-              {sidebarTab === "design" && (
-                <>
-                  <div className="px-2.5 pt-1.5 pb-1">
-                    <span className="text-[11px] font-medium text-fg-muted">Fonts</span>
+          <div className="flex-1 overflow-y-auto overflow-x-hidden px-1.5 py-1 space-y-1">
+            {sidebarTab === "screens" && (
+              <>
+                <div className="px-2.5 pr-0 pt-1 pb-1 flex items-center justify-between">
+                  <AnimatePresence mode="wait">
+                    {showSearch ? (
+                      <motion.div
+                        key="search"
+                        initial={{ opacity: 0, width: 0 }}
+                        animate={{ opacity: 1, width: "auto" }}
+                        exit={{ opacity: 0, width: 0 }}
+                        transition={{ duration: 0.15 }}
+                        className="flex items-center gap-1.5 overflow-hidden"
+                      >
+                        <Search size={13} strokeWidth={1.5} className="text-fg-muted shrink-0" />
+                        <input
+                          ref={searchRef}
+                          autoFocus
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === "Escape") { setShowSearch(false); setSearchQuery(""); } }}
+                          placeholder="Search screens..."
+                          className="w-[140px] text-[11px] font-medium text-foreground bg-transparent border-none outline-none placeholder:text-fg-faint"
+                        />
+                      </motion.div>
+                    ) : (
+                      <motion.span
+                        key="label"
+                        initial={false}
+                        animate={{ opacity: 1 }}
+                        exit={{ opacity: 0 }}
+                        className="text-[11.5px] font-semibold text-foreground"
+                      >
+                        Screens
+                      </motion.span>
+                    )}
+                  </AnimatePresence>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <button
+                      onClick={() => setShowSearch((prev) => { if (prev) setSearchQuery(""); return !prev; })}
+                      className="flex items-center justify-center w-[28px] h-[28px] rounded-[6px] text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer"
+                    >
+                      <Search size={13} strokeWidth={1.5} />
+                    </button>
+
                   </div>
-                  <div className="space-y-0.5 pb-1.5">
-                    {[
-                      { role: "Heading", font: "Inter" },
-                      { role: "Subheading", font: "SF Pro" },
-                      { role: "Body", font: "Inter" },
-                    ].map((item) => (
-                      <div key={item.role}>
-                        <button
-                          onClick={(e) => {
-                            if (selectedFont === item.role) {
-                              setSelectedFont(null);
-                              setFontRect(null);
-                            } else {
-                              const r = e.currentTarget.getBoundingClientRect();
-                              setFontRect({ top: r.top, left: r.left });
-                              setSelectedFont(item.role);
-                            }
-                          }}
-                          className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left"
-                        >
-                          <span>{item.role}</span>
+                </div>
+
+                {/* Real agent screens */}
+                {hasSession &&
+                  displayScreens
+                    .filter((s) => s.name.toLowerCase().includes(searchQuery.toLowerCase()))
+                    .map((s, i) => (
+                      <motion.button
+                        key={s.name}
+                        initial={{ opacity: 0, y: 4 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ duration: 0.25, delay: i * 0.04 }}
+                        onClick={() => selectScreen(s.name, s.ready)}
+                        disabled={!s.ready}
+                        className={`flex items-center gap-2 w-full h-[28px] px-2.5 rounded-[10px] text-left transition-colors text-foreground box-border border-2 ${
+                          selectedScreen === s.name && !activeDocPath
+                            ? "bg-surface-hover font-semibold border-transparent"
+                            : "bg-transparent border-transparent font-[450]"
+                        } ${s.ready ? "cursor-pointer hover:bg-surface-hover" : "cursor-default opacity-70"}`}
+                      >
+                        {s.ready ? (
+                          <Layout size={12} strokeWidth={1.5} className="shrink-0" />
+                        ) : s.failed ? (
+                          <AlertTriangle size={12} strokeWidth={1.5} className="shrink-0 text-warning" />
+                        ) : (
+                          <Loader2 size={12} className="shrink-0 animate-spin text-fg-faint" />
+                        )}
+                        <span className="text-[11px] truncate">{s.name}</span>
+                        {s.failed && <span className="ml-auto text-[9px] text-warning font-medium">warn</span>}
+                      </motion.button>
+                    ))}
+
+                {hasSession && displayScreens.length === 0 && (
+                  <div className="px-2.5 py-4 text-center">
+                    <Loader2 size={14} className="animate-spin text-fg-faint mx-auto mb-1.5" />
+                    <p className="text-[11px] text-fg-muted leading-relaxed">
+                      The agent is planning the screens — they'll appear here.
+                    </p>
+                  </div>
+                )}
+
+                {!hasSession && (
+                  <div className="px-2.5 py-4 text-center">
+                    <p className="text-[11px] text-fg-muted leading-relaxed">
+                      No screens yet — describe what you want to build above.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
+
+            {sidebarTab === "design" && (
+              <>
+                <div className="px-2.5 pt-1.5 pb-1">
+                  <span className="text-[11.5px] font-semibold text-foreground">Fonts</span>
+                </div>
+                <div className="space-y-0.5 pb-1.5">
+                  {Object.entries(fontValues).map(([role]) => (
+                    <div key={role}>
+                      <CanvasDropdown
+                        value={fontValues[role]}
+                        onChange={(font) => setFontValues((prev) => ({ ...prev, [role]: font }))}
+                        options={[...new Set([...Object.values(fontValues), ...ALL_FONTS])].map((f) => ({ value: f, label: f }))}
+                        align="center"
+                      >
+                        <button className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-[450] text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
+                          <span className="capitalize">{role}</span>
                           <span className="flex items-center gap-1 text-fg-faint">
-                            {fontValues[item.role]}
-                            <ChevronDown size={12} className={`transition-transform duration-200 ${selectedFont === item.role ? 'rotate-180' : ''}`} />
+                            {fontValues[role]}
+                            <ChevronDown size={12} />
                           </span>
                         </button>
+                      </CanvasDropdown>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="h-px bg-border -mx-2" />
+
+                <div className="px-2.5 pt-1.5 pb-1">
+                  <span className="text-[11.5px] font-semibold text-foreground">Font sizes</span>
+                </div>
+                <div className="space-y-0.5 pb-1.5">
+                  {Object.entries(sizeValues).map(([label, val]) => (
+                    <div key={label}>
+                      {editingSize === label ? (
+                        <div className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-[450] text-foreground">
+                          <span className="capitalize">{label}</span>
+                          <div className="flex items-center gap-0.5">
+                            <input
+                              autoFocus
+                              value={String(val).replace("px", "")}
+                              onChange={(e) => setSizeValues((prev) => ({ ...prev, [label]: e.target.value + "px" }))}
+                              onBlur={() => setEditingSize(null)}
+                              onKeyDown={(e) => { if (e.key === "Enter") setEditingSize(null); }}
+                              className="w-[40px] text-right text-[11px] font-[450] text-foreground bg-transparent border-none outline-none"
+                            />
+                            <span className="text-fg-faint text-[11px]">px</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setEditingSize(label)}
+                          className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-[450] text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left"
+                        >
+                          <span className="capitalize">{label}</span>
+                          <span className="text-fg-faint">{val}</span>
+                        </button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="h-px bg-border -mx-2" />
+
+                <div className="px-2.5 pt-1.5 pb-1">
+                  <span className="text-[11.5px] font-semibold text-foreground">Colours</span>
+                </div>
+                <div className="space-y-0.5 pb-1.5">
+                  {Object.entries(colourValues).map(([id, hex]) => {
+                    const safeHex = /^#[0-9a-fA-F]{6}$/.test(hex) ? hex : "#888888";
+                    const r = parseInt(safeHex.slice(1, 3), 16) || 0;
+                    const g = parseInt(safeHex.slice(3, 5), 16) || 0;
+                    const b = parseInt(safeHex.slice(5, 7), 16) || 0;
+                    return (
+                      <div key={id}>
+                        <button
+                          onClick={() => setSelectedColor(selectedColor === id ? null : id)}
+                          className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-[450] text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left"
+                        >
+                          <span className="flex items-center gap-2.5">
+                            <div
+                              className="w-[16px] h-[16px] rounded-[4px] border border-border/60 shrink-0"
+                              style={{ backgroundColor: safeHex }}
+                            />
+                            <span className="capitalize">{id}</span>
+                          </span>
+                          <span className="text-fg-faint">{hex}</span>
+                        </button>
+                        {selectedColor === id && (
+                          <div className="px-3 pb-2 pt-1.5 space-y-2">
+                            <div
+                              className="w-full h-[64px] rounded-[8px]"
+                              style={{
+                                background: `linear-gradient(135deg, ${safeHex} 0%, rgb(${Math.min(r + 100, 255)}, ${Math.min(g + 100, 255)}, ${Math.min(b + 100, 255)}) 100%)`,
+                              }}
+                            />
+                            <div className="flex items-center gap-2">
+                              <span className="text-[10px] text-fg-muted font-medium uppercase tracking-wider w-7">Hex</span>
+                              <span className="text-fg-faint text-[12px] font-mono">#</span>
+                              <input
+                                value={safeHex.slice(1)}
+                                onChange={(e) => {
+                                  setColourValues((prev) => ({ ...prev, [id]: `#${e.target.value}` }));
+                                }}
+                                className="flex-1 h-[28px] px-2 rounded-[6px] bg-surface-muted text-[12px] font-mono text-foreground border-none outline-none"
+                              />
+                            </div>
+                          </div>
+                        )}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
+                </div>
 
-                  <div className="h-px bg-border -mx-2" />
+                <div className="h-px bg-border -mx-2" />
 
-                  <div className="px-2.5 pt-1.5 pb-1">
-                    <span className="text-[11px] font-medium text-fg-muted">Font sizes</span>
-                  </div>
-                  <div className="space-y-0.5 pb-1.5">
-                    {[
-                      { label: "H1", size: "32px" },
-                      { label: "H2", size: "24px" },
-                      { label: "H3", size: "20px" },
-                      { label: "Body", size: "14px" },
-                      { label: "Small", size: "12px" },
-                    ].map((s) => (
-                      <div key={s.label}>
-                        {editingSize === s.label ? (
-                          <div className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground">
-                            <span>{s.label}</span>
+                <div className="px-2.5 pt-1.5 pb-1">
+                  <span className="text-[11.5px] font-semibold text-foreground">Roundness</span>
+                </div>
+                <div className="space-y-0.5 pb-1.5">
+                  {Object.entries(cornerRadiusValues).map(([label, rawVal]) => {
+                    const val = parseInt(rawVal) || 0;
+                    const r = Math.min(val, 16);
+                    return (
+                      <div key={label}>
+                        {editingRadius === label ? (
+                          <div className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-[450] text-foreground">
+                            <span className="flex items-center gap-2.5 capitalize">
+                              <svg width="14" height="14" viewBox="0 0 28 28" fill="none" className="shrink-0">
+                                <path d={`M 2 24 L 2 ${2 + r} Q 2 2 ${2 + r} 2 L 24 2`} stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" className="text-foreground" />
+                              </svg>
+                              {label}
+                            </span>
                             <div className="flex items-center gap-0.5">
                               <input
                                 autoFocus
-                                value={sizeValues[s.label].replace("px", "")}
-                                onChange={(e) => setSizeValues(prev => ({ ...prev, [s.label]: e.target.value + "px" }))}
-                                onBlur={() => setEditingSize(null)}
-                                onKeyDown={(e) => { if (e.key === 'Enter') setEditingSize(null); }}
-                                className="w-[40px] text-right text-[11px] font-medium text-foreground bg-transparent border-none outline-none"
+                                value={rawVal}
+                                onChange={(e) => setCornerRadiusValues((prev) => ({ ...prev, [label]: e.target.value }))}
+                                onBlur={() => setEditingRadius(null)}
+                                onKeyDown={(e) => { if (e.key === "Enter") setEditingRadius(null); }}
+                                className="w-[40px] text-right text-[11px] font-[450] text-foreground bg-transparent border-none outline-none"
                               />
                               <span className="text-fg-faint text-[11px]">px</span>
                             </div>
                           </div>
                         ) : (
                           <button
-                            onClick={() => setEditingSize(s.label)}
-                            className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left w-full"
+                            onClick={() => setEditingRadius(label)}
+                            className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-[450] text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left"
                           >
-                            <span>{s.label}</span>
-                            <span className="text-fg-faint">{sizeValues[s.label]}</span>
+                            <span className="flex items-center gap-2.5 capitalize">
+                              <svg width="14" height="14" viewBox="0 0 28 28" fill="none" className="shrink-0">
+                                <path d={`M 2 24 L 2 ${2 + r} Q 2 2 ${2 + r} 2 L 24 2`} stroke="currentColor" strokeWidth="2" fill="none" strokeLinecap="round" className="text-foreground" />
+                              </svg>
+                              {label}
+                            </span>
+                            <span className="text-fg-faint">{rawVal}px</span>
                           </button>
                         )}
                       </div>
-                    ))}
-                  </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
 
-                  <div className="h-px bg-border -mx-2" />
+            {sidebarTab === "docs" && (
+              <DocsPanel
+                docs={docs}
+                isRunning={isGenerating}
+                activeDocPath={activeDocPath}
+                onOpenDoc={openDoc}
+              />
+            )}
 
-                  <div className="px-2.5 pt-1.5 pb-1">
-                    <span className="text-[11px] font-medium text-fg-muted">Colours</span>
-                  </div>
-                  <div className="space-y-0.5 pb-1.5">
-                    {MOCK_COLOURS.map((col) => {
-                      const hex = colourValues[col.id];
-                      const r = parseInt(hex.slice(1, 3), 16) || 0;
-                      const g = parseInt(hex.slice(3, 5), 16) || 0;
-                      const b = parseInt(hex.slice(5, 7), 16) || 0;
-                      return (
-                        <div key={col.id}>
-                          <button
-                            onClick={() => setSelectedColor(selectedColor === col.id ? null : col.id)}
-                            className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left"
-                          >
-                            <span className="flex items-center gap-2.5">
-                              <div
-                                className="w-[16px] h-[16px] rounded-[4px] border border-border/60 shrink-0"
-                                style={{ backgroundColor: hex }}
-                              />
-                              {col.label}
-                            </span>
-                            <span className="text-fg-faint">{hex}</span>
-                          </button>
-                          {selectedColor === col.id && (
-                            <div className="px-3 pb-2 pt-1.5 space-y-2">
-                              <div
-                                className="w-full h-[64px] rounded-[8px]"
-                                style={{
-                                  background: `linear-gradient(135deg, ${hex} 0%, rgb(${Math.min(r + 100, 255)}, ${Math.min(g + 100, 255)}, ${Math.min(b + 100, 255)}) 100%)`,
-                                }}
-                              />
-                              <input
-                                type="range"
-                                min="0"
-                                max="360"
-                                value={col.id in sliderHues ? sliderHues[col.id] : (() => {
-                                  const rr = r / 255, gg = g / 255, bb = b / 255;
-                                  const mx = Math.max(rr, gg, bb), mn = Math.min(rr, gg, bb);
-                                  if (mx === mn) return 0;
-                                  const d = mx - mn;
-                                  let h = 0;
-                                  if (mx === rr) h = ((gg - bb) / d + (gg < bb ? 6 : 0)) * 60;
-                                  else if (mx === gg) h = ((bb - rr) / d + 2) * 60;
-                                  else h = ((rr - gg) / d + 4) * 60;
-                                  return Math.round(h);
-                                })()}
-                                onChange={(e) => {
-                                  const h = parseInt(e.target.value);
-                                  setSliderHues(prev => ({ ...prev, [col.id]: h }));
-                                  const s = 80, l = 55;
-                                  const c = (1 - Math.abs(2 * l / 100 - 1)) * s / 100;
-                                  const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-                                  const m = l / 100 - c / 2;
-                                  let r1 = 0, g1 = 0, b1 = 0;
-                                  if (h < 60) { r1 = c; g1 = x; }
-                                  else if (h < 120) { r1 = x; g1 = c; }
-                                  else if (h < 180) { g1 = c; b1 = x; }
-                                  else if (h < 240) { g1 = x; b1 = c; }
-                                  else if (h < 300) { r1 = x; b1 = c; }
-                                  else { r1 = c; b1 = x; }
-                                  const toHex = (n: number) => Math.round((n + m) * 255).toString(16).padStart(2, "0");
-                                  setColourValues(prev => ({ ...prev, [col.id]: `#${toHex(r1)}${toHex(g1)}${toHex(b1)}` }));
-                                }}
-                                className="w-full h-[20px] rounded-[6px] appearance-none cursor-pointer [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-[12px] [&::-webkit-slider-thumb]:h-[12px] [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-[radial-gradient(circle_at_center,white_3px,#171717_3px)] [&::-moz-range-thumb]:w-[12px] [&::-moz-range-thumb]:h-[12px] [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-[radial-gradient(circle_at_center,white_3px,#171717_3px)]"
-                                style={{
-                                  background: "linear-gradient(to right, #ff0000, #ffff00, #00ff00, #00ffff, #0000ff, #ff00ff, #ff0000)",
-                                }}
-                              />
-                              <div className="flex items-center gap-2">
-                                <span className="text-[10px] text-fg-muted font-medium uppercase tracking-wider w-7">Hex</span>
-                                <span className="text-fg-faint text-[12px] font-mono">#</span>
-                                <input
-                                  value={hex.slice(1)}
-                                  onChange={(e) => {
-                                    const newHex = `#${e.target.value}`;
-                                    setColourValues(prev => ({ ...prev, [col.id]: newHex }));
-                                    const rr = parseInt(newHex.slice(1, 3), 16) / 255 || 0;
-                                    const gg = parseInt(newHex.slice(3, 5), 16) / 255 || 0;
-                                    const bb = parseInt(newHex.slice(5, 7), 16) / 255 || 0;
-                                    const mx = Math.max(rr, gg, bb), mn = Math.min(rr, gg, bb);
-                                    let h = 0;
-                                    if (mx !== mn) {
-                                      const d = mx - mn;
-                                      if (mx === rr) h = ((gg - bb) / d + (gg < bb ? 6 : 0)) * 60;
-                                      else if (mx === gg) h = ((bb - rr) / d + 2) * 60;
-                                      else h = ((rr - gg) / d + 4) * 60;
-                                    }
-                                    setSliderHues(prev => ({ ...prev, [col.id]: Math.round(h) }));
-                                  }}
-                                  className="flex-1 h-[28px] px-2 rounded-[6px] bg-surface-muted text-[12px] font-mono text-foreground border-none outline-none"
-                                />
-                              </div>
-                            </div>
-                          )}
+            {sidebarTab === "assets" && (
+              <>
+                <div className="px-2.5 pt-1.5 pb-1 flex items-center justify-between">
+                  <span className="text-[11.5px] font-semibold text-foreground">Components</span>
+                </div>
+                <div className="space-y-1.5 px-2.5">
+                    {(componentFiles.length > 0
+                      ? componentFiles.map((p) => ({ id: p, label: p.split("/").pop()!.replace(/\.jsx$/, "") }))
+                      : []
+                    ).slice(0, 6).map((c, i) => (
+                    <div
+                      key={c.id}
+                      className="group rounded-[10px] border border-border bg-background hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-150 cursor-pointer overflow-hidden"
+                      onClick={() => {
+                        if (files[c.id]) {
+                          setActiveFilePath(c.id);
+                          setPreviewMode("code");
+                          setActiveDocPath(null);
+                        }
+                      }}
+                    >
+                      <div className="aspect-[16/8] bg-surface-hover flex items-center justify-center">
+                        <div className="w-5 h-5 rounded-[4px] border border-border/40 bg-background flex items-center justify-center">
+                          <span className="text-[9px] font-bold text-fg-muted uppercase">{c.label.slice(0, 2)}</span>
                         </div>
-                      );
-                    })}
-                  </div>
-
-                  {selectedFont && fontRect && (
-                    <>
-                      <div className="fixed inset-0 z-40" onClick={() => { setSelectedFont(null); setFontRect(null); }} />
-                      <div
-                        className="fixed z-50 bg-background border border-border rounded-[20px] p-1.5 shadow-lg min-w-[200px]"
-                        style={{
-                          top: fontRect.top + 32,
-                          left: fontRect.left + 8,
-                        }}
-                      >
-                        {ALL_FONTS.map((font) => (
-                          <button
-                            key={font}
-                            onClick={() => { setFontValues(prev => ({ ...prev, [selectedFont]: font })); setSelectedFont(null); setFontRect(null); }}
-                            className={`flex w-full items-center px-2.5 py-2 rounded-[14px] text-[11px] font-medium text-left transition-colors border-none bg-transparent cursor-pointer ${
-                              fontValues[selectedFont] === font ? 'bg-surface-hover text-foreground' : 'text-foreground hover:text-foreground hover:bg-surface-hover'
-                            }`}
-                          >
-                            {font}
-                          </button>
-                        ))}
                       </div>
-                    </>
+                      <div className="h-px bg-border/60" />
+                      <div className="px-2.5 py-1.5">
+                        <p className="text-[12px] font-[450] text-foreground truncate">{c.label}</p>
+                        <p className="text-[10px] text-fg-faint mt-0.5">{files[c.id] ? "Generated component" : ["2 hours ago", "Yesterday", "3 days ago", "1 week ago"][i % 4]}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="h-px bg-border -mx-2" />
+
+                <div className="px-2.5 pt-1.5 pb-1 flex items-center justify-between">
+                  <span className="text-[11.5px] font-semibold text-foreground">Uploads</span>
+                </div>
+                <div className="space-y-1.5 px-2.5">
+                  {([]
+                  ).slice(0, 4).map((u: any, i: number) => (
+                    <div
+                      key={u.id}
+                      className="group rounded-[10px] border border-border bg-background hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-150 cursor-pointer overflow-hidden"
+                    >
+                      <div className="aspect-[16/8] bg-surface-hover flex items-center justify-center">
+                        {u.type === "image" ? (
+                          <Image size={16} strokeWidth={1.5} className="text-fg-muted" />
+                        ) : (
+                          <FileImage size={16} strokeWidth={1.5} className="text-fg-muted" />
+                        )}
+                      </div>
+                      <div className="h-px bg-border/60" />
+                      <div className="px-2.5 py-1.5">
+                        <p className="text-[12px] font-[450] text-foreground truncate">{u.label}</p>
+                        <p className="text-[10px] text-fg-faint mt-0.5">{["2 hours ago", "Yesterday", "3 days ago", "1 week ago"][i % 4]}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+
+            {sidebarTab === "collab" && (
+              <>
+                <div className="px-2.5 pt-1.5 pb-2">
+                  <span className="text-[11.5px] font-semibold text-foreground">Invite</span>
+                </div>
+                <div className="px-2.5 pb-2">
+                  <div className="flex items-center gap-1">
+                    <input
+                      value={inviteEmail}
+                      onChange={(e) => setInviteEmail(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" && inviteEmail.trim()) {
+                          setInvitedUsers((prev) => [...prev, { name: inviteEmail.trim(), email: inviteEmail.trim(), status: "pending" }]);
+                          setInviteEmail("");
+                        }
+                      }}
+                      placeholder="Email or name..."
+                      className="flex-1 h-[28px] px-2 rounded-[6px] bg-surface-muted text-[12px] text-foreground border-none outline-none placeholder:text-fg-faint"
+                    />
+                    <button
+                      onClick={() => {
+                        if (inviteEmail.trim()) {
+                          setInvitedUsers((prev) => [...prev, { name: inviteEmail.trim(), email: inviteEmail.trim(), status: "pending" }]);
+                          setInviteEmail("");
+                        }
+                      }}
+                      className="flex items-center justify-center w-[28px] h-[28px] rounded-[6px] text-fg-muted hover:text-brand hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer shrink-0"
+                    >
+                      <Plus size={14} strokeWidth={2} />
+                    </button>
+                  </div>
+                </div>
+                <div className="px-2.5 pt-1 pb-1">
+                  <span className="text-[11.5px] font-semibold text-foreground">People</span>
+                </div>
+                <div className="space-y-0.5">
+                  {invitedUsers.length === 0 && (
+                    <p className="text-[11px] text-fg-faint py-2 text-center">No team members yet</p>
                   )}
-
-                  <div className="h-px bg-border -mx-2" />
-
-                  <div className="px-2.5 pt-1.5 pb-1">
-                    <span className="text-[11px] font-medium text-fg-muted">Roundness</span>
-                  </div>
-                  <div className="space-y-0.5 pb-1.5">
-                    {[
-                      { label: "Small", key: "Small" },
-                      { label: "Medium", key: "Medium" },
-                      { label: "Large", key: "Large" },
-                      { label: "Extra Large", key: "Extra Large" },
-                    ].map((s) => {
-                      const val = parseInt(cornerRadiusValues[s.key]) || 0;
-                      const r = Math.min(val, 16);
-                      return (
-                        <div key={s.key}>
-                          {editingRadius === s.key ? (
-                            <div className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground">
-                              <span className="flex items-center gap-2.5">
-                                <svg width="16" height="16" viewBox="0 0 28 28" fill="none" className="shrink-0">
-                                  <path
-                                    d={`M 2 24 L 2 ${2 + r} Q 2 2 ${2 + r} 2 L 24 2`}
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    fill="none"
-                                    strokeLinecap="round"
-                                    className="text-fg-faint"
-                                  />
-                                </svg>
-                                {s.label}
-                              </span>
-                              <div className="flex items-center gap-0.5">
-                                <input
-                                  autoFocus
-                                  value={cornerRadiusValues[s.key]}
-                                  onChange={(e) => setCornerRadiusValues(prev => ({ ...prev, [s.key]: e.target.value }))}
-                                  onBlur={() => setEditingRadius(null)}
-                                  onKeyDown={(e) => { if (e.key === 'Enter') setEditingRadius(null); }}
-                                  className="w-[40px] text-right text-[11px] font-medium text-foreground bg-transparent border-none outline-none"
-                                />
-                                <span className="text-fg-faint text-[11px]">px</span>
-                              </div>
-                            </div>
-                          ) : (
-                            <button
-                              onClick={() => setEditingRadius(s.key)}
-                              className="flex w-full items-center justify-between px-2.5 h-[28px] rounded-[10px] text-[11px] font-medium text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left w-full"
-                            >
-                              <span className="flex items-center gap-2.5">
-                                <svg width="16" height="16" viewBox="0 0 28 28" fill="none" className="shrink-0">
-                                  <path
-                                    d={`M 2 24 L 2 ${2 + r} Q 2 2 ${2 + r} 2 L 24 2`}
-                                    stroke="currentColor"
-                                    strokeWidth="2"
-                                    fill="none"
-                                    strokeLinecap="round"
-                                    className="text-fg-faint"
-                                  />
-                                </svg>
-                                {s.label}
-                              </span>
-                              <span className="text-fg-faint">{cornerRadiusValues[s.key]}px</span>
-                            </button>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </>
-              )}
-
-              {sidebarTab === "assets" && (
-                <>
-                  <div className="px-2.5 pt-1 pb-1 flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-fg-muted">Components</span>
-                    <button className="text-[11px] font-medium text-brand hover:text-brand/80 transition-colors border-none bg-transparent cursor-pointer">See all</button>
-                  </div>
-                  <div className="space-y-1.5 px-2.5">
-                    {MOCK_COMPONENTS.slice(0, 4).map((c, i) => (
-                      <div
-                        key={c.id}
-                        className="group rounded-[10px] border border-border bg-background hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-150 cursor-pointer overflow-hidden"
-                      >
-                        <div className="aspect-[16/8] bg-surface-hover flex items-center justify-center">
-                          <div className="w-5 h-5 rounded-[4px] border border-border/40 bg-background flex items-center justify-center">
-                            <span className="text-[9px] font-bold text-fg-muted uppercase">{c.label.slice(0, 2)}</span>
-                          </div>
-                        </div>
-                        <div className="h-px bg-border/60" />
-                        <div className="px-2.5 py-1.5">
-                          <p className="text-[12px] font-medium text-foreground truncate">{c.label}</p>
-                          <p className="text-[10px] text-fg-faint mt-0.5">{["2 hours ago", "Yesterday", "3 days ago", "1 week ago"][i]}</p>
-                        </div>
+                  {invitedUsers.map((user, i) => (
+                    <div key={i} className="flex items-center gap-2 px-2.5 h-[32px] rounded-[8px]">
+                      <div className="w-[20px] h-[20px] rounded-full bg-surface-hover flex items-center justify-center shrink-0">
+                        <span className="text-[10px] font-semibold text-fg-muted">
+                          {user.name.split(" ").map((n) => n[0]).join("").slice(0, 2).toUpperCase()}
+                        </span>
                       </div>
-                    ))}
-                    <button className="flex items-center gap-2 w-full h-[28px] px-2.5 rounded-[10px] text-left border-none bg-transparent cursor-pointer text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors">
-                      <Plus size={12} strokeWidth={1.5} />
-                      <span className="text-[11px] font-medium">Add component</span>
-                    </button>
-                  </div>
-
-                  <div className="h-px bg-border my-3 -mx-2" />
-
-                  <div className="px-2.5 pt-1 pb-1 flex items-center justify-between">
-                    <span className="text-[11px] font-medium text-fg-muted">Uploads</span>
-                    <button className="text-[11px] font-medium text-brand hover:text-brand/80 transition-colors border-none bg-transparent cursor-pointer">See all</button>
-                  </div>
-                  <div className="space-y-1.5 px-2.5">
-                    {MOCK_UPLOADS.slice(0, 4).map((u, i) => (
-                      <div
-                        key={u.id}
-                        className="group rounded-[10px] border border-border bg-background hover:shadow-[0_2px_8px_rgba(0,0,0,0.06)] transition-all duration-150 cursor-pointer overflow-hidden"
-                      >
-                        <div className="aspect-[16/8] bg-surface-hover flex items-center justify-center">
-                          {u.type === "image" ? (
-                            <Image size={16} strokeWidth={1.5} className="text-fg-muted" />
-                          ) : (
-                            <FileImage size={16} strokeWidth={1.5} className="text-fg-muted" />
-                          )}
-                        </div>
-                        <div className="h-px bg-border/60" />
-                        <div className="px-2.5 py-1.5">
-                          <p className="text-[12px] font-medium text-foreground truncate">{u.label}</p>
-                          <p className="text-[10px] text-fg-faint mt-0.5">{["2 hours ago", "Yesterday", "3 days ago", "1 week ago"][i]}</p>
-                        </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-[11px] font-medium text-foreground truncate">{user.name}</p>
                       </div>
-                    ))}
-                    <button className="flex items-center gap-2 w-full h-[28px] px-2.5 rounded-[10px] text-left border-none bg-transparent cursor-pointer text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors">
-                      <Plus size={12} strokeWidth={1.5} />
-                      <span className="text-[11px] font-medium">Upload asset</span>
-                    </button>
-                  </div>
-                </>
-              )}
-            </div>
+                      <div className={`text-[10px] font-medium shrink-0 ${
+                        user.status === "accepted" ? "text-brand" : user.status === "declined" ? "text-danger" : "text-fg-muted"
+                      }`}>
+                        {user.status === "accepted" ? "Active" : user.status === "declined" ? "Declined" : "Pending"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
 
-            <div className="shrink-0 px-2 py-2 border-t border-border">
-              <button
-                onClick={() => setSidebarCollapsed(true)}
-                className="flex items-center gap-2 w-full h-[28px] px-2.5 rounded-[10px] text-[11px] font-medium text-fg-muted hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer"
-              >
-                <ChevronLeft size={13} strokeWidth={1.5} />
-                Collapse
-              </button>
-            </div>
+            {sidebarTab === "info" && (
+              <>
+                <div className="px-2.5 pt-1.5 pb-2 flex items-center justify-between">
+                  <span className="text-[11.5px] font-semibold text-foreground">Project Info</span>
+                  <CanvasDropdown
+                    value=""
+                    onChange={(action) => {
+                      if (action === "rename") setEditingProjectName(true);
+                    }}
+                    options={[
+                      { value: "rename", label: "Rename project" },
+                      { value: "delete", label: "Delete project", variant: "danger" },
+                    ]}
+                    align="right"
+                  >
+                    <button className="flex items-center justify-center w-[22px] h-[22px] rounded-[4px] text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer">
+                      <MoreHorizontal size={13} strokeWidth={1.5} />
+                    </button>
+                  </CanvasDropdown>
+                </div>
+                <div className="px-2.5 pb-2 space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-fg-muted">Name</span>
+                    <span className="text-[10px] text-foreground font-medium truncate max-w-[120px]">{projectName}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-fg-muted">Screens</span>
+                    <span className="text-[10px] text-foreground">{hasSession ? displayScreens.length : mockScreens.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-fg-muted">Documents</span>
+                    <span className="text-[10px] text-foreground">{docs.length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-fg-muted">Source files</span>
+                    <span className="text-[10px] text-foreground">{Object.keys(files).length}</span>
+                  </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-[10px] text-fg-muted">Fonts</span>
+                    <span className="text-[10px] text-foreground">{Object.keys(fontValues).length}</span>
+                  </div>
+                </div>
+                {originalPrompt && (
+                  <>
+                    <div className="w-full h-px bg-border/50" />
+                    <div className="px-2.5 pt-2 pb-1">
+                      <span className="text-[11.5px] font-semibold text-foreground">Original Prompt</span>
+                      <p className="text-[10px] text-fg-muted leading-relaxed mt-1 line-clamp-6">{originalPrompt}</p>
+                    </div>
+                  </>
+                )}
+              </>
+            )}
           </div>
+        </div>
 
         {/* Canvas */}
         <div className="flex-1 flex flex-col bg-[hsl(var(--surface-muted))] border-l border-border relative">
@@ -774,7 +868,7 @@ export default function CanvasPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.4 }}
           >
-            <div className="flex items-center gap-2 h-[40px] px-3 rounded-[12px] bg-background shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
+            <div className="flex items-center gap-1.5 h-[36px] px-2 rounded-[10px] bg-background shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-border/50">
               <div className="flex items-center gap-0.5">
                 {[
                   { id: "select", icon: MousePointer2, label: "Select" },
@@ -785,67 +879,77 @@ export default function CanvasPage() {
                     <div key={t.id} className="relative group">
                       <button
                         onClick={() => setActiveTool(t.id)}
-                        className={`flex shrink-0 items-center justify-center min-w-[32px] w-[32px] h-[32px] p-0 rounded-[8px] transition-colors border-none cursor-pointer ${
-                          activeTool === t.id ? "bg-brand text-white shadow-sm" : "text-fg-muted hover:bg-surface-hover hover:text-brand"
+                        className={`flex shrink-0 items-center justify-center min-w-[28px] w-[28px] h-[28px] p-0 rounded-[7px] transition-colors border-none cursor-pointer ${
+                          activeTool === t.id ? "bg-brand text-white" : "text-fg-muted hover:bg-surface-hover hover:text-foreground"
                         }`}
                       >
-                        <Icon size={15} strokeWidth={1.5} />
+                        <Icon size={14} strokeWidth={1.5} />
                       </button>
                       <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">{t.label}</div>
                     </div>
                   );
                 })}
               </div>
-              <div className="w-px h-[18px] bg-border/60 shrink-0" />
-              <div className="flex items-center gap-1">
+              <div className="w-px h-[14px] bg-border/50 shrink-0" />
+              <div className="flex items-center gap-0.5">
                 <div className="relative group">
                   <button
                     onClick={() => setZoom((z) => Math.max(25, z - 10))}
-                    className="flex shrink-0 items-center justify-center w-[32px] h-[32px] p-0 rounded-[8px] text-fg-muted hover:bg-surface-hover hover:text-brand transition-colors border-none cursor-pointer"
+                    className="flex shrink-0 items-center justify-center w-[28px] h-[28px] p-0 rounded-[7px] text-fg-muted hover:bg-surface-hover hover:text-foreground transition-colors border-none cursor-pointer"
                   >
-                    <ZoomOut size={15} strokeWidth={1.5} />
+                    <ZoomOut size={14} strokeWidth={1.5} />
                   </button>
                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Zoom Out</div>
                 </div>
-                <span className="text-[13px] text-fg-muted font-semibold tabular-nums w-[38px] text-center shrink-0">{zoom}%</span>
+                <span className="text-[11px] text-fg-muted font-medium tabular-nums w-[32px] text-center shrink-0">{zoom}%</span>
                 <div className="relative group">
                   <button
                     onClick={() => setZoom((z) => Math.min(200, z + 10))}
-                    className="flex shrink-0 items-center justify-center w-[32px] h-[32px] p-0 rounded-[8px] text-fg-muted hover:bg-surface-hover hover:text-brand transition-colors border-none cursor-pointer"
+                    className="flex shrink-0 items-center justify-center w-[28px] h-[28px] p-0 rounded-[7px] text-fg-muted hover:bg-surface-hover hover:text-foreground transition-colors border-none cursor-pointer"
                   >
-                    <ZoomIn size={15} strokeWidth={1.5} />
+                    <ZoomIn size={14} strokeWidth={1.5} />
                   </button>
                   <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Zoom In</div>
                 </div>
               </div>
-              <div className="w-px h-[18px] bg-border/60 shrink-0" />
-              {showCanvasPreview && (
-                <div className="flex items-center gap-0.5">
-                  <div className="relative group">
-                    <button
-                      onClick={() => setPreviewMode("preview")}
-                      className={`flex shrink-0 items-center justify-center w-[32px] h-[32px] p-0 rounded-[8px] transition-colors border-none cursor-pointer ${
-                        previewMode === "preview" ? "bg-brand text-white shadow-sm" : "text-fg-muted hover:bg-white/60"
-                      }`}
-                    >
-                      <Eye size={14} strokeWidth={1.5} />
-                    </button>
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Preview</div>
+              {showPreviewToggle && (
+                <>
+                  <div className="w-px h-[14px] bg-border/50 shrink-0" />
+                  <div className="flex items-center gap-0.5">
+                    <div className="relative group">
+                      <button
+                        onClick={() => setPreviewMode("preview")}
+                        className={`flex shrink-0 items-center justify-center w-[28px] h-[28px] p-0 rounded-[7px] transition-colors border-none cursor-pointer ${
+                          previewMode === "preview" ? "bg-brand text-white" : "text-fg-muted hover:bg-surface-hover hover:text-foreground"
+                        }`}
+                      >
+                        <Eye size={14} strokeWidth={1.5} />
+                      </button>
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Preview</div>
+                    </div>
+                    <div className="relative group">
+                      <button
+                        onClick={() => {
+                          setPreviewMode("code");
+                          setActiveDocPath(null);
+                          if (!activeFilePath) {
+                            const first = Object.keys(files).sort()[0];
+                            if (first) setActiveFilePath(first);
+                          }
+                        }}
+                        className={`flex shrink-0 items-center justify-center w-[28px] h-[28px] p-0 rounded-[7px] transition-colors border-none cursor-pointer ${
+                          previewMode === "code" ? "bg-brand text-white" : "text-fg-muted hover:bg-surface-hover hover:text-foreground"
+                        }`}
+                      >
+                        <Code2 size={14} strokeWidth={1.5} />
+                      </button>
+                      <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Code</div>
+                    </div>
                   </div>
-                  <div className="relative group">
-                    <button
-                      onClick={() => setPreviewMode("code")}
-                      className={`flex shrink-0 items-center justify-center w-[32px] h-[32px] p-0 rounded-[8px] transition-colors border-none cursor-pointer ${
-                        previewMode === "code" ? "bg-brand text-white shadow-sm" : "text-fg-muted hover:bg-white/60"
-                      }`}
-                    >
-                      <Code2 size={14} strokeWidth={1.5} />
-                    </button>
-                    <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Code</div>
-                  </div>
-                </div>
+                </>
               )}
-              <button className="flex shrink-0 items-center gap-1.5 px-3 h-[32px] rounded-[8px] text-[13px] font-semibold bg-brand text-white hover:bg-[hsl(var(--brand-hover))] transition-colors border-none cursor-pointer">
+              <div className="w-px h-[14px] bg-border/50 shrink-0" />
+              <button className="flex shrink-0 items-center gap-1.5 px-2.5 h-[28px] rounded-[7px] text-[12px] font-semibold bg-brand text-white hover:bg-[hsl(var(--brand-hover))] transition-colors border-none cursor-pointer">
                 Export
               </button>
             </div>
@@ -853,7 +957,7 @@ export default function CanvasPage() {
 
           {/* Canvas area */}
           <motion.div
-            className="flex-1 flex flex-col relative overflow-auto"
+            className="flex-1 flex flex-col relative overflow-hidden"
             initial={isNewCanvas ? { opacity: 0 } : false}
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5, delay: 0.3 }}
@@ -866,159 +970,137 @@ export default function CanvasPage() {
               }}
             />
 
-            <div className="flex-1 flex items-center justify-center">
-              {awaitingAnswers && questions && questions.length > 0 && (
-                <div className="flex flex-col items-center text-center max-w-xs">
+            <div className="flex-1 relative">
+              {/* Doc reader (opens on top of everything) */}
+              {activeDoc && (
+                <DocReader doc={activeDoc} onBack={closeDoc} />
+              )}
+
+              {/* Code view */}
+              {!activeDoc && previewMode === "code" && hasSession && (
+                <div className="absolute inset-0 flex bg-background">
+                  <div className="w-[220px] shrink-0 border-r border-border overflow-y-auto px-1.5 py-2">
+                    <FilesPanel files={files} activeFile={activeFilePath} onSelectFile={setActiveFilePath} />
+                  </div>
+                  <div className="flex-1 overflow-auto">
+                    {activeFile ? (
+                      <div className="min-h-full">
+                        <div className="sticky top-0 bg-background/95 backdrop-blur border-b border-border px-4 h-[36px] flex items-center">
+                          <span className="text-[11px] font-mono text-fg-muted">{activeFile.path}</span>
+                        </div>
+                        <pre className="text-[12px] font-mono text-foreground/80 leading-relaxed whitespace-pre-wrap p-4">{activeFile.content}</pre>
+                      </div>
+                    ) : (
+                      <div className="h-full flex items-center justify-center">
+                        <p className="text-[12px] text-fg-muted">Select a file to view its source</p>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* Verified screen preview */}
+              {!activeDoc && previewMode === "preview" && status === "done" && selectedScreen && runId && (
+                <div className="absolute inset-0 flex flex-col items-center p-6 overflow-y-auto">
+                  <div className="w-full max-w-[1400px]">
+                    <ScreenPanel screenName={selectedScreen || ""}>
+                      <div className="w-full"
+                           style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center top" }}>
+                        <ScreenPreview runId={runId} screen={selectedScreen} />
+                      </div>
+                    </ScreenPanel>
+                  </div>
+                </div>
+              )}
+
+              {/* Working state */}
+              {!activeDoc && previewMode === "preview" && isGenerating && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex flex-col items-center text-center max-w-xs">
                   <div className="w-16 h-16 rounded-2xl bg-brand/10 flex items-center justify-center mb-4">
                     <Sparkles size={24} strokeWidth={1.5} className="text-brand" />
                   </div>
-                  <h2 className="text-[15px] font-semibold text-foreground mb-1">A few questions</h2>
-                  <p className="text-[12px] text-fg-muted leading-relaxed">Answer in the prompt box below — or skip to go straight to generation.</p>
-                </div>
-              )}
-
-              {isGenerating && !code && (
-                <div className="flex flex-col items-center text-center max-w-xs">
-                  <div className="w-8 h-8 border-2 border-brand/30 border-t-brand rounded-full animate-spin mb-4" />
                   <h2 className="text-[15px] font-semibold text-foreground mb-1">
-                    {activePhase === "concept" && "Creating vision..."}
-                    {activePhase === "system" && "Crafting design system..."}
-                    {activePhase === "compose" && "Composing layout..."}
-                    {activePhase === "critique" && "Reviewing quality..."}
-                    {activePhase === "polish" && "Polishing details..."}
-                    {!activePhase && "Starting..."}
+                    {phases.brief.status === "running" && "Reading your brief…"}
+                    {phases.plan.status === "running" && "Designing every detail…"}
+                    {phases.build.status === "running" && "Coding the app…"}
+                    {phases.verify.status === "running" && "Verifying in the sandbox…"}
+                    {phases.present.status === "running" && "Finishing up…"}
+                    {!phases.brief.status.match(/running|done/) && "Starting the agent…"}
                   </h2>
-                  <p className="text-[12px] text-fg-muted leading-relaxed">The Pastel Agent is designing your UI.</p>
+                  <p className="text-[12px] text-fg-muted leading-relaxed">
+                    {docs.length > 0
+                      ? `${docs.length} document${docs.length === 1 ? "" : "s"} written · ${Object.keys(files).length} files built`
+                      : "The agent is working. Everything is saved as it happens — you can safely leave this page."}
+                  </p>
+                  </div>
                 </div>
               )}
 
-              {code && previewMode === "preview" && (
-                <iframe srcDoc={code} className="w-full h-full border-0" title="Design Preview" sandbox="allow-scripts allow-same-origin" />
-              )}
-
-              {code && previewMode === "code" && (
-                <div className="w-full h-full overflow-auto p-6">
-                  <pre className="text-[12px] font-mono text-fg-muted leading-relaxed whitespace-pre-wrap bg-background rounded-xl border border-border p-6">{code}</pre>
+              {/* Clarify hint */}
+              {!activeDoc && awaitingAnswers && questions && questions.length > 0 && !isGenerating && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex flex-col items-center text-center max-w-xs">
+                    <div className="w-16 h-16 rounded-2xl bg-brand/10 flex items-center justify-center mb-4">
+                      <Sparkles size={24} strokeWidth={1.5} className="text-brand" />
+                    </div>
+                    <h2 className="text-[15px] font-semibold text-foreground mb-1">A few questions</h2>
+                    <p className="text-[12px] text-fg-muted leading-relaxed">Answer in the prompt box below — or skip to go straight to generation.</p>
+                  </div>
                 </div>
               )}
 
-              {!hasActiveSession && (
-                <div className="relative inline-flex">
-                  <div className="relative" onClick={() => setScreenToolbar(true)}>
-                    <div className="absolute left-[-44px] top-1/2 -translate-y-1/2">
-                      <button className="w-[28px] h-[28px] rounded-full border border-border bg-background flex items-center justify-center text-fg-muted hover:text-brand hover:border-brand focus:text-brand focus:border-brand transition-colors cursor-pointer">
-                        <Plus size={14} strokeWidth={1.5} />
-                      </button>
+              {/* Error state */}
+              {!activeDoc && status === "error" && !isGenerating && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex flex-col items-center text-center max-w-md">
+                    <div className="w-16 h-16 rounded-2xl bg-danger/10 flex items-center justify-center mb-4">
+                      <AlertTriangle size={24} strokeWidth={1.5} className="text-danger" />
                     </div>
-                    <div className="absolute right-[-44px] top-1/2 -translate-y-1/2">
-                      <button className="w-[28px] h-[28px] rounded-full border border-border bg-background flex items-center justify-center text-fg-muted hover:text-brand hover:border-brand focus:text-brand focus:border-brand transition-colors cursor-pointer">
-                        <Plus size={14} strokeWidth={1.5} />
-                      </button>
-                    </div>
-                    <div className="absolute bottom-[-44px] left-1/2 -translate-x-1/2">
-                      <button className="w-[28px] h-[28px] rounded-full border border-border bg-background flex items-center justify-center text-fg-muted hover:text-brand hover:border-brand focus:text-brand focus:border-brand transition-colors cursor-pointer">
-                        <Plus size={14} strokeWidth={1.5} />
-                      </button>
-                    </div>
-                    {screenToolbar && (
-                      <div ref={toolbarRef} className="absolute -top-12 right-0 flex items-center gap-2 z-30">
-                        <div className="flex items-center gap-0.5 h-[36px] px-[5px] rounded-[10px] bg-background shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
-                          <Dropdown
-                            value={screenModes[selectedPage] ?? "web"}
-                            onChange={(mode) => setScreenModes(prev => ({ ...prev, [selectedPage]: mode as 'web' | 'mobile' }))}
-                            options={[
-                              { value: "web", label: <div className="flex items-center gap-1.5"><ComputerIcon size={12} strokeWidth={1.5} />Web</div> },
-                              { value: "mobile", label: <div className="flex items-center gap-1.5"><SmartPhone01Icon size={12} strokeWidth={1.5} />Mobile</div> },
-                            ]}
-                            menuAlign="center"
-                            showChevron={false}
-                            triggerClassName="!p-0 !border-none !bg-transparent"
-                            className="[&>div:last-child]:!min-w-0"
-                            renderTrigger={() => (
-                              <button
-                                onClick={() => setActiveBarBtn(activeBarBtn === "mobile" ? null : "mobile")}
-                                className={`flex items-center justify-center w-[28px] h-[28px] p-0 rounded-[7px] transition-colors border-none cursor-pointer ${activeBarBtn === "mobile" ? "bg-brand text-white" : "text-fg-muted hover:bg-brand hover:text-white"}`}
-                              >
-                                <SmartPhone01Icon size={13} strokeWidth={1.5} />
-                              </button>
-                            )}
-                          />
-                          <div className="relative group">
-                            <button
-                              onClick={() => setActiveBarBtn(activeBarBtn === "duplicate" ? null : "duplicate")}
-                              className={`flex items-center justify-center w-[28px] h-[28px] p-0 rounded-[7px] transition-colors border-none cursor-pointer ${activeBarBtn === "duplicate" ? "bg-brand text-white" : "text-fg-muted hover:bg-brand hover:text-white"}`}
-                            >
-                              <Copy size={13} strokeWidth={1.5} />
-                            </button>
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Duplicate Screen</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-0.5 h-[36px] px-[5px] rounded-[10px] bg-background shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
-                          <div className="relative group">
-                            <button
-                              onClick={() => setActiveBarBtn(activeBarBtn === "share" ? null : "share")}
-                              className={`flex items-center justify-center w-[28px] h-[28px] p-0 rounded-[7px] transition-colors border-none cursor-pointer ${activeBarBtn === "share" ? "bg-brand text-white" : "text-fg-muted hover:bg-brand hover:text-white"}`}
-                            >
-                              <Share2 size={13} strokeWidth={1.5} />
-                            </button>
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Share Screen</div>
-                          </div>
-                          <div className="relative group">
-                            <button
-                              onClick={() => setActiveBarBtn(activeBarBtn === "code" ? null : "code")}
-                              className={`flex items-center justify-center w-[28px] h-[28px] p-0 rounded-[7px] transition-colors border-none cursor-pointer ${activeBarBtn === "code" ? "bg-brand text-white" : "text-fg-muted hover:bg-brand hover:text-white"}`}
-                            >
-                              <Code2 size={13} strokeWidth={1.5} />
-                            </button>
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">View Code</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-0.5 h-[36px] px-[5px] rounded-[10px] bg-background shadow-[0_2px_12px_rgba(0,0,0,0.08)]">
-                          <div className="relative group">
-                            <button
-                              onClick={() => setActiveBarBtn(activeBarBtn === "regenerate" ? null : "regenerate")}
-                              className={`flex items-center justify-center w-[28px] h-[28px] p-0 rounded-[7px] transition-colors border-none cursor-pointer ${activeBarBtn === "regenerate" ? "bg-brand text-white" : "text-fg-muted hover:bg-brand hover:text-white"}`}
-                            >
-                              <RotateCcw size={13} strokeWidth={1.5} />
-                            </button>
-                            <div className="absolute top-full left-1/2 -translate-x-1/2 mt-1.5 px-2 py-1 rounded-[6px] bg-[#171717] text-white text-[11px] font-medium whitespace-nowrap shadow-[0_2px_8px_rgba(0,0,0,0.15)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none">Regenerate</div>
-                          </div>
+                    <h2 className="text-[15px] font-semibold text-foreground mb-1">Couldn't generate your design</h2>
+                    <p className="text-[12px] text-fg-muted leading-relaxed mb-1">
+                      The design agent encountered an error. Your project is safe — try again.
+                    </p>
+                    <p className="text-[11px] text-fg-faint leading-relaxed mb-5 font-mono bg-surface-muted px-3 py-2 rounded-lg w-full truncate">{error}</p>
+                    <button
+                      onClick={handleReset}
+                      className="h-9 px-4 rounded-xl border border-border text-[13px] font-medium text-foreground hover:bg-surface-hover transition-colors bg-transparent cursor-pointer"
+                    >
+                      Try again
+                    </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Empty canvas (no session) */}
+              {!hasSession && (
+                <div className="absolute inset-0 flex items-center justify-center overflow-auto">
+                  <div
+                    className="relative"
+                    style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center center" }}
+                  >
+                    <div className="bg-white rounded-[6px] border border-border/60 shadow-[0_1px_6px_rgba(0,0,0,0.06)]" style={{ width: 900, height: 530 }}>
+                      <div className="w-full h-full flex items-center justify-center">
+                        <div className="text-center">
+                          <Layout size={32} strokeWidth={1} className="text-fg-faint mx-auto mb-2" />
+                          <p className="text-[13px] text-fg-muted font-medium">Empty canvas</p>
+                          <p className="text-[11px] text-fg-faint mt-1">Describe what you want to build below</p>
                         </div>
                       </div>
-                    )}
-                    <div className="absolute -top-7 left-0">
-                      {editingScreenName === selectedPage ? (
-                        <input
-                          autoFocus
-                          value={screenLabels[selectedPage] ?? ""}
-                          onChange={(e) => setScreenLabels(prev => ({ ...prev, [selectedPage]: e.target.value }))}
-                          onBlur={() => setEditingScreenName(null)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') setEditingScreenName(null); }}
-                          className="text-left text-[12px] font-medium text-fg-muted bg-transparent border-none outline-none w-[120px]"
-                        />
-                      ) : (
-                        <button
-                          onClick={() => setEditingScreenName(selectedPage)}
-                          className="text-left text-[12px] font-medium text-fg-muted hover:text-brand transition-colors border-none bg-transparent cursor-pointer"
-                        >
-                          {screenLabels[selectedPage] ?? "Untitled"}
-                        </button>
-                      )}
                     </div>
-                    <div
-                      className="bg-white rounded-[6px] border-2 border-border hover:border-brand shadow-[0_2px_12px_rgba(0,0,0,0.06)] transition-all duration-200 focus:shadow-[0_4px_20px_rgba(0,0,0,0.1)] focus:border-brand/30 outline-none cursor-pointer"
-                      tabIndex={-1}
-                      style={{
-                        width: 900,
-                        height: 530,
-                        transform: `scale(${zoom / 100})`,
-                        transformOrigin: "center center",
-                      }}
-                    >
-                      {canvasElements.map((el) => (
-                        <CanvasElement key={el.id} {...(el as any)} />
-                      ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Done but no screen selected */}
+              {!activeDoc && previewMode === "preview" && status === "done" && !selectedScreen && (
+                <div className="absolute inset-0 flex items-center justify-center">
+                  <div className="flex flex-col items-center text-center max-w-xs">
+                    <div className="w-16 h-16 rounded-2xl bg-surface-muted flex items-center justify-center mb-4">
+                      <Layout size={24} strokeWidth={1.5} className="text-fg-muted" />
                     </div>
+                    <h2 className="text-[15px] font-semibold text-foreground mb-1">Select a screen</h2>
+                    <p className="text-[12px] text-fg-muted leading-relaxed">Pick a screen from the sidebar to view it.</p>
                   </div>
                 </div>
               )}
@@ -1028,72 +1110,27 @@ export default function CanvasPage() {
             <AnimatePresence>
               {showAgent && (
                 <motion.div
-                  className="shrink-0 flex justify-center pb-3 px-4"
+                  className="shrink-0 flex justify-center pb-3 px-4 relative z-20"
                   initial={{ opacity: 0, y: 24 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: 24 }}
                   transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="max-w-[580px] w-full">
-                    {(isGenerating || awaitingAnswers || code) && (
-                      <div className="rounded-t-[20px] rounded-b-none border border-border bg-background shadow-[0_4px_16px_rgba(0,0,0,0.06)] border-b-0 mb-[-48px]">
-                        <div className="p-3 space-y-2">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-2 min-w-0">
-                              <span className="text-[12px] font-semibold text-foreground truncate">
-                                {isGenerating
-                                  ? (activePhase === "concept" ? "Creating vision..." :
-                                     activePhase === "system" ? "Crafting design system..." :
-                                     activePhase === "compose" ? "Composing layout..." :
-                                     activePhase === "critique" ? "Reviewing quality..." :
-                                     activePhase === "polish" ? "Polishing details..." :
-                                     "Starting...")
-                                  : code ? "Design ready" : ""}
-                              </span>
-                            </div>
-                            {isGenerating ? (
-                              <button
-                                onClick={cancel}
-                                className="shrink-0 text-[11px] font-medium text-fg-muted hover:text-foreground px-2.5 py-1 rounded-lg border border-border bg-transparent cursor-pointer transition-colors"
-                              >
-                                Cancel
-                              </button>
-                            ) : awaitingAnswers ? null : code ? (
-                              <button
-                                onClick={handleReset}
-                                className="shrink-0 text-[11px] font-medium text-fg-muted hover:text-foreground px-2.5 py-1 rounded-lg border border-border bg-transparent cursor-pointer transition-colors"
-                              >
-                                Reset
-                              </button>
-                            ) : null}
-                          </div>
-
-                          <div className="flex items-center gap-1.5">
-                            {phaseOrder.filter(p => p !== "done" && p !== "error").map((phase) => {
-                              const state = phases[phase];
-                              const isActive = state?.status === "running";
-                              const isDone = state?.status === "done";
-                              return (
-                                <div
-                                  key={phase}
-                                  className={`flex-1 h-1.5 rounded-full transition-colors ${
-                                    isActive ? "bg-brand" : isDone ? "bg-brand/40" : "bg-surface-muted"
-                                  }`}
-                                />
-                              );
-                            })}
-                          </div>
-
-                          {pendingPrompt && (
-                            <p className="text-[11px] text-fg-faint truncate">{pendingPrompt}</p>
-                          )}
-
-                          {error && (
-                            <p className="text-[11px] text-danger font-medium">{error}</p>
-                          )}
-                        </div>
-                        <div className="h-12" />
-                      </div>
+                    {hasSession && (
+                      <AgentRunCard
+                        status={status}
+                        phases={phases}
+                        phaseOrder={phaseOrder}
+                        phaseLabels={phaseLabels}
+                        activity={activity}
+                        prompt={originalPrompt || pendingPrompt}
+                        error={error}
+                        screensCount={agentScreens.length}
+                        docsCount={docs.length}
+                        failedScreens={failedScreens}
+                        onReset={handleReset}
+                      />
                     )}
 
                     <AnimatePresence mode="wait">
@@ -1109,8 +1146,9 @@ export default function CanvasPage() {
                             questions={questions}
                             answers={answers}
                             onAnswerChange={setAnswer}
-                            onSubmit={handleSubmitAnswers}
-                            isLoading={isGenerating}
+                            onSubmit={submitAnswers}
+                            onSkip={skipClarify}
+                            isLoading={isGenerating || isClarifying}
                           />
                         </motion.div>
                       ) : (
@@ -1121,8 +1159,9 @@ export default function CanvasPage() {
                         >
                           <PromptInput
                             onSubmit={handlePrompt}
-                            placeholder={code ? "Refine this design..." : "Describe what you want to build..."}
-                            isLoading={isGenerating}
+                            placeholder={status === "done" ? "Start a new design..." : "Describe what you want to build..."}
+                            isLoading={isGenerating || isCreating || isClarifying}
+                            systemError={status === "error"}
                           />
                         </motion.div>
                       )}

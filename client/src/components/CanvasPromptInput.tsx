@@ -8,6 +8,7 @@ type Props = {
   answers: Record<string, string>;
   onAnswerChange: (id: string, value: string) => void;
   onSubmit: () => void;
+  onSkip?: () => void;
   isLoading?: boolean;
 };
 
@@ -16,6 +17,7 @@ export function CanvasPromptInput({
   answers,
   onAnswerChange,
   onSubmit,
+  onSkip,
   isLoading,
 }: Props) {
   const [currentIndex, setCurrentIndex] = useState(0);
@@ -86,9 +88,20 @@ export function CanvasPromptInput({
               <ChevronRight size={15} strokeWidth={1.5} />
             </button>
           </div>
-          <span className="text-[10px] font-medium text-fg-faint uppercase tracking-wider">
-            Clarify
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-[10px] font-medium text-fg-faint uppercase tracking-wider">
+              Clarify
+            </span>
+            {onSkip && (
+              <button
+                onClick={onSkip}
+                disabled={isLoading}
+                className="text-[11px] font-medium text-fg-muted hover:text-brand transition-colors border-none bg-transparent cursor-pointer disabled:opacity-40"
+              >
+                Skip →
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Question text */}

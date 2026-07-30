@@ -3,7 +3,6 @@ import type { Server } from "http";
 import passport from "passport";
 import rateLimit from "express-rate-limit";
 import multer from "multer";
-import Stripe from "stripe";
 import { storage } from "./storage";
 import { db } from "./db";
 import { sql, eq, and } from "drizzle-orm";
@@ -28,6 +27,7 @@ import {
   updateWorkspaceSchema,
   inviteWorkspaceMemberSchema,
   updateWorkspaceMemberSchema,
+  createProjectSchema,
   PLAN_LIMITS,
   type PlanTier,
   type User,
@@ -37,29 +37,6 @@ import {
   resetPasswordSchema,
   onboardingStepSchema,
 } from "@shared/schema";
-
-// Stripe plan helpers — single source of truth for what Stripe price IDs map to which tier.
-const STRIPE_API_VERSION = "2026-02-25.clover" as const;
-type PaidPlan = "dev" | "startup" | "scale" | "enterprise";
-
-function stripePriceFor(plan: PaidPlan): string | null {
-  const map: Record<PaidPlan, string | undefined> = {
-    dev: process.env.STRIPE_PRICE_DEV,
-    startup: process.env.STRIPE_PRICE_STARTUP,
-    scale: process.env.STRIPE_PRICE_SCALE,
-    enterprise: process.env.STRIPE_PRICE_ENTERPRISE,
-  };
-  return map[plan] || null;
-}
-
-function planFromPriceId(priceId: string | undefined | null): PaidPlan | null {
-  if (!priceId) return null;
-  if (priceId === process.env.STRIPE_PRICE_DEV) return "dev";
-  if (priceId === process.env.STRIPE_PRICE_STARTUP) return "startup";
-  if (priceId === process.env.STRIPE_PRICE_SCALE) return "scale";
-  if (priceId === process.env.STRIPE_PRICE_ENTERPRISE) return "enterprise";
-  return null;
-}
 
 function safeUserPayload(u: User) {
   const {
@@ -327,6 +304,67 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
 
   registerAuthRoutes(app);
   registerRemainingRoutes(app);
+  // ── Projects ──────────────────────────────────────────────────────────
+  app.post("/api/projects", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req.user as User).id;
+      const parsed = createProjectSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid request", errors: parsed.error.issues });
+      }
+
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      let workspaceId = (req.body as any).workspaceId || user.lastWorkspaceId;
+
+      if (!workspaceId) {
+        const ws = await storage.createWorkspace(userId, {
+          name: `${user.displayName || user.username || "My"}'s Workspace`,
+          slug: `ws-${randomBytes(6).toString("hex")}`,
+        });
+        workspaceId = ws.id;
+        await storage.updateUser(userId, { lastWorkspaceId: ws.id });
+      }
+
+      const access = await storage.canAccessWorkspace(userId, workspaceId);
+      if (!access.allowed) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      const project = await storage.createProject(userId, workspaceId, parsed.data);
+
+      try {
+        await storage.incrementUsage(userId, "projects_count");
+      } catch {}
+
+      return res.status(201).json(project);
+    } catch (err: any) {
+      console.error("[projects] create error:", err?.message || err);
+      return res.status(500).json({ message: err?.message || "Failed to create project" });
+    }
+  });
+
+  app.get("/api/projects", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const userId = (req.user as User).id;
+      const user = await storage.getUserById(userId);
+      if (!user) return res.status(404).json({ message: "User not found" });
+
+      const workspaceId = (req.query.workspaceId as string) || user.lastWorkspaceId;
+      if (!workspaceId) return res.json([]);
+
+      const access = await storage.canAccessWorkspace(userId, workspaceId);
+      if (!access.allowed) return res.json([]);
+
+      const projectsList = await storage.listProjects(workspaceId);
+      return res.json(projectsList);
+    } catch (err: any) {
+      console.error("[projects] list error:", err?.message || err);
+      return res.status(500).json({ message: err?.message || "Failed to list projects" });
+    }
+  });
+
   registerPastelAgentRoutes(app);
 
   return httpServer;

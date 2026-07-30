@@ -34,7 +34,7 @@ async function apiJson<T>(method: string, url: string, data?: unknown): Promise<
 function ForwardingTab({ plan }: { plan: string }) {
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const isLocked = plan === "starter";
+  const isLocked = plan === "free" || plan === "starter";
   const [email, setEmail] = useState("");
   const [dirty, setDirty] = useState(false);
 
@@ -129,7 +129,7 @@ function ForwardingTab({ plan }: { plan: string }) {
 
 function GhostingTab({ plan }: { plan: string }) {
   const { toast } = useToast();
-  const isLocked = plan === "starter";
+  const isLocked = plan === "free" || plan === "starter";
   const [ghostDomain, setGhostDomain] = useState("");
   const [dirty, setDirty] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -192,7 +192,7 @@ function GhostingTab({ plan }: { plan: string }) {
 
 export default function Advanced() {
   const { data: planInfo } = usePlan();
-  const currentPlan = planInfo?.plan ?? "starter";
+  const currentPlan = planInfo?.plan ?? "free";
   const [tab, setTab] = useState("forwarding");
 
   return (

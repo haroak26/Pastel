@@ -162,16 +162,7 @@ function DragOverlayCard({ ticket }: { ticket: Ticket }) {
 }
 
 
-const MOCK_TICKETS: Ticket[] = import.meta.env.DEV ? [
-  { id: 1, userId: 1, ticketId: 'TKT-001', publicId: 1001, inboxId: '', fromEmail: 'alice@example.com', fromName: 'Alice Johnson', subject: 'Unable to login to my account', body: null, status: 'open', threadId: null, createdAt: new Date(Date.now() - 3600000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 2, userId: 1, ticketId: 'TKT-002', publicId: 1002, inboxId: '', fromEmail: 'bob@example.com', fromName: 'Bob Smith', subject: 'Payment not going through', body: null, status: 'open', threadId: null, createdAt: new Date(Date.now() - 7200000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 3, userId: 1, ticketId: 'TKT-003', publicId: 1003, inboxId: '', fromEmail: 'carol@example.com', fromName: 'Carol Davis', subject: 'Feature request: dark mode', body: null, status: 'in_progress', threadId: null, createdAt: new Date(Date.now() - 86400000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 4, userId: 1, ticketId: 'TKT-004', publicId: 1004, inboxId: '', fromEmail: 'dave@example.com', fromName: null, subject: 'Billing inquiry for last month', body: null, status: 'in_progress', threadId: null, createdAt: new Date(Date.now() - 172800000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 5, userId: 1, ticketId: 'TKT-005', publicId: 1005, inboxId: '', fromEmail: 'eve@example.com', fromName: 'Eve Wilson', subject: 'Account deletion request', body: null, status: 'resolved', threadId: null, createdAt: new Date(Date.now() - 259200000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 6, userId: 1, ticketId: 'TKT-006', publicId: 1006, inboxId: '', fromEmail: 'frank@example.com', fromName: 'Frank Miller', subject: 'Integration with Slack failing', body: null, status: 'resolved', threadId: null, createdAt: new Date(Date.now() - 345600000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 7, userId: 1, ticketId: 'TKT-007', publicId: 1007, inboxId: '', fromEmail: 'grace@example.com', fromName: 'Grace Lee', subject: 'Password reset not working', body: null, status: 'closed', threadId: null, createdAt: new Date(Date.now() - 432000000).toISOString(), updatedAt: new Date().toISOString() },
-  { id: 8, userId: 1, ticketId: 'TKT-008', publicId: 1008, inboxId: '', fromEmail: 'henry@example.com', fromName: 'Henry Brown', subject: 'API rate limit exceeded', body: null, status: 'closed', threadId: null, createdAt: new Date(Date.now() - 604800000).toISOString(), updatedAt: new Date().toISOString() },
-] : [];
+
 
 export default function TicketsKanban({ defaultFilter = 'all' }: { defaultFilter?: string }) {
   const [search, setSearch] = useState('');
@@ -203,10 +194,7 @@ export default function TicketsKanban({ defaultFilter = 'all' }: { defaultFilter
     retry: false,
   });
 
-  const tickets = useMemo(() => {
-    const apiTickets = ticketsData?.tickets ?? [];
-    return apiTickets.length > 0 ? apiTickets : MOCK_TICKETS;
-  }, [ticketsData]);
+  const tickets = useMemo(() => ticketsData?.tickets ?? [], [ticketsData]);
 
   const grouped = useMemo(() => {
     const map: Record<string, Ticket[]> = {};
@@ -269,8 +257,6 @@ export default function TicketsKanban({ defaultFilter = 'all' }: { defaultFilter
     if (!ticket) return;
     if (ticket.status === targetStatus) return;
 
-    const isMock = String(ticketId).startsWith('mock-');
-
     queryClient.setQueryData<{ tickets: Ticket[] }>(['/api/tickets', activeSpaceId], (prev) => {
       if (!prev) return prev;
       return {
@@ -280,8 +266,6 @@ export default function TicketsKanban({ defaultFilter = 'all' }: { defaultFilter
         ),
       };
     });
-
-    if (isMock) return;
 
     try {
       await fetch(`/api/tickets/${ticketId}`, {

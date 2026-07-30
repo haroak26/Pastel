@@ -167,7 +167,7 @@ export const bulkInviteMemberSchema = z.object({
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").primaryKey().defaultRandom(),
   userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
-  plan: text("plan").notNull().default("starter"),
+  plan: text("plan").notNull().default("free"),
   subscriptionStatus: text("subscription_status"),
   planRenewsAt: timestamp("plan_renews_at"),
   cancelAtPeriodEnd: boolean("cancel_at_period_end").notNull().default(false),
@@ -180,17 +180,17 @@ export const subscriptions = pgTable("subscriptions", {
 
 export type Subscription = typeof subscriptions.$inferSelect;
 
-export const PLAN_TIERS = ["starter", "pro", "team", "enterprise"] as const;
+export const PLAN_TIERS = ["free", "pro", "team", "enterprise"] as const;
 export type PlanTier = (typeof PLAN_TIERS)[number];
 export type BillingPeriod = "monthly" | "annual";
 
 export type PlanLimits = {
   label: string;
   prices: { monthly: number; annual: number };
-  projects: number;
-  designFiles: number;
-  editors: number;
-  viewers: number;
+  projects: number | "unlimited";
+  designFiles: number | "unlimited";
+  editors: number | "unlimited";
+  viewers: number | "unlimited";
   storage: number;
   versionHistory: number;
   components: number;
@@ -199,13 +199,39 @@ export type PlanLimits = {
   advancedPrototyping: boolean;
   apiAccess: boolean;
   ssO: boolean;
+  prioritySupport: boolean;
+  aiCredits: { monthly: number; daily: number };
 };
 
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
-  starter: { label: "Starter", prices: { monthly: 10, annual: 96 }, projects: 3, designFiles: 10, editors: 2, viewers: 2, storage: 500, versionHistory: 30, components: 50, customFonts: false, exportPresets: false, advancedPrototyping: false, apiAccess: false, ssO: false },
-  pro: { label: "Pro", prices: { monthly: 20, annual: 192 }, projects: 20, designFiles: 100, editors: 5, viewers: 10, storage: 2000, versionHistory: 90, components: 500, customFonts: true, exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: false },
-  team: { label: "Team", prices: { monthly: 40, annual: 384 }, projects: 100, designFiles: 500, editors: 25, viewers: 50, storage: 10000, versionHistory: 180, components: 2000, customFonts: true, exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: true },
-  enterprise: { label: "Enterprise", prices: { monthly: 80, annual: 768 }, projects: 500, designFiles: 2500, editors: 100, viewers: 250, storage: 50000, versionHistory: 365, components: 10000, customFonts: true, exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: true },
+  free: {
+    label: "Free", prices: { monthly: 0, annual: 0 },
+    projects: 1, designFiles: 3, editors: 1, viewers: 1, storage: 100,
+    versionHistory: 7, components: 10, customFonts: false,
+    exportPresets: false, advancedPrototyping: false, apiAccess: false, ssO: false,
+    prioritySupport: false, aiCredits: { monthly: 15, daily: 5 },
+  },
+  pro: {
+    label: "Pro", prices: { monthly: 19, annual: 192 },
+    projects: 10, designFiles: 100, editors: 3, viewers: 10, storage: 2048,
+    versionHistory: 30, components: 300, customFonts: true,
+    exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: false,
+    prioritySupport: false, aiCredits: { monthly: 1000, daily: 100 },
+  },
+  team: {
+    label: "Team", prices: { monthly: 49, annual: 492 },
+    projects: 50, designFiles: 500, editors: 10, viewers: 50, storage: 10240,
+    versionHistory: 90, components: 1000, customFonts: true,
+    exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: true,
+    prioritySupport: true, aiCredits: { monthly: 5000, daily: 500 },
+  },
+  enterprise: {
+    label: "Enterprise", prices: { monthly: 99, annual: 996 },
+    projects: "unlimited", designFiles: "unlimited", editors: "unlimited", viewers: "unlimited", storage: 51200,
+    versionHistory: 365, components: 10000, customFonts: true,
+    exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: true,
+    prioritySupport: true, aiCredits: { monthly: 20000, daily: 2000 },
+  },
 };
 
 // ── Usage Tracking ────────────────────────────────────────────────────────
@@ -224,6 +250,58 @@ export const usage = pgTable("usage", {
 });
 
 export type Usage = typeof usage.$inferSelect;
+
+// ── User Credits ─────────────────────────────────────────────────────────
+
+export const userCredits = pgTable("user_credits", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
+  balance: real("balance").notNull().default(0),
+  lifetimePurchased: real("lifetime_purchased").notNull().default(0),
+  lifetimeUsed: real("lifetime_used").notNull().default(0),
+  dailyUsed: real("daily_used").notNull().default(0),
+  dailyResetAt: timestamp("daily_reset_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
+export type UserCredits = typeof userCredits.$inferSelect;
+
+export const CREDIT_TRANSACTION_TYPES = ["purchase", "usage", "usage_hold", "usage_refund", "grant"] as const;
+export type CreditTransactionType = (typeof CREDIT_TRANSACTION_TYPES)[number];
+
+export const creditTransactions = pgTable("credit_transactions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  type: text("type").notNull(),
+  amount: real("amount").notNull(),
+  balanceAfter: real("balance_after").notNull(),
+  description: text("description"),
+  metadata: jsonb("metadata").$type<Record<string, unknown>>().default({}),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  index("credit_transactions_user_idx").on(t.userId, t.createdAt.desc()),
+]);
+
+export type CreditTransaction = typeof creditTransactions.$inferSelect;
+
+export const CREDIT_HOLD_STATUSES = ["active", "released", "refunded"] as const;
+export type CreditHoldStatus = (typeof CREDIT_HOLD_STATUSES)[number];
+
+export const creditHolds = pgTable("credit_holds", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  runId: uuid("run_id"),
+  amount: real("amount").notNull(),
+  status: text("status").notNull().default("active"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("credit_holds_user_idx").on(t.userId),
+  index("credit_holds_run_idx").on(t.runId),
+]);
+
+export type CreditHold = typeof creditHolds.$inferSelect;
 
 // ── API Integrations ───────────────────────────────────────────────────────
 
@@ -818,25 +896,68 @@ export const userSessions = pgTable("user_sessions", {
 export type UserSession = typeof userSessions.$inferSelect;
 export type NewUserSession = typeof userSessions.$inferInsert;
 
-// ── Export Types ───────────────────────────────────────────────────────────
+// ── Pastel Agent Runs ──────────────────────────────────────────────────────
 
-export type {
-  Project,
-  DesignFile,
-  DesignVersion,
-  Canvas,
-  Layer,
-  ComponentSet,
-  Component,
-  Asset,
-  Comment,
-  CommentReply,
-  DesignToken,
-  DesignShare,
-  ExportPreset,
-  Notification,
-  ActivityLog,
-  Plugin,
-  PluginInstallation,
-  ProjectMember,
-};
+export const AGENT_RUN_STATUSES = ["running", "done", "error"] as const;
+export type AgentRunStatus = (typeof AGENT_RUN_STATUSES)[number];
+
+export const agentRuns = pgTable("agent_runs", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").references(() => projects.id, { onDelete: "cascade" }),
+  userId: uuid("user_id"),
+  prompt: text("prompt").notNull(),
+  answers: jsonb("answers").$type<Record<string, string>>().default({}).notNull(),
+  title: text("title"),
+  status: text("status").notNull().default("running"),
+  phase: text("phase"),
+  error: text("error"),
+  // manifest: { screens: string[], docs: string[], brandKit: {...}, phases: Record<phase, status> }
+  manifest: jsonb("manifest").$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  index("agent_runs_project_idx").on(t.projectId, t.createdAt),
+  index("agent_runs_user_idx").on(t.userId, t.createdAt),
+]);
+
+export type AgentRun = typeof agentRuns.$inferSelect;
+
+// ── Pastel Agent Documents (markdown design docs generated during a run) ────
+
+export const AGENT_DOCUMENT_KINDS = ["brief", "system", "screen-spec", "component-spec"] as const;
+export type AgentDocumentKind = (typeof AGENT_DOCUMENT_KINDS)[number];
+
+export const agentDocuments = pgTable("agent_documents", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  runId: uuid("run_id").notNull().references(() => agentRuns.id, { onDelete: "cascade" }),
+  path: text("path").notNull(),
+  title: text("title").notNull(),
+  kind: text("kind").notNull().default("brief"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("agent_documents_run_path_idx").on(t.runId, t.path),
+]);
+
+export type AgentDocument = typeof agentDocuments.$inferSelect;
+
+// ── Pastel Agent Files (virtual file system + compiled screen bundles) ─────
+
+export const AGENT_FILE_KINDS = ["screen", "component", "style", "entry", "build"] as const;
+export type AgentFileKind = (typeof AGENT_FILE_KINDS)[number];
+
+export const agentFiles = pgTable("agent_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  runId: uuid("run_id").notNull().references(() => agentRuns.id, { onDelete: "cascade" }),
+  path: text("path").notNull(),
+  kind: text("kind").notNull().default("component"),
+  content: text("content").notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (t) => [
+  uniqueIndex("agent_files_run_path_idx").on(t.runId, t.path),
+]);
+
+export type AgentFile = typeof agentFiles.$inferSelect;
+
+

@@ -12,23 +12,19 @@ const faqs = [
   },
   {
     q: "What is a workspace?",
-    a: "A workspace represents a domain you own (e.g. yourcompany.com). Each workspace has its own inboxes, agents, tickets, and analytics — keeping data completely separate across your different brands or products.",
+    a: "A workspace keeps your projects, design files, and team members organized in one place. Each workspace has its own projects, assets, and settings.",
   },
   {
-    q: "Is there a free trial on paid plans?",
-    a: "A payment card is required at signup and you can cancel anytime.",
+    q: "Is there a free plan?",
+    a: "Yes! The Free plan includes 1 project, 3 design files, 1 editor, 100 MB storage, and 15 AI credits per month — no payment card required.",
   },
   {
-    q: "Is Pastel GDPR compliant?",
-    a: "Yes. Pastel stores only what's needed to operate the helpdesk. Data is encrypted at rest and in transit. We are fully GDPR and SOC 2 aligned.",
+    q: "Can I switch plans at any time?",
+    a: "Yes, you can upgrade or downgrade whenever you need to from your billing page. Changes take effect immediately and your payment is adjusted prorata.",
   },
   {
-    q: "Can my whole team use Pastel?",
-    a: "Yes — every plan includes unlimited agent seats. Invite your entire support team at no extra cost.",
-  },
-  {
-    q: "What inbox types are available?",
-    a: "Support inboxes create tickets from incoming email and work with auto-reply agents. Regular inboxes are for general communication without ticketing. No-reply inboxes are send-only for transactional messages.",
+    q: "What are AI credits?",
+    a: "AI credits power the Pastel AI agent for UI generation. Each credit is consumed based on the AI model used and generation complexity. You get a monthly allowance with your plan, and can buy more credit packs anytime — they never expire.",
   },
 ];
 

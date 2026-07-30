@@ -1,22 +1,64 @@
 import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@/hooks/use-user';
 import { PromptInput } from '@/components/PromptInput';
 import { Plus, ArrowRight } from 'lucide-react';
 import { useLocation } from 'wouter';
 
-const RECENT_PROJECTS = [
-  { id: '1', name: 'Landing Page Redesign', updated: '2 hours ago' },
-  { id: '2', name: 'Dashboard UI Kit', updated: '1 day ago' },
-  { id: '3', name: 'Mobile App Mockups', updated: '3 days ago' },
-];
+interface ApiProject {
+  id: string;
+  name: string;
+  updatedAt: string;
+}
+
+function timeAgo(dateStr: string): string {
+  const diff = Date.now() - new Date(dateStr).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return 'just now';
+  if (mins < 60) return `${mins}m ago`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `${hours}h ago`;
+  const days = Math.floor(hours / 24);
+  if (days < 30) return `${days}d ago`;
+  return new Date(dateStr).toLocaleDateString();
+}
 
 export default function HomePage() {
   const { data: user } = useUser();
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
 
+  const { data: projects = [] } = useQuery<ApiProject[]>({
+    queryKey: ['/api/projects'],
+    queryFn: async () => {
+      const res = await fetch('/api/projects', { credentials: 'include' });
+      if (!res.ok) return [];
+      return res.json();
+    },
+    staleTime: 30_000,
+  });
+
+  const recentProjects = projects.slice(0, 3);
+
   const handlePrompt = async (prompt: string) => {
     setLoading(true);
+    try {
+      const res = await fetch('/api/projects', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: prompt.length > 200 ? prompt.slice(0, 197) + '...' : prompt,
+          description: prompt,
+        }),
+      });
+      if (res.ok) {
+        const project = await res.json();
+        sessionStorage.setItem('pastel-prompt', prompt);
+        setLocation(`/canvas/${project.id}`);
+        return;
+      }
+    } catch {}
     sessionStorage.setItem('pastel-prompt', prompt);
     setLocation('/canvas/new');
   };
@@ -49,7 +91,12 @@ export default function HomePage() {
           </div>
 
           <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-4 sm:-mx-0 px-4 sm:px-0">
-            {RECENT_PROJECTS.map((project) => (
+            {recentProjects.length === 0 && (
+              <div className="flex-shrink-0 w-full text-center py-8">
+                <p className="text-[13px] text-fg-muted">No projects yet. Describe what you want to build above.</p>
+              </div>
+            )}
+            {recentProjects.map((project) => (
               <div
                 key={project.id}
                 onClick={() => setLocation(`/canvas/${project.id}`)}
@@ -61,7 +108,7 @@ export default function HomePage() {
                 <div className="h-px bg-border/60" />
                 <div className="px-3 py-2">
                   <p className="text-[13px] font-medium text-foreground truncate">{project.name}</p>
-                  <p className="text-[11px] text-fg-faint mt-0.5">{project.updated}</p>
+                  <p className="text-[11px] text-fg-faint mt-0.5">{timeAgo(project.updatedAt)}</p>
                 </div>
               </div>
             ))}

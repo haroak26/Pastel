@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { AppLayout } from "@/components/AppLayout";
-import { useUser, useLogout, usePlan } from "@/hooks/use-user";
+import { useUser, useLogout, usePlan, useCredits, useCreditPacks } from "@/hooks/use-user";
 import { useTheme } from "@/hooks/use-theme";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -787,20 +787,24 @@ function SecurityAuthPage() {
 }
 
 function BillingPage({ planInfo, cancelMutation, portalMutation }: any) {
-  const currentPlan: Plan = planInfo?.plan ?? "dev";
-  const limits = PLAN_LIMITS[currentPlan] ?? PLAN_LIMITS.starter;
+  const currentPlan: Plan = planInfo?.plan ?? "free";
+  const limits = PLAN_LIMITS[currentPlan] ?? PLAN_LIMITS.free;
   const price = limits.prices.monthly;
   const renewsLabel = planInfo?.renewsAt
     ? new Date(planInfo.renewsAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
     : null;
 
-  const TRANSACTIONS = [
-    { id: '1', description: 'Plan subscription', amount: -20, date: 'Jul 25, 2026', status: 'completed' },
-    { id: '2', description: 'Credit top-up', amount: 100, date: 'Jul 20, 2026', status: 'completed' },
-    { id: '3', description: 'AI generations used', amount: -5, date: 'Jul 18, 2026', status: 'completed' },
-    { id: '4', description: 'Credit top-up', amount: 50, date: 'Jul 10, 2026', status: 'completed' },
-    { id: '5', description: 'Plan subscription', amount: -20, date: 'Jun 25, 2026', status: 'completed' },
-  ];
+  const { data: transactionsData } = useQuery<{ transactions: Array<{ id: string; description: string; amount: number; date: string; status: string }> }>({
+    queryKey: ['/api/credits/transactions'],
+    queryFn: async () => {
+      const res = await fetch('/api/credits/transactions', { credentials: 'include' });
+      if (!res.ok) return { transactions: [] };
+      return res.json();
+    },
+    retry: false,
+  });
+
+  const transactions = transactionsData?.transactions ?? [];
 
   return (
     <div className="py-4 space-y-6">
@@ -838,7 +842,12 @@ function BillingPage({ planInfo, cancelMutation, portalMutation }: any) {
       </SettingsSection>
 
       <SettingsSection title="Transaction History" description="Recent billing activity on your account.">
-        {TRANSACTIONS.map((t) => (
+        {transactions.length === 0 ? (
+          <div className="py-4 text-center">
+            <p className="text-[13px] text-fg-muted">No transactions yet.</p>
+          </div>
+        ) : (
+          transactions.map((t) => (
           <div key={t.id} className="flex items-center justify-between py-2.5">
             <div>
               <p className="text-[13px] font-medium text-foreground">{t.description}</p>
@@ -848,7 +857,7 @@ function BillingPage({ planInfo, cancelMutation, portalMutation }: any) {
               {t.amount > 0 ? '+' : ''}{t.amount}
             </span>
           </div>
-        ))}
+        )))}
       </SettingsSection>
     </div>
   );
@@ -976,8 +985,8 @@ function UsageBar({ current, limit, label, unit = "", decimals = 0 }: { current:
 }
 
 function UsagePage({ planInfo }: any) {
-  const plan = (planInfo?.plan ?? "starter") as PlanTier;
-  const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.starter;
+  const plan = (planInfo?.plan ?? "free") as PlanTier;
+  const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
   const usage = planInfo?.usage ?? {};
 
   const pctUsed = (current: number, limit: number | "unlimited") =>
@@ -1035,47 +1044,95 @@ function AgentPage() {
 }
 
 function CreditsPage({ planInfo }: any) {
-  const plan = (planInfo?.plan ?? "starter") as PlanTier;
-  const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.starter;
-  const usage = planInfo?.usage ?? {};
-  const remaining = 250 - (usage.assistantCreditUsed ?? 0);
+  const plan = (planInfo?.plan ?? "free") as PlanTier;
+  const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
+  const { data: credits, isLoading } = useCredits();
+  const { data: packs } = useCreditPacks();
+  const [buying, setBuying] = useState<string | null>(null);
+
+  const balance = credits?.balance ?? 0;
+  const monthlyUsed = credits?.monthlyUsed ?? 0;
+  const monthlyAllowance = credits?.monthlyAllowance ?? limits.aiCredits.monthly;
+  const dailyUsed = credits?.dailyUsed ?? 0;
+  const dailyAllowance = credits?.dailyAllowance ?? limits.aiCredits.daily;
+  const maxTotal = Math.max(monthlyAllowance, balance, 100);
+
+  const buyMutation = useMutation({
+    mutationFn: async (packId: string) => {
+      const res = await fetch("/api/credits/buy", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        credentials: "include",
+        body: JSON.stringify({ packId }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Purchase failed" }));
+        throw new Error(err.message);
+      }
+      return res.json();
+    },
+    onSuccess: (data) => {
+      if (data.url) window.location.href = data.url;
+    },
+  });
 
   return (
     <div className="py-4 space-y-6">
-      <SettingsSection title="Credit Balance" description="Your available credits for AI generations, exports, and premium features.">
+      <SettingsSection title="Credit Balance" description="Your available credits for Pastel AI agent generations.">
         <div className="px-1 pt-2 pb-4">
-          <div className="flex items-baseline gap-2 mb-1">
-            <span className="text-[36px] font-bold text-foreground tracking-tight tabular-nums">{remaining}</span>
-            <span className="text-[15px] font-medium text-fg-muted">credits remaining</span>
-          </div>
-          <div className="h-2 bg-muted rounded-full overflow-hidden max-w-xs mt-3">
-            <div
-              className="h-full rounded-full bg-brand transition-all"
-              style={{ width: `${Math.min((remaining / 250) * 100, 100)}%` }}
-            />
-          </div>
-          <div className="flex items-center gap-4 mt-2">
-            <span className="text-[12px] text-fg-muted">
-              <span className="text-foreground font-medium tabular-nums">{usage.assistantCreditUsed ?? 0}</span> used this month
-            </span>
-            <span className="text-[12px] text-fg-muted">
-              <span className="text-foreground font-medium tabular-nums">250</span> total
-            </span>
-          </div>
+          {isLoading ? (
+            <div className="h-10 w-32 bg-muted rounded animate-pulse" />
+          ) : (
+            <>
+              <div className="flex items-baseline gap-2 mb-1">
+                <span className="text-[36px] font-bold text-foreground tracking-tight tabular-nums">{balance}</span>
+                <span className="text-[15px] font-medium text-fg-muted">credits remaining</span>
+              </div>
+              <div className="h-2 bg-muted rounded-full overflow-hidden max-w-xs mt-3">
+                <div
+                  className="h-full rounded-full bg-brand transition-all"
+                  style={{ width: `${Math.min((balance / maxTotal) * 100, 100)}%` }}
+                />
+              </div>
+              <div className="flex items-center gap-4 mt-2">
+                <span className="text-[12px] text-fg-muted">
+                  <span className="text-foreground font-medium tabular-nums">{monthlyUsed}</span> / {monthlyAllowance} used this month
+                </span>
+                <span className="text-[12px] text-fg-muted">
+                  <span className="text-foreground font-medium tabular-nums">{dailyUsed}</span> / {dailyAllowance} used today
+                </span>
+              </div>
+            </>
+          )}
         </div>
-        <SettingsRow label="Purchase credits">
-          <Button size="xs">
-            <Coins className="h-3.5 w-3.5" /> Buy credits
-          </Button>
-        </SettingsRow>
       </SettingsSection>
 
-      <SettingsSection title="Usage Breakdown" description="How your credits were used this period.">
-        <UsageBar label="AI generations" current={usage.assistantCreditUsed ?? 5} limit={100} />
-        <UsageBar label="Exports" current={usage.designFilesCount ?? 2} limit={limits.designFiles} />
-        <UsageBar label="Storage" current={usage.storageUsed ?? 0} limit={limits.storage} unit="MB" />
-      </SettingsSection>
+      {packs && packs.length > 0 && (
+        <SettingsSection title="Buy Credits" description="Credit packs are one-time purchases that never expire.">
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 pt-2">
+            {packs.map((pack) => (
+              <button
+                key={pack.id}
+                onClick={() => {
+                  setBuying(pack.id);
+                  buyMutation.mutate(pack.id);
+                }}
+                disabled={buyMutation.isPending && buying === pack.id}
+                className="flex flex-col items-center gap-1 p-4 rounded-xl border border-border/50 bg-surface/50 hover:bg-surface transition-colors disabled:opacity-50"
+              >
+                <span className="text-xl font-bold text-foreground">{pack.credits}</span>
+                <span className="text-[11px] text-fg-muted">credits</span>
+                <span className="text-[13px] font-medium text-brand mt-1">${(pack.usd / 100).toFixed(0)}</span>
+              </button>
+            ))}
+          </div>
+        </SettingsSection>
+      )}
 
+      <SettingsSection title="Usage Breakdown" description="How your plan allowances were used this period.">
+        <UsageBar label="Monthly AI credits" current={monthlyUsed} limit={monthlyAllowance} />
+        <UsageBar label="Daily AI credits" current={dailyUsed} limit={dailyAllowance} />
+      </SettingsSection>
     </div>
   );
 }
@@ -1121,7 +1178,7 @@ export default function Account() {
     if (params.get("verified") === "1") { toast({ title: "Email verified", variant: "success" }); refetch(); window.history.replaceState({}, "", window.location.pathname); }
     if (params.get("email-changed") === "1") { toast({ title: "Email updated", variant: "success" }); refetch(); window.history.replaceState({}, "", window.location.pathname); }
     if (params.get("billing") === "success") {
-      const plan = params.get("plan") ?? "starter";
+      const plan = params.get("plan") ?? "free";
       fetch("/api/billing/success", { method: "POST", headers: { "Content-Type": "application/json" }, credentials: "include", body: JSON.stringify({ plan }) }).catch(console.error);
       toast({ title: "Subscription active!", variant: "success" }); window.history.replaceState({}, "", window.location.pathname);
     }
@@ -1222,8 +1279,8 @@ export default function Account() {
   const email = (user as any).email ?? "";
   const emailVerified = (user as any).emailVerified ?? false;
   const pendingEmail = (user as any).pendingEmail;
-  const currentPlan = planInfo?.plan ?? "dev";
-  const planLabel = planInfo?.limits?.label ?? "Starter";
+  const currentPlan = planInfo?.plan ?? "free";
+  const planLabel = planInfo?.limits?.label ?? "Free";
 
 const contentBySection: Record<string, React.ReactNode> = {
   "": <AccountOverview user={user} planLabel={planLabel} currentPlan={currentPlan} />,

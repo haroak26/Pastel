@@ -4,12 +4,7 @@ import { StatusPage } from "@/components/StatusPage";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 
 export function OfflinePage() {
-  const { isOnline, refresh } = useNetworkStatus();
-
-  if (isOnline) {
-    refresh();
-    return null;
-  }
+  const { refresh } = useNetworkStatus();
 
   return (
     <StatusPage

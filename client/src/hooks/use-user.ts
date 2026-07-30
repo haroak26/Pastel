@@ -16,7 +16,7 @@ export function useUser() {
     queryKey: ["/api/me"],
     queryFn: fetchUser,
     staleTime: 5 * 60 * 1000,
-    retry: false,
+    retry: 2,
   });
 }
 
@@ -26,8 +26,25 @@ export type PlanInfo = {
   cancelAtPeriodEnd: boolean;
   billingPeriod: "monthly" | "annual";
   renewsAt: string | null;
-  limits: { label: string; prices: { monthly: number; annual: number }; spaces: number; domains: number; emailsPerMonth: number | "unlimited"; aiCredit: number; assistantCredit: number };
-  usage: { spaces: number; domains: number; aiCreditUsed?: number; aiCreditPurchased?: number; assistantCreditUsed?: number };
+  limits: {
+    label: string;
+    prices: { monthly: number; annual: number };
+    projects: number;
+    designFiles: number;
+    editors: number;
+    viewers: number;
+    storage: number;
+    versionHistory: number;
+    components: number;
+    customFonts: boolean;
+    exportPresets: boolean;
+    advancedPrototyping: boolean;
+    apiAccess: boolean;
+    ssO: boolean;
+    prioritySupport: boolean;
+    aiCredits: { monthly: number; daily: number };
+  };
+  usage: { storageUsed: number; projectsCount: number; designFilesCount: number; versionCount: number; componentCount: number };
 };
 
 async function fetchPlan(): Promise<PlanInfo | null> {
@@ -42,6 +59,54 @@ export function usePlan() {
     queryKey: ["/api/me/plan"],
     queryFn: fetchPlan,
     staleTime: 5 * 60 * 1000,
+    retry: false,
+  });
+}
+
+export type CreditBalance = {
+  balance: number;
+  dailyUsed: number;
+  lifetimePurchased: number;
+  lifetimeUsed: number;
+  monthlyUsed: number;
+  monthlyAllowance: number;
+  dailyAllowance: number;
+};
+
+async function fetchCredits(): Promise<CreditBalance | null> {
+  const res = await fetch("/api/credits/balance", { credentials: "include" });
+  if (res.status === 401) return null;
+  if (!res.ok) return null;
+  return res.json();
+}
+
+export function useCredits() {
+  return useQuery<CreditBalance | null>({
+    queryKey: ["/api/credits/balance"],
+    queryFn: fetchCredits,
+    staleTime: 30 * 1000,
+    retry: false,
+  });
+}
+
+export type CreditPack = {
+  id: string;
+  credits: number;
+  label: string;
+  usd: number;
+};
+
+async function fetchCreditPacks(): Promise<CreditPack[]> {
+  const res = await fetch("/api/credits/packs", { credentials: "include" });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export function useCreditPacks() {
+  return useQuery<CreditPack[]>({
+    queryKey: ["/api/credits/packs"],
+    queryFn: fetchCreditPacks,
+    staleTime: 60 * 60 * 1000,
     retry: false,
   });
 }

@@ -81,7 +81,7 @@ export function checkPlanLimit(
   limitKey: keyof PlanLimits,
   current: number,
 ): LimitCheckResult {
-  const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.starter;
+  const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
   const limit = limits[limitKey];
   if (limit === "unlimited") {
     return { allowed: true, current, limit: "unlimited" };

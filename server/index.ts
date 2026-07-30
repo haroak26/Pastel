@@ -150,12 +150,13 @@ export function createApp() {
   // Custom CSP and additional headers
   app.use((_req, res, next) => {
     const isDev = process.env.NODE_ENV !== "production";
+    const cdnSrc = "https://unpkg.com https://cdn.tailwindcss.com https://fonts.googleapis.com https://fonts.gstatic.com https://cdn.jsdelivr.net";
     const scriptSrc = isDev
-      ? "'self' 'unsafe-inline' 'unsafe-eval' https://9fa523f4-b7f0-4769-942e-e2ebf496995e-00-3mhvr91md9y73.picard.replit.dev https://replit-cdn.com https://va.vercel-scripts.com"
-      : "'self'";
+      ? `'self' 'unsafe-inline' 'unsafe-eval' ${cdnSrc} https://9fa523f4-b7f0-4769-942e-e2ebf496995e-00-3mhvr91md9y73.picard.replit.dev https://replit-cdn.com https://va.vercel-scripts.com`
+      : `'self' ${cdnSrc}`;
     const styleSrc = isDev
-      ? "'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net"
-      : "'self' 'unsafe-inline' https://fonts.googleapis.com https://cdn.jsdelivr.net";
+      ? `'self' 'unsafe-inline' ${cdnSrc}`
+      : `'self' 'unsafe-inline' ${cdnSrc}`;
     res.setHeader("Content-Security-Policy",
       `default-src 'self'; ` +
       `script-src ${scriptSrc}; ` +
@@ -163,7 +164,7 @@ export function createApp() {
       `font-src 'self' https://fonts.gstatic.com https://cdn.jsdelivr.net data:; ` +
       `img-src 'self' data: https:; ` +
       `connect-src 'self' https: ws:; ` +
-      `frame-src 'none'; ` +
+      `frame-src 'self'; ` +
       `object-src 'none'`
     );
     res.setHeader("Permissions-Policy", "camera=(), microphone=(), geolocation=()");
@@ -208,6 +209,12 @@ export async function startServer(app: Express, httpServer: Server) {
   } catch (e) {
     console.error("[startup] Database unreachable — check DATABASE_URL:", e);
   }
+
+  // Mark agent runs orphaned by a previous process as errored
+  try {
+    const { cleanupStaleRuns } = await import("./lib/pastel-agent/run-store");
+    await cleanupStaleRuns();
+  } catch {}
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {
     const status = err.status || err.statusCode || 500;
     const message = err.message || "Internal Server Error";
@@ -223,9 +230,14 @@ export async function startServer(app: Express, httpServer: Server) {
 
   if (process.env.NODE_ENV === "production" && process.env.SERVE_STATIC !== "false") {
     serveStatic(app);
-  } else if (process.env.NODE_ENV !== "production") {
-    const { setupVite } = await import("./vite");
-    await setupVite(httpServer, app);
+  } else {
+    try {
+      const { setupVite } = await import("./vite");
+      await setupVite(httpServer, app);
+    } catch {
+      log("Vite not available, serving static files instead");
+      serveStatic(app);
+    }
   }
 
   const port = parseInt(process.env.PORT || "5000", 10);

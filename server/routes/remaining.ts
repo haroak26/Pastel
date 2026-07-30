@@ -8,10 +8,11 @@ import { storage } from "../storage";
 import { db } from "../db";
 import { eq, sql } from "drizzle-orm";
 import { hashPassword, comparePasswords } from "../auth";
-import type { ChatCompletionChunk } from "artificial-gateway-sdk";
+import { Stream } from "merge-gateway-sdk";
 import { assistantChat, assistantChatNonStream, routerChat } from "../lib/ai";
 import { sendEmailChangeVerification, sendVerificationEmail, sendPasswordResetEmail, sendAccountDeletionEmail, sendSubscriptionUpdateEmail, sendWorkspaceInviteEmail } from "../email";
 import { uploadBlob, deleteBlob } from "../blob-storage";
+import * as creditService from "../lib/credit-service";
 
 import {
   signupSchema, loginSchema, verifyEmailSchema, resendVerificationSchema,
@@ -31,7 +32,7 @@ import {
 } from "./helpers";
 
 const STRIPE_API_VERSION = "2026-02-25.clover" as const;
-type PaidPlan = "dev" | "startup" | "scale" | "enterprise";
+type PaidPlan = "free" | "pro" | "team" | "enterprise";
 
 function stripePriceFor(plan: PaidPlan, billingPeriod: BillingPeriod = "monthly"): string | null {
   const key = billingPeriod === "annual" ? `${plan.toUpperCase()}_ANNUAL` : plan.toUpperCase();
@@ -40,7 +41,7 @@ function stripePriceFor(plan: PaidPlan, billingPeriod: BillingPeriod = "monthly"
 
 function planInfoFromPriceId(priceId: string | undefined | null): { plan: PaidPlan; billingPeriod: BillingPeriod } | null {
   if (!priceId) return null;
-  for (const plan of ["dev", "startup", "scale", "enterprise"] as const) {
+  for (const plan of ["free", "pro", "team", "enterprise"] as const) {
     for (const bp of ["monthly", "annual"] as const) {
       const key = bp === "annual" ? `STRIPE_PRICE_${plan.toUpperCase()}_ANNUAL` : `STRIPE_PRICE_${plan.toUpperCase()}`;
       if (priceId === process.env[key]) return { plan, billingPeriod: bp };
@@ -151,8 +152,12 @@ export function registerRemainingRoutes(app: Express): void {
     try {
       const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
       const user = req.user as User;
-      const { plan } = z.object({ plan: z.enum(["dev", "startup", "scale", "enterprise"]) }).parse(req.body);
-      const priceId = stripePriceFor(plan, "monthly");
+      const { plan, billingPeriod } = z.object({
+        plan: z.enum(["free", "pro", "team", "enterprise"]),
+        billingPeriod: z.enum(["monthly", "annual"]).optional().default("monthly"),
+      }).parse(req.body);
+      if (plan === "free") return res.status(400).json({ message: "Free plan cannot be purchased" });
+      const priceId = stripePriceFor(plan, billingPeriod);
       if (!priceId) return res.status(400).json({ message: `Plan "${plan}" is not configured` });
       const fullUser = await storage.getUserById(user.id);
       if (!fullUser) return res.status(404).json({ message: "User not found" });
@@ -176,10 +181,10 @@ export function registerRemainingRoutes(app: Express): void {
         if (currentItem?.price?.id === priceId && !liveSub.cancel_at_period_end) return res.status(400).json({ message: "You are already on this plan" });
         const items = [{ id: currentItem.id, price: priceId, quantity: currentItem.quantity ?? 1 }, ...liveSub.items.data.slice(1).map((item) => ({ id: item.id, deleted: true }))] as Stripe.BillingPortal.SessionCreateParams.FlowData.SubscriptionUpdateConfirm.Item[];
         const portalSession = await stripe.billingPortal.sessions.create({ customer: customerId, return_url: `${getPublicUrl(req)}/account?billing=success&plan=${plan}`, flow_data: { type: "subscription_update_confirm", subscription_update_confirm: { subscription: liveSub.id, items } } });
-        sub = await storage.updateSubscription(fullUser.id, { stripeSubscriptionId: liveSub.id, billingPeriod: "monthly" });
+        sub = await storage.updateSubscription(fullUser.id, { stripeSubscriptionId: liveSub.id, billingPeriod });
         return res.json({ url: portalSession.url });
       }
-      sub = await storage.updateSubscription(fullUser.id, { billingPeriod: "monthly" });
+      sub = await storage.updateSubscription(fullUser.id, { billingPeriod });
       const session = await stripe.checkout.sessions.create({ mode: "subscription", payment_method_types: ["card"], allow_promotion_codes: true, line_items: [{ price: priceId, quantity: 1 }], customer: customerId, success_url: `${getPublicUrl(req)}/account?billing=success&plan=${plan}`, cancel_url: `${getPublicUrl(req)}/account?billing=cancelled`, metadata: { userId: String(fullUser.id), plan }, subscription_data: { metadata: { userId: String(fullUser.id), plan } } });
       return res.json({ url: session.url });
     } catch (err) {
@@ -203,7 +208,7 @@ export function registerRemainingRoutes(app: Express): void {
       const subs = await stripe.subscriptions.list({ customer: sub.stripeCustomerId, status: "all", limit: 100 });
       const live = subs.data.filter((s) => s.status !== "canceled" && s.status !== "incomplete_expired");
       if (live.length === 0) {
-        await storage.updateSubscription(fullUser.id, { plan: "dev", stripeSubscriptionId: null, subscriptionStatus: "canceled", cancelAtPeriodEnd: false, planRenewsAt: null });
+        await storage.updateSubscription(fullUser.id, { plan: "free", stripeSubscriptionId: null, subscriptionStatus: "canceled", cancelAtPeriodEnd: false, planRenewsAt: null });
         return res.json({ ok: true, cancelAtPeriodEnd: false });
       }
       let cancelAtPeriodEnd = false;
@@ -212,7 +217,7 @@ export function registerRemainingRoutes(app: Express): void {
       }
       const latest = live[live.length - 1];
       const renewsAt = (latest as unknown as { current_period_end?: number }).current_period_end;
-      await storage.updateSubscription(fullUser.id, { subscriptionStatus: "canceled", cancelAtPeriodEnd, planRenewsAt: renewsAt ? new Date(renewsAt * 1000) : null, ...(immediately ? { plan: "dev", stripeSubscriptionId: null } : {}) });
+      await storage.updateSubscription(fullUser.id, { subscriptionStatus: "canceled", cancelAtPeriodEnd, planRenewsAt: renewsAt ? new Date(renewsAt * 1000) : null, ...(immediately ? { plan: "free", stripeSubscriptionId: null } : {}) });
       return res.json({ ok: true, cancelAtPeriodEnd });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
@@ -224,8 +229,8 @@ export function registerRemainingRoutes(app: Express): void {
   app.get("/api/me/plan", requireAuth, async (req, res) => {
     const user = req.user as User;
     const sub = await storage.getSubscription(user.id);
-    const plan = (sub?.plan as PlanTier) || "starter";
-    const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.starter;
+    const plan = (sub?.plan as PlanTier) || "free";
+    const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
     const usageRec = await storage.getUsage(user.id);
     return res.json({
       plan, status: sub?.subscriptionStatus ?? null, cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false,
@@ -244,13 +249,18 @@ export function registerRemainingRoutes(app: Express): void {
     const payload = {
       exportedAt,
       account: { id: fullUser.id, username: fullUser.username, displayName: fullUser.displayName, email: fullUser.email, emailVerified: fullUser.emailVerified, pendingEmail: fullUser.pendingEmail, createdAt: fullUser.createdAt ? fullUser.createdAt.toISOString() : null },
-      billing: { plan: sub?.plan ?? "dev", subscriptionStatus: sub?.subscriptionStatus ?? null, cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false, planRenewsAt: sub?.planRenewsAt ? sub.planRenewsAt.toISOString() : null },
+      billing: { plan: sub?.plan ?? "free", subscriptionStatus: sub?.subscriptionStatus ?? null, cancelAtPeriodEnd: sub?.cancelAtPeriodEnd ?? false, planRenewsAt: sub?.planRenewsAt ? sub.planRenewsAt.toISOString() : null },
       notifications: { newsletterSubscribed: fullUser.newsletterSubscribed, transactionalEmails: true },
       workspaces: userWorkspaces.map((w) => ({ id: w.id, name: w.name, createdAt: w.createdAt ? w.createdAt.toISOString() : null })),
     };
     res.setHeader("Content-Type", "application/json; charset=utf-8");
     res.setHeader("Content-Disposition", `attachment; filename=\"latte-account-export-${exportedAt.slice(0, 10)}.json\"`);
     return res.status(200).send(JSON.stringify(payload, null, 2));
+  });
+
+  // ── Spaces (legacy — migrated to design tool, returns empty set) ────────────
+  app.get("/api/spaces", requireAuth, async (_req, res) => {
+    return res.json([]);
   });
 
   // ── Workspaces ─────────────────────────────────────────────────────────────
@@ -661,20 +671,25 @@ export function registerRemainingRoutes(app: Express): void {
     try { event = stripe.webhooks.constructEvent(raw as Buffer, sig as string, webhookSecret); } catch { return res.status(400).json({ message: "Invalid webhook signature" }); }
     try {
       switch (event.type) {
-        case "checkout.session.completed":
-        case "customer.subscription.created":
-        case "customer.subscription.updated": {
-          let subscriptionId: string | null = null;
-          let userIdFromMeta: number | null = null;
-          if (event.type === "checkout.session.completed") {
-            const session = event.data.object as Stripe.Checkout.Session;
-            userIdFromMeta = Number(session.metadata?.userId) || null;
-            subscriptionId = typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null;
-          } else {
-            const sub = event.data.object as Stripe.Subscription;
-            subscriptionId = sub.id;
-            userIdFromMeta = Number(sub.metadata?.userId) || null;
+        case "checkout.session.completed": {
+          const session = event.data.object as Stripe.Checkout.Session;
+          const metaType = session.metadata?.type;
+          if (metaType === "credit_purchase") {
+          const userId = session.metadata?.userId;
+          const packId = session.metadata?.packId;
+          const credits = Number(session.metadata?.credits) || 0;
+
+            if (userId && credits > 0) {
+              await creditService.addCredits(userId, credits, `Credit pack purchase: ${packId}`, {
+                type: "purchase",
+                stripeSessionId: session.id,
+                packId,
+              });
+            }
+            break;
           }
+          let subscriptionId: string | null = typeof session.subscription === "string" ? session.subscription : session.subscription?.id ?? null;
+          const userIdFromMeta = session.metadata?.userId ?? null;
           if (!subscriptionId) break;
           const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
           const customerId = typeof stripeSub.customer === "string" ? stripeSub.customer : stripeSub.customer.id;
@@ -688,13 +703,42 @@ export function registerRemainingRoutes(app: Express): void {
           const prevSub = await storage.getSubscription(user.id);
           await storage.updateSubscription(user.id, {
             stripeCustomerId: customerId, stripeSubscriptionId: isLive ? stripeSub.id : null,
-            plan: isLive && priceInfo ? priceInfo.plan : "dev",
+            plan: isLive && priceInfo ? priceInfo.plan : "free",
             billingPeriod: isLive && priceInfo ? priceInfo.billingPeriod : "monthly",
             subscriptionStatus: stripeSub.status, planRenewsAt: renewsAt ? new Date(renewsAt * 1000) : null, cancelAtPeriodEnd: !!stripeSub.cancel_at_period_end,
           });
           if (isLive && user.email && priceInfo) {
             const planLabel = priceInfo.plan.charAt(0).toUpperCase() + priceInfo.plan.slice(1);
             const isNewSub = event.type === "checkout.session.completed" || !prevSub?.stripeSubscriptionId;
+            const displayName = user.displayName ?? user.username ?? "";
+            sendSubscriptionUpdateEmail(user.email, displayName, planLabel, isNewSub ? "new" : "updated").catch(() => {});
+          }
+          break;
+        }
+        case "customer.subscription.created":
+        case "customer.subscription.updated": {
+          const sub = event.data.object as Stripe.Subscription;
+          const subscriptionId = sub.id;
+          const userIdFromMeta = sub.metadata?.userId ?? null;
+          const stripeSub = await stripe.subscriptions.retrieve(subscriptionId);
+          const customerId = typeof stripeSub.customer === "string" ? stripeSub.customer : stripeSub.customer.id;
+          let user = await storage.getUserByStripeCustomerId(customerId);
+          if (!user && userIdFromMeta) user = await storage.getUserById(String(userIdFromMeta));
+          if (!user) break;
+          const priceId = stripeSub.items.data[0]?.price?.id;
+          const priceInfo = planInfoFromPriceId(priceId);
+          const isLive = stripeSub.status === "active" || stripeSub.status === "trialing" || stripeSub.status === "past_due";
+          const renewsAt = (stripeSub as unknown as { current_period_end?: number }).current_period_end;
+          const prevSub = await storage.getSubscription(user.id);
+          await storage.updateSubscription(user.id, {
+            stripeCustomerId: customerId, stripeSubscriptionId: isLive ? stripeSub.id : null,
+            plan: isLive && priceInfo ? priceInfo.plan : "free",
+            billingPeriod: isLive && priceInfo ? priceInfo.billingPeriod : "monthly",
+            subscriptionStatus: stripeSub.status, planRenewsAt: renewsAt ? new Date(renewsAt * 1000) : null, cancelAtPeriodEnd: !!stripeSub.cancel_at_period_end,
+          });
+          if (isLive && user.email && priceInfo) {
+            const planLabel = priceInfo.plan.charAt(0).toUpperCase() + priceInfo.plan.slice(1);
+            const isNewSub = !prevSub?.stripeSubscriptionId;
             const displayName = user.displayName ?? user.username ?? "";
             sendSubscriptionUpdateEmail(user.email, displayName, planLabel, isNewSub ? "new" : "updated").catch(() => {});
           }
@@ -707,7 +751,7 @@ export function registerRemainingRoutes(app: Express): void {
           if (!user) break;
           const existingSub = await storage.getSubscription(user.id);
           if (existingSub?.stripeSubscriptionId && existingSub.stripeSubscriptionId !== deletedSub.id) break;
-          await storage.updateSubscription(user.id, { stripeSubscriptionId: null, plan: "dev", billingPeriod: "monthly", subscriptionStatus: "canceled", planRenewsAt: null, cancelAtPeriodEnd: false });
+          await storage.updateSubscription(user.id, { stripeSubscriptionId: null, plan: "free", billingPeriod: "monthly", subscriptionStatus: "canceled", planRenewsAt: null, cancelAtPeriodEnd: false });
           if (user.email) {
             const displayName = user.displayName ?? user.username ?? "";
             const prevPlanLabel = existingSub?.plan ? existingSub.plan.charAt(0).toUpperCase() + existingSub.plan.slice(1) : "Pro";
@@ -736,8 +780,7 @@ export function registerRemainingRoutes(app: Express): void {
       const { context } = req.body;
       if (!context || typeof context !== 'string') return res.status(400).json({ message: "Context is required" });
       if (!process.env.VERCEL_GATEWAY_ASSISTANT_API) return res.json({ draft: "AI assistant is not configured." });
-      const { content: draft, cost } = await assistantChatNonStream([{ role: "system", content: "You are a writing assistant. Given the context, write a professional draft." }, { role: "user", content: context }], { temperature: 0.7, maxTokens: 500 });
-      storage.incrementUsage(user.id, "assistant_credit_used", cost).catch(() => {});
+      const { content: draft } = await assistantChatNonStream([{ role: "system", content: "You are a writing assistant. Given the context, write a professional draft." }, { role: "user", content: context }], { temperature: 0.7, maxTokens: 500 });
       return res.json({ draft });
     } catch { return res.status(500).json({ message: "Failed to generate draft" }); }
   });
@@ -769,20 +812,16 @@ export function registerRemainingRoutes(app: Express): void {
       ];
 
       let fullResponse = "";
-      const inputCharsForCost = messages.reduce((sum, m) => sum + m.content.length, 0);
       try {
-        const stream = await assistantChat(messages, { temperature: 0.7, maxTokens: 900, stream: true }) as AsyncIterable<ChatCompletionChunk>;
-        for await (const chunk of stream) {
-          const content = chunk.choices?.[0]?.delta?.content || "";
-          if (content) { fullResponse += content; res.write(`data: ${JSON.stringify({ type: "content", text: content })}\n\n`); }
+        const stream = await assistantChat(messages, { temperature: 0.7, maxTokens: 900, stream: true }) as Stream;
+        for await (const event of stream) {
+          const data = event as Record<string, unknown>;
+          const text = typeof data.text === "string" ? data.text : (data as any)?.delta?.text || "";
+          if (text) { fullResponse += text; res.write(`data: ${JSON.stringify({ type: "content", text })}\n\n`); }
         }
       } catch {
         res.write(`data: ${JSON.stringify({ type: "error", message: "AI service unavailable" })}\n\n`);
         res.write("data: [DONE]\n\n"); return res.end();
-      }
-      if (fullResponse) {
-        const assistantCost = (inputCharsForCost + fullResponse.length) * 0.0000005;
-        storage.incrementUsage(user.id, "assistant_credit_used", assistantCost).catch(() => {});
       }
       res.write("data: [DONE]\n\n");
       res.end();
@@ -791,6 +830,91 @@ export function registerRemainingRoutes(app: Express): void {
       if (!res.headersSent) return res.status(500).json({ message: "Chat failed" });
       res.write(`data: ${JSON.stringify({ type: "error", message: "Chat failed" })}\n\n`);
       res.write("data: [DONE]\n\n"); res.end();
+    }
+  });
+
+  // ── Credits ─────────────────────────────────────────────────────────────
+  const CREDIT_PACKS = [
+    { id: "credits_100", credits: 100, label: "Starter Pack", usd: 1500, priceId: process.env.STRIPE_PRICE_CREDITS_100 },
+    { id: "credits_500", credits: 500, label: "Growth Pack", usd: 6000, priceId: process.env.STRIPE_PRICE_CREDITS_500 },
+    { id: "credits_2000", credits: 2000, label: "Pro Pack", usd: 20000, priceId: process.env.STRIPE_PRICE_CREDITS_2000 },
+    { id: "credits_5000", credits: 5000, label: "Team Pack", usd: 45000, priceId: process.env.STRIPE_PRICE_CREDITS_5000 },
+  ] as const;
+
+  app.get("/api/credits/packs", (_req, res) => {
+    return res.json(CREDIT_PACKS.map(p => ({ id: p.id, credits: p.credits, label: p.label, usd: p.usd })));
+  });
+
+  app.get("/api/credits/balance", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const balance = await creditService.getBalance(user.id);
+      const monthlyUsed = await creditService.getMonthlyUsage(user.id);
+      const sub = await storage.getSubscription(user.id);
+      const plan = (sub?.plan as PlanTier) || "free";
+      const limits = PLAN_LIMITS[plan] ?? PLAN_LIMITS.free;
+      return res.json({
+        balance: balance.balance,
+        dailyUsed: balance.dailyUsed,
+        lifetimePurchased: balance.lifetimePurchased,
+        lifetimeUsed: balance.lifetimeUsed,
+        monthlyUsed,
+        monthlyAllowance: limits.aiCredits.monthly,
+        dailyAllowance: limits.aiCredits.daily,
+      });
+    } catch { return res.status(500).json({ message: "Failed to fetch balance" }); }
+  });
+
+  app.get("/api/credits/transactions", requireAuth, async (req, res) => {
+    try {
+      const user = req.user as User;
+      const limit = Math.min(Number(req.query.limit) || 50, 100);
+      const offset = Number(req.query.offset) || 0;
+      const txs = await storage.getCreditTransactions(user.id, limit, offset);
+      return res.json(txs);
+    } catch { return res.status(500).json({ message: "Failed to fetch transactions" }); }
+  });
+
+  app.post("/api/credits/buy", authRateLimiter, requireAuth, async (req, res) => {
+    const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+    if (!stripeSecretKey) return res.status(503).json({ message: "Billing not configured" });
+    try {
+      const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
+      const user = req.user as User;
+      const { packId } = z.object({ packId: z.string() }).parse(req.body);
+      const pack = CREDIT_PACKS.find(p => p.id === packId);
+      if (!pack) return res.status(400).json({ message: "Invalid credit pack" });
+      if (!pack.priceId) return res.status(400).json({ message: "Credit pack not configured" });
+
+      const fullUser = await storage.getUserById(user.id);
+      if (!fullUser) return res.status(404).json({ message: "User not found" });
+
+      let sub = await storage.getSubscription(user.id);
+      let customerId = sub?.stripeCustomerId ?? null;
+      if (customerId) {
+        try { const c = await stripe.customers.retrieve(customerId); if ((c as Stripe.DeletedCustomer).deleted) customerId = null; } catch { customerId = null; }
+      }
+      if (!customerId) {
+        const created = await stripe.customers.create({ email: fullUser.email, name: fullUser.displayName ?? fullUser.username, metadata: { userId: String(fullUser.id) } });
+        customerId = created.id;
+        sub = await storage.createSubscription(fullUser.id, { stripeCustomerId: customerId });
+      }
+
+      const session = await stripe.checkout.sessions.create({
+        mode: "payment",
+        payment_method_types: ["card"],
+        line_items: [{ price: pack.priceId, quantity: 1 }],
+        customer: customerId,
+        success_url: `${getPublicUrl(req)}/account?credits=bought&pack=${pack.id}`,
+        cancel_url: `${getPublicUrl(req)}/account?credits=cancelled`,
+        metadata: { type: "credit_purchase", userId: String(fullUser.id), packId: pack.id, credits: String(pack.credits) },
+      });
+
+      return res.json({ url: session.url });
+    } catch (err) {
+      if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
+      console.error("[credits/buy] error:", err);
+      return res.status(500).json({ message: "Failed to create checkout session" });
     }
   });
 }
