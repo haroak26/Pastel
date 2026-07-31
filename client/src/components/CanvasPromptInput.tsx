@@ -105,9 +105,15 @@ export function CanvasPromptInput({
         </div>
 
         {/* Question text */}
-        <div className="px-4 pt-2.5 pb-1">
-          <p className="text-[14px] font-medium text-foreground leading-snug">
+        <div className="px-4 pt-3 pb-1">
+          <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-brand mb-1">
+            {currentQuestion.title}
+          </p>
+          <p className="text-[15px] font-medium text-foreground leading-snug">
             {currentQuestion.question}
+          </p>
+          <p className="text-[11px] text-fg-muted leading-relaxed mt-1.5">
+            {currentQuestion.whyItMatters}
           </p>
         </div>
 
@@ -115,18 +121,19 @@ export function CanvasPromptInput({
         {currentQuestion.options && currentQuestion.options.length > 0 && (
           <div className="px-4 py-2 flex flex-wrap gap-1.5">
             {currentQuestion.options.map((option) => {
-              const isSelected = answers[currentQuestion.id] === option;
+              const isSelected = answers[currentQuestion.id] === option.label;
               return (
                 <button
-                  key={option}
-                  onClick={() => handleSelectOption(option)}
-                  className={`inline-flex items-center px-3 py-1.5 rounded-full text-[12px] font-medium transition-all duration-150 border cursor-pointer ${
+                  key={option.label}
+                  onClick={() => handleSelectOption(option.label)}
+                  className={`flex-1 min-w-[46%] text-left px-3 py-2 rounded-[12px] text-[12px] transition-all duration-150 border cursor-pointer ${
                     isSelected
-                      ? "bg-brand text-white border-brand shadow-sm"
+                      ? "bg-brand/10 text-foreground border-brand/50"
                       : "bg-surface-muted text-fg-muted border-border/60 hover:border-brand/40 hover:text-foreground"
                   }`}
                 >
-                  {option}
+                  <span className="block font-semibold">{option.label}</span>
+                  <span className="block text-[10px] leading-relaxed mt-0.5 opacity-80">{option.description}</span>
                 </button>
               );
             })}
@@ -141,7 +148,7 @@ export function CanvasPromptInput({
               value={localText}
               onChange={(e) => setLocalText(e.target.value)}
               onKeyDown={handleKeyDown}
-              placeholder={hasCurrentAnswer ? answers[currentQuestion.id] : "Type your own answer..."}
+              placeholder={hasCurrentAnswer ? answers[currentQuestion.id] : (currentQuestion.placeholder || "Or describe a different direction...")}
               rows={1}
               className="flex-1 resize-none bg-transparent text-[13px] text-foreground placeholder:text-fg-faint px-3 py-2 outline-none border-none leading-relaxed"
             />

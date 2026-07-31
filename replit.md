@@ -24,6 +24,17 @@ Email helpdesk platform with AI-powered agent replies, ticket management, and su
 - Rate limiting on all auth endpoints via `authRateLimiter`
 - **Timestamps are emitted as UTC ISO 8601** (`...Z`) from the server. `server/db.ts` overrides pg type parsers (OID 1114 → append Z, 1184 → as-is) and pins each connection to `SET TIME ZONE 'UTC'`.
 
+## Pastel Agent (v2 design agent)
+
+Autonomous design pipeline in `server/lib/pastel-agent/`:
+
+- **Stages** (orchestrated, mapped onto the client's six phases): intake (ambiguity engine with confidence scoring) → product spec → design system (+ deterministic `src/styles.css` codegen) → architecture (component contracts + screen blueprints) → design gate → implement (registry-reused components, screen composition, progressive per-screen verification) → verify (incremental, artifact-scoped repairs, anti-slop rules) → visual QA → publish.
+- **Model routing**: reasoning/planning/verification on `openai/gpt-5.6-terra`; implementation (components, screens, repairs) on `openai/gpt-5.6-luna`. Per-run credit budget guard (`PASTEL_MAX_RUN_CREDITS`, default 25).
+- **Persistent state**: `agent_project_state` (intake/spec/design system/architecture per project) + `agent_component_registry` (validated reusable components). Markdown docs and SSE events are rendered from state — nothing is re-derived from prose.
+- **Delta runs**: `POST /api/pastel-agent/projects/:projectId/screens` adds screens onto an established project (state + registry reused, only the delta is generated). Cost estimate: `GET /api/pastel-agent/estimate`.
+- **Client wire contract** (unchanged): phases `brief/plan/review/build/verify/present`; SSE event types; doc kinds `brief|system|component-spec|screen-spec|visual-review`; screen docs at `docs/screens/<Name>.md`; bundles at `.build/<S>.js`.
+- Validation: `npx tsx script/pastel-e2e.ts` (full live run), `script/pastel-delta-probe.ts` (delta-only), `script/verify-repro.ts <runId>` (offline verify).
+
 ## Environment Variables
 
 - `DATABASE_URL` — PostgreSQL connection string
@@ -43,6 +54,13 @@ Email helpdesk platform with AI-powered agent replies, ticket management, and su
 - `STRIPE_PRICE_STARTER`, `STRIPE_PRICE_PRO`, `STRIPE_PRICE_MAX` — Stripe Price IDs for monthly billing
 - `STRIPE_PRICE_STARTER_ANNUAL`, `STRIPE_PRICE_PRO_ANNUAL`, `STRIPE_PRICE_MAX_ANNUAL` — Stripe Price IDs for annual billing (20% discount)
 - `PADDLE_API_KEY` — Paddle billing (optional)
+- `MERGE_GATEWAY_API_KEY` — AI gateway for the Pastel Agent + assistant features
+- `PASTEL_MODEL_<ROLE>` — override Pastel models per role (roles: INTAKE, SPEC, DESIGN_SYSTEM, ARCHITECTURE, DESIGN_GATE, VISUAL_QA, COMPONENT, SCREEN, PATCH)
+- `PASTEL_MERGE_GATEWAY_TAG_<ROLE>` / `PASTEL_MERGE_GATEWAY_TAG_KEY` / `PASTEL_MERGE_GATEWAY_TAG_VALUE` — gateway analytics tags (default key `betatesterid`; values must be org-registered)
+- `PASTEL_MAX_RUN_CREDITS` — per-run repair/guard budget ceiling (default 25)
+- `PASTEL_INTAKE_CONFIDENCE` — ambiguity threshold for clarification questions (default 0.65)
+- `PASTEL_MAX_TOKENS_<ROLE>` — per-role output budgets; `PASTEL_THINKING_BUDGET` (`off` disables reasoning)
+- `PASTEL_CHROMIUM_PATH`, `REPLIT_PLAYWRIGHT_CHROMIUM_EXECUTABLE`, `PASTEL_PREVIEW_BASE_URL`, `PASTEL_VISUAL_MOBILE` (`all` adds mobile screenshots) — visual QA tuning
 
 ## Database Schema
 

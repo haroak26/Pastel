@@ -201,3 +201,44 @@ export function selectStyleSeed(recentSeeds: string[] = []): StyleSeed {
 export function selectStyleSeedByName(name: string): StyleSeed | undefined {
   return STYLE_SEEDS.find(s => s.name === name);
 }
+
+export function selectStyleSeedDeterministic(key: string): StyleSeed {
+  let hash = 0;
+  for (let i = 0; i < key.length; i++) {
+    hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
+  }
+  return STYLE_SEEDS[hash % STYLE_SEEDS.length];
+}
+
+/**
+ * Permission matrix for a style seed — the single source of truth consumed
+ * by prompts, the anti-slop rule engine, and deterministic validators.
+ */
+export function seedPermissions(name: string): {
+  shadows: boolean;
+  gradients: boolean;
+  centered: boolean;
+  thickBorders: boolean;
+} {
+  return {
+    shadows: ["neo-brutalist", "brutalist", "glassmorphic", "organic", "motion-first"].includes(name),
+    gradients: ["retro-futurist", "motion-first", "glassmorphic", "memphis"].includes(name),
+    centered: ["art-deco", "monumental", "motion-first"].includes(name),
+    thickBorders: ["neo-brutalist", "brutalist", "constructivist", "memphis"].includes(name),
+  };
+}
+
+export function styleSeedContext(seed: StyleSeed): string {
+  const perms = seedPermissions(seed.name);
+
+  return `STYLE SEED
+Name: ${seed.name}
+Mood: ${seed.mood.join(", ")}
+Spatial philosophy: ${seed.spatialPhilosophy}
+Typographic attitude: ${seed.typographicAttitude}
+Color temperature: ${seed.colorTemperature}
+Texture approach: ${seed.textureApproach}
+Creative direction: ${seed.creativeDirection}
+Permission guardrails: shadows ${perms.shadows ? "allowed sparingly" : "not allowed"}; gradients ${perms.gradients ? "allowed sparingly" : "not allowed"}; centered layouts ${perms.centered ? "allowed when intentional" : "not the default"}; thick borders ${perms.thickBorders ? "allowed when structural" : "not allowed"}.
+Global quality guardrails: no muddy brown palettes, no dead whitespace, no generic card-grid repetition, no default blue/purple palette, and no novelty body typography.`;
+}

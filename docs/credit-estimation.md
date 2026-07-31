@@ -2,7 +2,7 @@
 
 ## Overview
 
-Every Pastel AI agent run (Build or Plane mode) consumes credits. Before starting, the system estimates the cost, checks the user's balance, and places a hold. After completion, the hold is released against the actual cost.
+Every Pastel AI agent run consumes credits. Before starting, the server estimates the cost, checks the user's balance, and places a hold. After completion, the hold is released against the **actual measured cost** (tracked per stage in the run manifest's cost ledger).
 
 ## Core Formula
 
@@ -14,112 +14,61 @@ credits = costInDollars × 5
 Minimum deduction: `0.01 credits` (2 decimal places).
 Minimum balance to start a run: **5 credits** (hard floor).
 
-## Per-Phase Cost Breakdown
+## Pastel Agent v2 — Model Routing
 
-Estimation is based on typical input/output character counts per phase, multiplied by the model's per-token pricing (1 token ≈ 4 chars).
+Reasoning/planning/verification runs on `openai/gpt-5.6-terra`; deterministic implementation (components, screens, repairs) runs on `openai/gpt-5.6-luna`. Deterministic work (styles.css codegen, sitemap derivation, lint, anti-slop checks, sandbox verification) costs **zero** model tokens.
 
-### Build Mode (full pipeline, ~4 screens)
+| Stage | Role (model) | Typical calls per 4-screen run |
+|-------|--------------|-------------------------------|
+| Intake + ambiguity | terra (`intake`) | 1 (0 when cached from `/clarify`) |
+| Product spec | terra (`spec`) | 1 |
+| Design system | terra (`designSystem`) | 1 |
+| Architecture + contracts + blueprints | terra (`architecture`) | 1 |
+| Design gate (+ targeted fixes) | terra (`designGate`) | 1 (+0–3) |
+| Components | luna (`component`) | one per new/changed component (registry-validated ones are reused) |
+| Screens | luna (`screen`) | one per screen |
+| Surgical repairs | luna (`patch`) | only for failing artifacts, capped rounds |
+| Visual QA | terra (`visualQA`) | 1 (batched screenshots) |
 
-| Phase | Model | Input (chars) | Output (chars) | Est. Tokens | Est. Cost | Est. Credits |
-|-------|-------|--------------|----------------|-------------|-----------|-------------|
-| Clarify | gpt-5.4-nano | 500 | 2,000 | 625 | $0.0007 | 0.01 |
-| Title | mistral-small-4 | 300 | 100 | 100 | $0.00002 | 0.01 |
-| Brief | gpt-5.4-mini | 3,000 | 4,000 | 1,750 | $0.005 | 0.03 |
-| Design System | claude-sonnet-5 | 5,000 | 4,000 | 2,250 | $0.012 | 0.06 |
-| Component Spec | claude-sonnet-5 | 6,000 | 6,000 | 3,000 | $0.018 | 0.09 |
-| Screen Specs (×4) | claude-sonnet-5 | 4,000×4 | 6,000×4 | 10,000 | $0.072 | 0.36 |
-| Shared Code | gpt-5.6-terra | 8,000 | 12,000 | 5,000 | $0.025 | 0.13 |
-| Screen Code (×4) | gpt-5.6-terra | 6,000×4 | 10,000×4 | 16,000 | $0.09 | 0.45 |
-| Fix Rounds (×2) | gpt-5.6-terra | 4,000×2 | 4,000×2 | 4,000 | $0.008 | 0.04 |
-| **Total** | | | | **~47,725** | **~$0.23** | **~1.15** |
+**Measured production runs (4-screen product, ~12 components): ~1.3 credits (~$0.26) full run; ~0.3–0.6 credits (~$0.06–0.12) delta (add-a-screen) run.** Delta runs reuse the persistent project state, the component registry, and the previous run's sources.
 
-### Plane Mode (lighter pipeline — fewer model calls)
-
-Plane mode skips the code generation phases and only does clarify → title → brief → design system (no specs, no code). Estimated cost: **~$0.02 → ~0.10 credits**.
-
-## Estimation Algorithm
+## Estimation Endpoint
 
 ```
-estimateBuildCredits(prompt, screenCount = 4):
-  promptChars = prompt.length
-
-  // Phase 1: Clarify (proportional to prompt length)
-  clarify = calcCost(clarifyModel, promptChars + 500, min(2000, promptChars × 2))
-
-  // Phase 2: Title (tiny — proportional to prompt)
-  title = calcCost(titleModel, 300 + promptChars, 100)
-
-  // Phase 3-5: Plan phases (scale with screen count)
-  brief = calcCost(briefModel, 3000, 4000)
-  designSystem = calcCost(planModel, 5000, 4000)
-  componentSpec = calcCost(planModel, 6000, 6000)
-  screenSpecs = screenCount × calcCost(planModel, 4000, 6000)
-
-  // Phase 6-8: Build phases (scale with screen count)
-  sharedCode = calcCost(codeModel, 8000, 12000)
-  screenCode = screenCount × calcCost(codeModel, 6000, 10000)
-  fixRounds = 2 × calcCost(codeModel, 4000, 4000)
-
-  total = sum(all phases)
-  return max(0.10, round(total, 2))
+GET /api/pastel-agent/estimate?prompt=...&screens=4
+→ { estimatedCredits: 2.35, balance: 42.00, minRequired: 5 }
 ```
 
-Where `calcCost(model, inputChars, outputChars)` uses the model's per-token pricing from `server/lib/pricing.ts`:
+(requires auth; implementation in `server/routes/pastel-agent.ts` → `estimateRunCredits`, mirroring the stage call graph above.)
+
+## Flow
 
 ```
-inputTokens  = ceil(inputChars / model.charsPerToken)   // typically /4
-outputTokens = ceil(outputChars / model.charsPerToken)
-costDollars  = inputTokens × model.inputCostPerToken + outputTokens × model.outputCostPerToken
-credits      = max(0.01, round(costDollars × 5, 2))
+User clicks "Generate"
+  → POST /api/pastel-agent/generate { prompt, answers?, projectId? }
+  → estimate cost, check balance/monthly/daily allowances (402 on failure)
+  → create credit hold for the estimate
+  → start agent loop (background), return { runId, holdId, status }
+
+Party completes:
+  → releaseHold(holdId, actualCreditsFromLedger)
+  → if actual < estimate: difference refunded
+  → if run failed: full refund
 ```
 
-## Flow: User Experience
+A per-run budget ceiling (`PASTEL_MAX_RUN_CREDITS`, default 25; the route passes `max(2×estimate, 10)`) stops unbounded repair loops — beyond it, optional repairs are skipped and artifacts degrade gracefully.
+
+## Delta runs (add screens)
 
 ```
-User clicks "Generate" in the UI
-  → Client calls POST /api/pastel-agent/generate { prompt, mode: "build" }
-  → Server estimates cost (~1.15 credits for a typical build)
-  → Server checks: balance >= 5? (min balance check)
-  → Server checks: monthlyUsed + estimate <= monthlyAllowance?
-  → Server checks: dailyUsed + estimate <= dailyAllowance?
-  → If any check fails: return 402 with reason + current balance
-  → If all pass: create credit hold for estimated amount
-  → Start agent loop (background)
-  → Return { runId, holdId, estimatedCredits: 1.15 }
-
-Agent loop completes:
-  → Sum actual cost from all model calls (tracked per-phase)
-  → Release hold: actualCost credits deducted
-  → If actual < estimate: refund = estimate - actual (auto-added back)
-  → If run failed: full refund of held credits
-  → Log credit_transaction with per-phase breakdown in metadata
+POST /api/pastel-agent/projects/:projectId/screens { prompt }
 ```
 
-## Frontend Estimation Display
+Loads the project's persistent state + registry, plans only the delta, generates only missing components/screens, verifies incrementally, and reports `screensAdded` in the manifest. Estimated with 2 screens.
 
-The client should show users an estimate before confirming:
+## Manifest transparency
 
-```
-┌──────────────────────────────────────┐
-│  Estimated Credit Cost               │
-│                                      │
-│  Build (4 screens) .......... 1.15   │
-│  ─────────────────────────           │
-│  Your balance ............. 42.00    │
-│  Balance after ........... 40.85    │
-│                                      │
-│  Min. balance required: 5 credits    │
-│                                      │
-│  [Cancel]    [Start Build (1.15)]    │
-└──────────────────────────────────────┘
-```
-
-To support this, the server exposes:
-
-```
-GET /api/pastel-agent/estimate?prompt=...&mode=build
-→ { estimatedCredits: 1.15, balance: 42.00, minRequired: 5 }
-```
+Each run's manifest carries `costs: { entries: [{stage, modelId, inputChars, outputChars, credits}], totalCredits, totalDollars }`, `registryStats: {reused, generated, fallback}`, and `quality: {repairs, gatePassedFirstTry}` for cost/quality auditing.
 
 ## Edge Cases
 
@@ -130,6 +79,6 @@ GET /api/pastel-agent/estimate?prompt=...&mode=build
 | Daily cap hit | 402 — "Daily credit limit reached (48/50)" |
 | Run uses less than estimated | Refund difference automatically on hold release |
 | Run fails mid-way | Full refund of held credits |
-| User has allowance but no purchased credits | Combination: allowance + purchased balance both available |
-| Prompt is very long (4000 chars) | Estimate scales with prompt length proportionally |
-| Screen count varies (1-6) | Estimate scales linearly with screen count for spec + code phases |
+| Intake already analyzed via `/clarify` | `/generate` reuses the cached intake brief — zero duplicate reasoning cost |
+| Registry component valid from previous run | Reused with no model call; counted in `registryStats.reused` |
+```

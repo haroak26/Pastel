@@ -285,7 +285,7 @@ export const creditTransactions = pgTable("credit_transactions", {
 
 export type CreditTransaction = typeof creditTransactions.$inferSelect;
 
-export const CREDIT_HOLD_STATUSES = ["active", "released", "refunded"] as const;
+export const CREDIT_HOLD_STATUSES = ["active", "released", "refunded", "cancelled"] as const;
 export type CreditHoldStatus = (typeof CREDIT_HOLD_STATUSES)[number];
 
 export const creditHolds = pgTable("credit_holds", {
@@ -952,12 +952,62 @@ export const agentFiles = pgTable("agent_files", {
   path: text("path").notNull(),
   kind: text("kind").notNull().default("component"),
   content: text("content").notNull(),
-  createdAt: timestamp("created_at").defaultNow().notNull(),
-  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
 }, (t) => [
   uniqueIndex("agent_files_run_path_idx").on(t.runId, t.path),
 ]);
 
 export type AgentFile = typeof agentFiles.$inferSelect;
+
+// ── Pastel Agent Project State (persistent structured state per project) ───
+//
+// The v2 pipeline is built around this table: every stage reads compact
+// structured slices of state instead of reprocessing long prompts, and every
+// artifact is generated once, persisted here, and reused across runs.
+
+export const agentProjectState = pgTable("agent_project_state", {
+  projectId: uuid("project_id").primaryKey().references(() => projects.id, { onDelete: "cascade" }),
+  intake: jsonb("intake").$type<Record<string, unknown>>(),
+  productSpec: jsonb("product_spec").$type<Record<string, unknown>>(),
+  designSystem: jsonb("design_system").$type<Record<string, unknown>>(),
+  architecture: jsonb("architecture").$type<Record<string, unknown>>(),
+  styleSeed: text("style_seed"),
+  decisionLog: jsonb("decision_log").$type<unknown[]>().default([]).notNull(),
+  artifactHashes: jsonb("artifact_hashes").$type<Record<string, string>>().default({}).notNull(),
+  version: integer("version").notNull().default(0),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export type AgentProjectState = typeof agentProjectState.$inferSelect;
+
+// ── Pastel Agent Component Registry (validated, reusable components) ───────
+
+export const AGENT_COMPONENT_KINDS = ["shared", "layout", "screen"] as const;
+export type AgentComponentKind = (typeof AGENT_COMPONENT_KINDS)[number];
+
+export const AGENT_COMPONENT_STATUSES = ["validated", "fallback", "deprecated"] as const;
+export type AgentComponentStatus = (typeof AGENT_COMPONENT_STATUSES)[number];
+
+export const agentComponentRegistry = pgTable("agent_component_registry", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  projectId: uuid("project_id").notNull().references(() => projects.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  kind: text("kind").notNull().default("shared"),
+  spec: jsonb("spec").$type<Record<string, unknown>>().default({}).notNull(),
+  contract: jsonb("contract").$type<Record<string, unknown>>().default({}).notNull(),
+  source: text("source").notNull().default(""),
+  sourceHash: text("source_hash").notNull().default(""),
+  version: integer("version").notNull().default(1),
+  status: text("status").notNull().default("validated"),
+  verifiedAt: timestamp("verified_at"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("agent_component_registry_project_name_idx").on(t.projectId, t.name),
+  index("agent_component_registry_project_idx").on(t.projectId),
+]);
+
+export type AgentComponentRegistryEntry = typeof agentComponentRegistry.$inferSelect;
 
 

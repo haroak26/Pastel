@@ -16,6 +16,10 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
   "mistralai/mistral-small-2603": { inputCostPerToken: 0.00000015, outputCostPerToken: 0.00000060, charsPerToken: 4 },
   "openai/gpt-5.4-mini": { inputCostPerToken: 0.00000075, outputCostPerToken: 0.00000450, charsPerToken: 4 },
   "anthropic/claude-sonnet-5": { inputCostPerToken: 0.00000200, outputCostPerToken: 0.00001000, charsPerToken: 4 },
+  "anthropic/claude-haiku-4-5": { inputCostPerToken: 0.00000080, outputCostPerToken: 0.00000400, charsPerToken: 4 },
+  // Keep Luna explicit rather than silently charging the generic fallback.
+  // Update these values when the active Merge Gateway rate card changes.
+  "openai/gpt-5.6-luna": { inputCostPerToken: 0.00000050, outputCostPerToken: 0.00000150, charsPerToken: 4 },
   "openai/gpt-5.6-terra": { inputCostPerToken: 0.00000125, outputCostPerToken: 0.00000750, charsPerToken: 4 },
 };
 

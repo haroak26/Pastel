@@ -5,10 +5,16 @@ Every Pastel project is a real React application built as a virtual file system.
 ## File structure
 
 ```
-src/styles.css              ← design tokens as CSS custom properties + base styles (provided to you)
-src/components/<Name>.jsx   ← reusable components (default export)
-src/screens/<Screen>.jsx    ← one full page per file (default export)
+src/styles.css                      ← design tokens as CSS custom properties + base styles (provided to you)
+src/components/<Name>.jsx           ← shared reusable components (default export)
+src/layouts/<Name>.jsx              ← layout chrome components (default export)
+src/features/<Screen>/<Name>.jsx    ← screen-local components (default export)
+src/screens/<Screen>.jsx            ← one full page per file (default export)
+src/hooks/use<Name>.js              ← optional local-state hooks (named exports)
+src/lib/<name>.js                   ← optional pure helpers (named exports)
 ```
+
+Import across directories with relative paths and extensions: `import Button from "../components/Button.jsx"`, `import AppShell from "../layouts/AppShell.jsx"`, `import StatStrip from "../features/Dashboard/StatStrip.jsx"`.
 
 ## Hard rules
 

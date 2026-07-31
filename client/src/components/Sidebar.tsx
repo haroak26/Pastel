@@ -112,7 +112,7 @@ export function SidebarContent({ location: _location, onNavigate, collapsed }: {
         {isAccountPage ? (
           <ArrowLeft01Icon size={18} className="text-fg-muted" />
         ) : (
-          <img src="/PastelLogo.svg" alt="Pastel" height={22} className="shrink-0 w-auto" />
+          <img src="/PastelLogo.svg" alt="Pastel" height={3} className="shrink-0 w-auto" />
         )}
         {isAccountPage && (
           <span className="text-[15px] font-semibold text-foreground">Account</span>

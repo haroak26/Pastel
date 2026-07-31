@@ -1,10 +1,11 @@
 import { EventEmitter } from "node:events";
-import { desc, eq } from "drizzle-orm";
+import { desc, eq, and, sql } from "drizzle-orm";
 import { db } from "../../db";
 import {
   agentRuns,
   agentDocuments,
   agentFiles,
+  creditHolds,
   type AgentRun,
   type AgentDocument,
   type AgentFile,
@@ -30,6 +31,7 @@ interface RunEntry {
 
 const MAX_EVENT_LOG = 1000;
 const registry = new Map<string, RunEntry>();
+const manifestQueues = new Map<string, Promise<void>>();
 
 function getOrCreateEntry(runId: string): RunEntry {
   let entry = registry.get(runId);
@@ -57,6 +59,7 @@ export async function createRun(opts: {
     screens: [],
     docs: [],
     brandKit: null,
+    styleSeed: null,
     phases: {},
     failedScreens: [],
   };
@@ -115,17 +118,31 @@ export async function mergeManifest(
   runId: string,
   patch: Partial<AgentManifest>,
 ): Promise<AgentManifest> {
-  const [run] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId)).limit(1);
-  const current = (run?.manifest ?? {}) as unknown as AgentManifest;
-  const merged: AgentManifest = {
-    screens: patch.screens ?? current.screens ?? [],
-    docs: patch.docs ?? current.docs ?? [],
-    brandKit: patch.brandKit ?? current.brandKit ?? null,
-    phases: { ...(current.phases ?? {}), ...(patch.phases ?? {}) },
-    failedScreens: patch.failedScreens ?? current.failedScreens ?? [],
-  };
-  await updateRun(runId, { manifest: merged as unknown as Record<string, unknown> });
-  return merged;
+  const previous = manifestQueues.get(runId) ?? Promise.resolve();
+  let release!: () => void;
+  const currentQueue = new Promise<void>((resolve) => { release = resolve; });
+  manifestQueues.set(runId, currentQueue);
+
+  await previous;
+  try {
+    const [run] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId)).limit(1);
+    const current = (run?.manifest ?? {}) as unknown as AgentManifest;
+    const merged: AgentManifest = {
+      ...current,
+      ...patch,
+      screens: patch.screens ?? current.screens ?? [],
+      docs: patch.docs ?? current.docs ?? [],
+      brandKit: patch.brandKit ?? current.brandKit ?? null,
+      styleSeed: patch.styleSeed ?? current.styleSeed ?? null,
+      phases: { ...(current.phases ?? {}), ...(patch.phases ?? {}) },
+      failedScreens: patch.failedScreens ?? current.failedScreens ?? [],
+    };
+    await updateRun(runId, { manifest: merged as unknown as Record<string, unknown> });
+    return merged;
+  } finally {
+    release();
+    if (manifestQueues.get(runId) === currentQueue) manifestQueues.delete(runId);
+  }
 }
 
 export async function persistDoc(
@@ -198,6 +215,38 @@ export async function getLatestRunForProject(projectId: string): Promise<RunStat
 }
 
 /**
+ * Source files from the most recent completed run of a project (excluding a
+ * given run) — used by delta runs to seed their virtual file system.
+ */
+export async function getLatestCompletedFilesForProject(
+  projectId: string,
+  excludeRunId?: string,
+): Promise<Record<string, string>> {
+  const runs = await db
+    .select({ id: agentRuns.id })
+    .from(agentRuns)
+    .where(and(eq(agentRuns.projectId, projectId), eq(agentRuns.status, "done")))
+    .orderBy(desc(agentRuns.createdAt))
+    .limit(3);
+
+  for (const candidate of runs) {
+    if (excludeRunId && candidate.id === excludeRunId) continue;
+    const rows = await db
+      .select()
+      .from(agentFiles)
+      .where(eq(agentFiles.runId, candidate.id));
+    const files: Record<string, string> = {};
+    for (const row of rows) {
+      if (row.kind === "build") continue;
+      if (!row.path.startsWith("src/")) continue;
+      files[row.path] = row.content;
+    }
+    if (Object.keys(files).length > 0) return files;
+  }
+  return {};
+}
+
+/**
  * Subscribe to a run's event stream. Replays the buffered event log first,
  * then streams live events. Returns an unsubscribe function.
  */
@@ -223,14 +272,41 @@ export function getRunLiveStatus(runId: string): { status: string; phase: string
 
 /**
  * On boot, mark runs stuck in "running" (from a previous process) as errored
- * so clients restoring them don't wait forever.
+ * so clients restoring them don't wait forever. Also cancels credit holds
+ * for those runs and any stale holds (no balance impact — holds never deducted).
  */
 export async function cleanupStaleRuns(): Promise<void> {
   try {
+    const staleRuns = await db
+      .select({ id: agentRuns.id })
+      .from(agentRuns)
+      .where(eq(agentRuns.status, "running"));
+
     await db
       .update(agentRuns)
       .set({ status: "error", error: "Run interrupted by server restart", updatedAt: new Date() })
       .where(eq(agentRuns.status, "running"));
+
+    // Cancel active holds for stale runs — no balance change since holds never deduct
+    const runIds = staleRuns.map((r) => r.id);
+    if (runIds.length > 0) {
+      for (const runId of runIds) {
+        await db
+          .update(creditHolds)
+          .set({ status: "cancelled", updatedAt: new Date() })
+          .where(and(eq(creditHolds.status, "active"), eq(creditHolds.runId, runId)));
+      }
+    }
+
+    // Cancel any stale active holds older than 12h
+    const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000);
+    await db
+      .update(creditHolds)
+      .set({ status: "cancelled", updatedAt: new Date() })
+      .where(and(
+        eq(creditHolds.status, "active"),
+        sql`${creditHolds.createdAt} < ${cutoff.toISOString()}`,
+      ));
   } catch (err) {
     console.error("[pastel-agent] stale run cleanup failed:", err instanceof Error ? err.message : err);
   }

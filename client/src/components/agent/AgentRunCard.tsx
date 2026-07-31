@@ -20,6 +20,7 @@ interface AgentRunCardProps {
 const RUNNING_TITLES: Record<AgentPhase, string> = {
   brief: "Writing the build brief…",
   plan: "Designing every detail…",
+  review: "Reviewing the design…",
   build: "Coding the app…",
   verify: "Verifying in the sandbox…",
   present: "Presenting…",

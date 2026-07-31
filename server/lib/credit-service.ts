@@ -41,6 +41,11 @@ export async function checkAllowance(
   const balance = await storage.getCredits(userId);
   const monthlyUsed = await storage.getMonthlyCreditUsage(userId);
 
+  // Sum active holds so concurrent runs can't bypass the check
+  const activeHolds = await storage.getActiveHolds(userId);
+  const totalHeld = activeHolds.reduce((s, h) => s + h.amount, 0);
+  const availableBalance = Math.max(0, balance.balance - totalHeld);
+
   const res: AllowanceCheck = {
     allowed: true,
     balance,
@@ -57,17 +62,24 @@ export async function checkAllowance(
 
   const monthlyRemaining = monthlyAllowance - monthlyUsed;
   const effectiveCredits = Math.max(0, estimatedCredits - Math.max(0, monthlyRemaining));
-  if (monthlyUsed >= monthlyAllowance && balance.balance < estimatedCredits) {
+
+  if (monthlyUsed >= monthlyAllowance && availableBalance < estimatedCredits) {
     res.allowed = false;
     res.reason = `Monthly credit allowance used (${monthlyUsed}/${monthlyAllowance}). Buy more credits or wait until next month.`;
     return res;
   }
-  if (balance.balance < effectiveCredits) {
+
+  if (availableBalance < effectiveCredits) {
+    const effectiveAvailable = availableBalance + Math.max(0, monthlyRemaining);
     res.allowed = false;
-    res.reason = `You don't have enough credits. Need ${estimatedCredits} credits but only have ${balance.balance + Math.max(0, monthlyRemaining)} available.`;
+    res.reason = `You don't have enough credits. Need ${estimatedCredits} credits but only have ${effectiveAvailable.toFixed(1)} available${totalHeld > 0 ? ` (${totalHeld.toFixed(1)} held in active runs)` : ""}.`;
     return res;
   }
-  if (balance.dailyUsed + estimatedCredits > dailyAllowance) {
+
+  // Daily limit: check actual usage + held against allowance
+  // Don't add estimatedCredits — the estimate is a worst-case, not actual spend.
+  // Monthly/budget checks above already verify credit sufficiency.
+  if (balance.dailyUsed >= dailyAllowance) {
     res.allowed = false;
     res.reason = `Daily credit limit reached (${balance.dailyUsed}/${dailyAllowance}). Try again tomorrow.`;
     return res;
@@ -107,4 +119,12 @@ export async function releaseHold(
   actualCredits: number,
 ): Promise<void> {
   return storage.releaseCreditHold(holdId, actualCredits);
+}
+
+export async function getActiveHolds(userId: string): Promise<Array<{ id: string; amount: number; createdAt: Date }>> {
+  return storage.getActiveHolds(userId);
+}
+
+export async function releaseStaleHolds(): Promise<number> {
+  return storage.releaseStaleHolds();
 }

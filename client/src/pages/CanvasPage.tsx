@@ -329,13 +329,7 @@ export default function CanvasPage() {
           transition={{ duration: 0.4, delay: 0.3 }}
         >
           <div ref={iconHeaderRef} className="shrink-0 border-b border-border flex items-center justify-center w-full">
-            <span className="text-brand leading-none">
-              <svg viewBox="0 0 32 32" width="18" height="18" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-                <rect x="1.5" y="1.5" width="29" height="29" rx="8" fill="currentColor" />
-                <path d="M10 22L16 9L22 22H10Z" fill="white" opacity="0.92" />
-                <circle cx="16" cy="24" r="2.5" fill="white" opacity="0.92" />
-              </svg>
-            </span>
+            <img src="/PastelIcon.svg" alt="Pastel" width={18} height={18} className="shrink-0" />
           </div>
           <div className="h-[6px]" />
           {[
@@ -1021,9 +1015,10 @@ export default function CanvasPage() {
                     <Sparkles size={24} strokeWidth={1.5} className="text-brand" />
                   </div>
                   <h2 className="text-[15px] font-semibold text-foreground mb-1">
-                    {phases.brief.status === "running" && "Reading your brief…"}
-                    {phases.plan.status === "running" && "Designing every detail…"}
-                    {phases.build.status === "running" && "Coding the app…"}
+                     {phases.brief.status === "running" && "Reading your brief…"}
+                     {phases.plan.status === "running" && "Designing every detail…"}
+                     {phases.review.status === "running" && "Reviewing the design…"}
+                     {phases.build.status === "running" && "Coding the app…"}
                     {phases.verify.status === "running" && "Verifying in the sandbox…"}
                     {phases.present.status === "running" && "Finishing up…"}
                     {!phases.brief.status.match(/running|done/) && "Starting the agent…"}

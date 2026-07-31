@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
-const CLARIFY_KEY = "pastel.agent.clarify";
+const CLARIFY_KEY = "pastel.agent.clarify.v2";
 
 function saveClarifyState(data: Record<string, unknown>) {
   try { sessionStorage.setItem(CLARIFY_KEY, JSON.stringify(data)); } catch {}
@@ -18,13 +18,14 @@ function clearClarifyState() {
   try { sessionStorage.removeItem(CLARIFY_KEY); } catch {}
 }
 
-export type AgentPhase = "brief" | "plan" | "build" | "verify" | "present";
+export type AgentPhase = "brief" | "plan" | "review" | "build" | "verify" | "present";
 
-export const PHASE_ORDER: AgentPhase[] = ["brief", "plan", "build", "verify", "present"];
+export const PHASE_ORDER: AgentPhase[] = ["brief", "plan", "review", "build", "verify", "present"];
 
 export const PHASE_LABELS: Record<AgentPhase, string> = {
   brief: "Build brief",
   plan: "Design specs",
+  review: "Design review",
   build: "Coding",
   verify: "Sandbox verify",
   present: "Present",
@@ -56,8 +57,11 @@ export interface BrandKit {
 
 export interface ClarifyQuestion {
   id: string;
+  title: string;
   question: string;
-  options?: string[];
+  whyItMatters: string;
+  options: Array<{ label: string; description: string }>;
+  placeholder?: string;
 }
 
 export interface ActivityItem {
@@ -85,6 +89,7 @@ interface PastelEvent {
 const IDLE_PHASES: Record<AgentPhase, PhaseState> = {
   brief: { status: "idle" },
   plan: { status: "idle" },
+  review: { status: "idle" },
   build: { status: "idle" },
   verify: { status: "idle" },
   present: { status: "idle" },
@@ -267,6 +272,7 @@ export function usePastelAgent(projectId: string | null) {
           setPhases({
             brief: { status: "done" },
             plan: { status: "done" },
+            review: { status: manifest.phases?.review === "error" ? "error" : "done" },
             build: { status: "done" },
             verify: { status: manifest.phases?.verify === "error" ? "error" : "done" },
             present: { status: "done" },

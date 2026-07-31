@@ -14,6 +14,7 @@ const GROUPS: Array<{ id: string; label: string; match: (d: DocItem) => boolean 
   { id: "system", label: "Design System", match: (d) => d.kind === "system" },
   { id: "components", label: "Components", match: (d) => d.kind === "component-spec" },
   { id: "screens", label: "Screen Specs", match: (d) => d.kind === "screen-spec" },
+  { id: "visual", label: "Visual QA", match: (d) => d.kind === "visual-review" },
 ];
 
 /** Sidebar panel listing every markdown document the agent produced, live. */

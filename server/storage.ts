@@ -94,6 +94,8 @@ export interface IStorage {
   addCredits(userId: string, amount: number, description: string, metadata: Record<string, unknown>): Promise<number>;
   createCreditHold(userId: string, amount: number, runId?: string): Promise<string>;
   releaseCreditHold(holdId: string, actualCredits: number): Promise<void>;
+  getActiveHolds(userId: string): Promise<Array<{ id: string; amount: number; createdAt: Date }>>;
+  releaseStaleHolds(): Promise<number>;
   getCreditTransactions(userId: string, limit?: number, offset?: number): Promise<CreditTransaction[]>;
   createProject(ownerId: string, workspaceId: string, data: { name: string; description?: string; color?: string; publicId?: string }): Promise<Project>;
   getProjectById(id: string): Promise<Project | undefined>;
@@ -544,6 +546,29 @@ class DatabaseStorage implements IStorage {
         updatedAt: new Date(),
       }).where(eq(creditHolds.id, holdId));
     });
+  }
+
+  async getActiveHolds(userId: string): Promise<Array<{ id: string; amount: number; createdAt: Date }>> {
+    const holds = await db.select({
+      id: creditHolds.id,
+      amount: creditHolds.amount,
+      createdAt: creditHolds.createdAt,
+    }).from(creditHolds)
+      .where(and(eq(creditHolds.userId, userId), eq(creditHolds.status, "active")));
+    return holds;
+  }
+
+  async releaseStaleHolds(): Promise<number> {
+    const cutoff = new Date(Date.now() - 12 * 60 * 60 * 1000); // 12 hours
+    const result = await db.update(creditHolds).set({
+      status: "cancelled",
+      updatedAt: new Date(),
+    }).where(and(
+      eq(creditHolds.status, "active"),
+      sql`${creditHolds.createdAt} < ${cutoff.toISOString()}`,
+    )).returning({ id: creditHolds.id });
+
+    return result.length;
   }
 
   async getCreditTransactions(userId: string, limit = 50, offset = 0): Promise<CreditTransaction[]> {
