@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { AppLayout } from "@/components/AppLayout";
 import { useUser, useLogout, usePlan, useCredits, useCreditPacks } from "@/hooks/use-user";
+import { wipeAppCache } from "@/lib/queryClient";
 import { useTheme } from "@/hooks/use-theme";
 import { useQueryClient, useMutation, useQuery } from "@tanstack/react-query";
 import { useToast } from "@/hooks/use-toast";
@@ -374,7 +375,9 @@ function DeleteRow({ username }: { username: string }) {
         body: JSON.stringify({ password }),
       });
       if (!res.ok) { const d = await res.json().catch(() => ({ message: "Failed" })); throw new Error(d.message); }
-      qc.clear(); navigate("/");
+      qc.setQueryData(["/api/me"], null);
+      await wipeAppCache();
+      navigate("/");
     } catch (e) { setError(e instanceof Error ? e.message : "Failed"); setDeleting(false); }
   };
 
@@ -1055,7 +1058,9 @@ function CreditsPage({ planInfo }: any) {
   const monthlyAllowance = credits?.monthlyAllowance ?? limits.aiCredits.monthly;
   const dailyUsed = credits?.dailyUsed ?? 0;
   const dailyAllowance = credits?.dailyAllowance ?? limits.aiCredits.daily;
-  const maxTotal = Math.max(monthlyAllowance, balance, 100);
+  const monthlyUnlimited = monthlyAllowance === "unlimited";
+  const dailyUnlimited = dailyAllowance === "unlimited";
+  const maxTotal = monthlyUnlimited ? Math.max(balance, 100) : Math.max(monthlyAllowance, balance, 100);
 
   const buyMutation = useMutation({
     mutationFn: async (packId: string) => {
@@ -1096,10 +1101,10 @@ function CreditsPage({ planInfo }: any) {
               </div>
               <div className="flex items-center gap-4 mt-2">
                 <span className="text-[12px] text-fg-muted">
-                  <span className="text-foreground font-medium tabular-nums">{monthlyUsed}</span> / {monthlyAllowance} used this month
+                  <span className="text-foreground font-medium tabular-nums">{monthlyUsed}</span> / {monthlyUnlimited ? "Unlimited" : monthlyAllowance} used this month
                 </span>
                 <span className="text-[12px] text-fg-muted">
-                  <span className="text-foreground font-medium tabular-nums">{dailyUsed}</span> / {dailyAllowance} used today
+                  <span className="text-foreground font-medium tabular-nums">{dailyUsed}</span> / {dailyUnlimited ? "No daily cap" : dailyAllowance} used today
                 </span>
               </div>
             </>

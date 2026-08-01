@@ -27,7 +27,6 @@ export default function LoadingVerification() {
       if (data.verified && data.user) {
         queryClient.setQueryData(["/api/me"], data.user);
         await prefetchAppData(queryClient);
-        await new Promise(r => setTimeout(r, 700));
         setLocation("/home");
       }
     };

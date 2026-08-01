@@ -45,6 +45,19 @@ const RULES: SlopRule[] = [
     message: "gradient used but the active style seed does not permit gradients",
   },
   {
+    id: "thick-border-not-permitted",
+    severity: "high",
+    when: (perms) => !perms.thickBorders,
+    test: (code) => /(?:^|[\s"'])border-(?:2|4|8)\b|border-\[(?:2|3|4|8)px\]/.test(code),
+    message: "thick border (border-2/4/8 or 2px+) used but the active style demands 1px hairlines only",
+  },
+  {
+    id: "excessive-corner-radius",
+    severity: "medium",
+    test: (code) => /rounded-(?:2xl|3xl)\b|rounded-\[(?:2[5-9]|[3-9]\d)px\]/.test(code),
+    message: "oversized corner radius (>24px) — enterprise surfaces use 4-16px radii",
+  },
+  {
     id: "rounded-shadow-card",
     severity: "medium",
     test: (code) => /rounded-(?:xl|2xl|3xl)[^\n]{0,100}shadow-/.test(code),

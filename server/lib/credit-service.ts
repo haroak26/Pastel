@@ -14,8 +14,8 @@ export interface AllowanceCheck {
   reason?: string;
   balance: CreditBalance;
   monthlyUsed: number;
-  monthlyAllowance: number;
-  dailyAllowance: number;
+  monthlyAllowance: number | "unlimited";
+  dailyAllowance: number | "unlimited";
 }
 
 export async function ensureCredits(userId: string): Promise<void> {
@@ -56,30 +56,33 @@ export async function checkAllowance(
 
   if (monthlyAllowance === 0) {
     res.allowed = false;
-    res.reason = "Your plan does not include AI agent credits. Upgrade to Pro to use the AI agent.";
+    res.reason = "Your plan does not include AI agent credits. Upgrade to Individual to use the AI agent.";
     return res;
   }
 
-  const monthlyRemaining = monthlyAllowance - monthlyUsed;
-  const effectiveCredits = Math.max(0, estimatedCredits - Math.max(0, monthlyRemaining));
+  // Unlimited plans (Professional / Enterprise): no monthly or daily caps.
+  if (monthlyAllowance !== "unlimited") {
+    const monthlyRemaining = monthlyAllowance - monthlyUsed;
+    const effectiveCredits = Math.max(0, estimatedCredits - Math.max(0, monthlyRemaining));
 
-  if (monthlyUsed >= monthlyAllowance && availableBalance < estimatedCredits) {
-    res.allowed = false;
-    res.reason = `Monthly credit allowance used (${monthlyUsed}/${monthlyAllowance}). Buy more credits or wait until next month.`;
-    return res;
-  }
+    if (monthlyUsed >= monthlyAllowance && availableBalance < estimatedCredits) {
+      res.allowed = false;
+      res.reason = `Monthly credit allowance used (${monthlyUsed}/${monthlyAllowance}). Buy more credits or wait until next month.`;
+      return res;
+    }
 
-  if (availableBalance < effectiveCredits) {
-    const effectiveAvailable = availableBalance + Math.max(0, monthlyRemaining);
-    res.allowed = false;
-    res.reason = `You don't have enough credits. Need ${estimatedCredits} credits but only have ${effectiveAvailable.toFixed(1)} available${totalHeld > 0 ? ` (${totalHeld.toFixed(1)} held in active runs)` : ""}.`;
-    return res;
+    if (availableBalance < effectiveCredits) {
+      const effectiveAvailable = availableBalance + Math.max(0, monthlyRemaining);
+      res.allowed = false;
+      res.reason = `You don't have enough credits. Need ${estimatedCredits} credits but only have ${effectiveAvailable.toFixed(1)} available${totalHeld > 0 ? ` (${totalHeld.toFixed(1)} held in active runs)` : ""}.`;
+      return res;
+    }
   }
 
   // Daily limit: check actual usage + held against allowance
   // Don't add estimatedCredits — the estimate is a worst-case, not actual spend.
   // Monthly/budget checks above already verify credit sufficiency.
-  if (balance.dailyUsed >= dailyAllowance) {
+  if (dailyAllowance !== "unlimited" && balance.dailyUsed >= dailyAllowance) {
     res.allowed = false;
     res.reason = `Daily credit limit reached (${balance.dailyUsed}/${dailyAllowance}). Try again tomorrow.`;
     return res;

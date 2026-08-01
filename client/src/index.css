@@ -406,6 +406,29 @@
   .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
   .no-scrollbar::-webkit-scrollbar { display: none; }
 
+  /* Soft brand-blue glow bleeding up from the bottom of the landing hero.
+     Marketing-only — pair with a `relative` parent. Subtle, not streaky. */
+  .hero-glow {
+    position: absolute;
+    left: 0; right: 0; bottom: 0;
+    height: 380px;
+    background: radial-gradient(65% 100% at 50% 100%, hsl(var(--brand) / 0.10) 0%, hsl(var(--brand) / 0.04) 45%, transparent 75%);
+    pointer-events: none;
+  }
+
+  /* Slow ambient float for decorative color dots (marketing-only). */
+  @keyframes floatY {
+    0%, 100% { transform: translateY(0); }
+    50%      { transform: translateY(-8px); }
+  }
+  .animate-float-slow { animation: floatY 7s ease-in-out infinite; }
+
+  /* Marketing soft card — borderless muted surface, generous radius.
+     The marketing exception to the flat/hairline rule (see DESIGN_SYSTEM.md). */
+  .soft-card {
+    @apply bg-surface-muted rounded-[20px];
+  }
+
   .page-enter { animation: pageEnter 0.05s ease-out both; }
   .animate-fade-in { animation: fadeIn 0.15s ease-out both; }
   .animate-slide-in-left { animation: sidebarSlideIn 0.2s ease-out both; }

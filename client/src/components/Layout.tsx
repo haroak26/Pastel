@@ -17,22 +17,22 @@ interface LayoutProps {
 const navDropdowns = [
   {
     label: "Features",
-    href: "/features",
+    href: "/#features",
     items: [
-      { icon: PenTool, title: "Design Editor", desc: "Intuitive canvas for UI design", href: "/features" },
-      { icon: Layers, title: "Components", desc: "Reusable design components", href: "/features" },
-      { icon: Share2, title: "Collaboration", desc: "Real-time team collaboration", href: "/features" },
-      { icon: Sparkles, title: "AI-powered", desc: "Smart design suggestions", href: "/features" },
+      { icon: PenTool, title: "Design Editor", desc: "Intuitive canvas for UI design", href: "/#features" },
+      { icon: Layers, title: "Components", desc: "Reusable design components", href: "/#features" },
+      { icon: Share2, title: "Collaboration", desc: "Real-time team collaboration", href: "/#features" },
+      { icon: Sparkles, title: "AI-powered", desc: "Smart design suggestions", href: "/#features" },
     ],
   },
   {
     label: "Product",
-    href: "/features",
+    href: "/#features",
     items: [
-      { icon: PenTool, title: "Design", desc: "Create beautiful interfaces", href: "/features" },
-      { icon: Layers, title: "Prototype", desc: "Interactive prototypes", href: "/features" },
-      { icon: Share2, title: "Handoff", desc: "Developer handoff made easy", href: "/features" },
-      { icon: Sparkles, title: "AI Features", desc: "AI-powered design tools", href: "/features" },
+      { icon: PenTool, title: "Design", desc: "Create beautiful interfaces", href: "/#features" },
+      { icon: Layers, title: "Prototype", desc: "Interactive prototypes", href: "/#features" },
+      { icon: Share2, title: "Handoff", desc: "Developer handoff made easy", href: "/#features" },
+      { icon: Sparkles, title: "AI Features", desc: "AI-powered design tools", href: "/#features" },
     ],
   },
   {
@@ -156,7 +156,7 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
         <nav className="flex flex-col flex-1">
           <div>
             {[
-              { label: "Features", href: "/features" },
+              { label: "Features", href: "/#features" },
               { label: "Pricing", href: "/pricing" },
             ].map(({ label, href }) => (
               <div key={label}>
@@ -237,7 +237,7 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
             <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10 pb-10 border-b border-border">
               <div className="space-y-3 max-w-xs">
                 <Link href="/" className="inline-flex items-center gap-2">
-<img src="/PastelLogo.svg" alt="Pastel" height={22} className="w-auto shrink-0" />
+<img src="/PastelLogo.svg" alt="Pastel" width={116} className="h-auto shrink-0" />
                 </Link>
                 <p className="text-[13px] text-fg-muted font-medium leading-[1.6]">
                   Design beautiful interfaces, together.
@@ -247,7 +247,7 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-8 py-10">
               {[
-                { heading: "Product", links: [["Features", "/features"], ["Pricing", "/pricing"]] },
+                { heading: "Product", links: [["Features", "/#features"], ["Pricing", "/pricing"]] },
                 { heading: "Resources", links: [["Documentation", "/docs"], ["Status", "/status"], ["Contact", "/contact"]] },
                 { heading: "Company", links: [["Privacy", "/privacy"], ["Terms", "/terms"]] },
                 { heading: "Legal", links: [["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"]] },

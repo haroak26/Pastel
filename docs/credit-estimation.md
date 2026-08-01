@@ -7,30 +7,39 @@ Every Pastel AI agent run consumes credits. Before starting, the server estimate
 ## Core Formula
 
 ```
-1 credit = $0.20 USD of API usage
-credits = costInDollars × 5
+1 credit = $0.01 USD of AI API usage (CREDIT_PER_DOLLAR = 100 in server/lib/pricing.ts)
+credits = costInDollars × 100
 ```
 
 Minimum deduction: `0.01 credits` (2 decimal places).
 Minimum balance to start a run: **5 credits** (hard floor).
 
-## Pastel Agent v2 — Model Routing
+## Pastel Agent 2 — Model Routing (17-stage pipeline)
 
-Reasoning/planning/verification runs on `openai/gpt-5.6-terra`; deterministic implementation (components, screens, repairs) runs on `openai/gpt-5.6-luna`. Deterministic work (styles.css codegen, sitemap derivation, lint, anti-slop checks, sandbox verification) costs **zero** model tokens.
+Reasoning/planning/verification runs on `openai/gpt-5.6-terra`; deterministic implementation (components, screens, repairs) runs on `openai/gpt-5.6-luna`. Light transformation roles (IA, user flows, pattern rerank, interactions) default to Terra as well but can be redirected to a cheaper model via `PASTEL_MODEL_LIGHT` (or per-role via `PASTEL_MODEL_<ROLE>`). Deterministic work (styles.css codegen, derivations, lint, anti-slop checks, sandbox verification, embeddings query for pattern retrieval) costs **zero or near-zero** model tokens.
 
-| Stage | Role (model) | Typical calls per 4-screen run |
-|-------|--------------|-------------------------------|
-| Intake + ambiguity | terra (`intake`) | 1 (0 when cached from `/clarify`) |
-| Product spec | terra (`spec`) | 1 |
-| Design system | terra (`designSystem`) | 1 |
-| Architecture + contracts + blueprints | terra (`architecture`) | 1 |
-| Design gate (+ targeted fixes) | terra (`designGate`) | 1 (+0–3) |
-| Components | luna (`component`) | one per new/changed component (registry-validated ones are reused) |
-| Screens | luna (`screen`) | one per screen |
-| Surgical repairs | luna (`patch`) | only for failing artifacts, capped rounds |
-| Visual QA | terra (`visualQA`) | 1 (batched screenshots) |
+| # | Stage | Role | Calls per run |
+|---|-------|------|---------------|
+| 1 | Clarification | terra (`intake`) | 1 (0 when cached from `/clarify`) |
+| 2 | Creative brief | terra (`creativeBrief`) | 1 |
+| 3 | Product specification | terra (`spec`) | 1 |
+| 4 | Brand strategy | terra (`brandStrategy`) | 1 |
+| 5 | Brand kit | terra (`designSystem`) | 1 |
+| 6 | Information architecture | light (`ia`) | 1 |
+| 7 | User flows | light (`flows`) | 1 |
+| 8 | Screen planning | terra (`screenPlan`) | 1 |
+| 9 | Layout planning | terra (`layout`) | 1 |
+| 10 | Component system | terra (`componentSystem`) | 1 |
+| 11 | Pattern retrieval | pgvector + light (`patternRank`) | 1 embedding + 1 rerank |
+| 12 | Screen composition | terra (`compose`) | 1 |
+| 13 | Interaction planning | light (`interactions`) | 1 |
+| 14 | Code generation | luna (`component`/`screen`) | one per component/screen (registry reused) |
+| 15 | Automated QA | deterministic + luna (`patch`) | only failing artifacts, capped rounds |
+| 16 | Visual design review | terra-multimodal (`visualQA`) | 1 per repair-loop iteration |
+| 17 | Repair loop | dedup of 15/16 | ≤ `PASTEL_MAX_REPAIR_ITERS` (default 2) |
+| — | Composition design gate | terra (`designGate`) | 1 (+0–3 targeted fixes) |
 
-**Measured production runs (4-screen product, ~12 components): ~1.3 credits (~$0.26) full run; ~0.3–0.6 credits (~$0.06–0.12) delta (add-a-screen) run.** Delta runs reuse the persistent project state, the component registry, and the previous run's sources.
+**Measured production runs (2026-08-01): ~26 credits (~$0.26) full run (4 screens, 12 components, all planning stages on-model, visual QA executed twice); ~7.5–8.8 credits (~$0.08) delta run.** Light roles (6/7/11/13) default to `mistralai/ministral-14b-2512` (~7–60× cheaper than Terra — `gpt-oss-20b` returns empty responses on this gateway and is banned); the component system is hard-capped at 12 contracts; visual QA is budget-reserved so it always executes; screenshot base64 is priced as image tokens, not text chars.
 
 ## Estimation Endpoint
 

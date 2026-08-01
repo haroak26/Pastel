@@ -1,25 +1,43 @@
 import { createStageContext, type StageContext } from "./stages/context";
-import { intakeStage } from "./stages/intake";
-import { specStage } from "./stages/spec";
-import { designSystemStage } from "./stages/design-system";
-import { architectureStage } from "./stages/architecture";
+import { intakeStage } from "./stages/clarify";
+import { creativeBriefStage } from "./stages/creative-brief";
+import { specStage } from "./stages/product-spec";
+import { brandStrategyStage } from "./stages/brand-strategy";
+import { brandKitStage } from "./stages/brand-kit";
+import { informationArchitectureStage } from "./stages/information-architecture";
+import { userFlowsStage } from "./stages/user-flows";
+import { screenPlanStage } from "./stages/screen-plan";
+import { layoutPlanStage } from "./stages/layout-plan";
+import { componentSystemStage } from "./stages/component-system";
+import { patternRetrievalStage } from "./stages/pattern-retrieval";
+import { screenCompositionStage } from "./stages/screen-composition";
+import { interactionsStage } from "./stages/interactions";
 import { designGateStage } from "./stages/gate";
 import { implementStage } from "./stages/implement";
-import { verifyStage } from "./stages/verify";
-import { visualQaStage } from "./stages/visual-qa";
+import { repairLoopStage } from "./stages/repair-loop";
 import { publishStage } from "./stages/publish";
 import { deltaPlanStage } from "./stages/delta";
 import { emptyProjectState, loadProjectState, saveProjectState } from "./state";
 import { listRegistry } from "./registry";
-import { selectStyleSeedByName, selectStyleSeedDeterministic, styleSeedContext } from "./style-seeds";
+import { selectPipelineSeed, styleSeedContext } from "./style-seeds";
 import { emitEvent, updateRun, mergeManifest, persistFile, getLatestCompletedFilesForProject } from "./run-store";
 import * as creditService from "../credit-service";
 import type { RunKind } from "./types";
 
 /**
- * Orchestrator — runs the stage DAG. Each stage has a single responsibility,
- * consumes compact structured state, and is mapped onto the six wire phases
- * the client already understands: brief, plan, review, build, verify, present.
+ * Orchestrator — runs the 17-stage Pastel Agent 2 pipeline. Each stage has a
+ * single responsibility, consumes compact structured state, and is mapped
+ * onto the six wire phases the client already understands:
+ *
+ *   brief:   1 clarify → 2 creative brief → 3 product specification
+ *   plan:    4 brand strategy → 5 brand kit → 6 information architecture →
+ *            7 user flows → 8 screen planning → 9 layout planning →
+ *            10 component system → 11 pattern retrieval → 12 screen
+ *            composition → 13 interaction planning
+ *   review:  composition design gate (deterministic checks + adjudication)
+ *   build:   14 code generation
+ *   verify:  15/16/17 repair loop (automated QA ↔ visual review ↔ repair)
+ *   present: publish (manifest + done)
  */
 
 function defaultMaxRunCredits(): number {
@@ -39,19 +57,26 @@ async function initContext(opts: {
   forceSeed?: string;
   seedFiles?: Record<string, string>;
 }): Promise<StageContext> {
-  const seedName = opts.forceSeed ?? (opts.projectId ?? opts.prompt);
-  const seed = selectStyleSeedByName(seedName) ?? selectStyleSeedDeterministic(seedName);
+  const seed = selectPipelineSeed(opts.projectId ?? opts.prompt, opts.forceSeed);
   const styleDirection = styleSeedContext(seed);
 
   const state = opts.projectId
     ? (await loadProjectState(opts.projectId)) ?? emptyProjectState(opts.projectId)
     : emptyProjectState("");
   if (opts.runKind === "full") {
-    // A full run regenerates intake/spec/DS/architecture — but keeps nothing
-    // stale: registry reuse (outside the state object) still applies.
+    // A full run regenerates every planning artifact — but registry reuse
+    // (outside the state object) still applies.
     state.intake = null;
+    state.creativeBrief = null;
     state.productSpec = null;
+    state.brandStrategy = null;
     state.designSystem = null;
+    state.informationArchitecture = null;
+    state.userFlowPlan = null;
+    state.screenPlan = null;
+    state.layoutPlan = null;
+    state.patternContext = null;
+    state.interactionPlan = null;
     state.architecture = null;
     state.styleSeed = seed.name;
   }
@@ -116,31 +141,39 @@ export async function startAgentLoop(
 
   try {
     await ctx.setPhase("brief", "running");
-    await intakeStage(ctx);
-    await specStage(ctx);
+    await intakeStage(ctx);                  // 1 — clarification / intake
+    await creativeBriefStage(ctx);           // 2 — creative brief
+    await specStage(ctx);                    // 3 — product specification
     await ctx.setPhase("brief", "done");
 
     await ctx.setPhase("plan", "running");
-    await designSystemStage(ctx);
-    await architectureStage(ctx);
+    await brandStrategyStage(ctx);           // 4 — brand strategy
+    await brandKitStage(ctx);                // 5 — brand kit generation
+    await informationArchitectureStage(ctx); // 6 — information architecture
+    await userFlowsStage(ctx);               // 7 — user flow planning
+    await screenPlanStage(ctx);              // 8 — screen planning
+    await layoutPlanStage(ctx);              // 9 — layout planning
+    await componentSystemStage(ctx);         // 10 — component system planning
+    await patternRetrievalStage(ctx);        // 11 — design pattern retrieval
+    await screenCompositionStage(ctx);       // 12 — screen composition
+    await interactionsStage(ctx);            // 13 — interaction planning
     await ctx.setPhase("plan", "done");
 
     await ctx.setPhase("review", "running");
-    await designGateStage(ctx);
+    await designGateStage(ctx);              // composition review gate
     await ctx.setPhase("review", "done");
 
     await ctx.setPhase("build", "running");
-    await implementStage(ctx);
+    await implementStage(ctx);               // 14 — code generation
     await ctx.setPhase("build", "done");
 
     await ctx.setPhase("verify", "running");
-    await verifyStage(ctx);
-    const verifyOk = ctx.failedScreens.length === 0;
-    await visualQaStage(ctx);
-    await ctx.setPhase("verify", verifyOk && ctx.failedScreens.length === 0 ? "done" : "error");
+    const loop = await repairLoopStage(ctx); // 15/16/17 — QA ↔ visual review ↔ repair
+    const verifyOk = loop.passed && ctx.failedScreens.length === 0;
+    await ctx.setPhase("verify", verifyOk ? "done" : "error");
 
     await ctx.setPhase("present", "running");
-    await publishStage(ctx, { verifyOk: verifyOk && ctx.failedScreens.length === 0 });
+    await publishStage(ctx, { verifyOk, repairIterations: loop.iterations });
     await ctx.setPhase("present", "done");
   } catch (err) {
     await failRun(ctx, err);
@@ -160,7 +193,7 @@ export async function startScreenDeltaLoop(
   opts?: { maxCredits?: number },
 ): Promise<void> {
   const existing = await loadProjectState(projectId);
-  if (!existing || !existing.productSpec || !existing.designSystem || !existing.architecture) {
+  if (!existing || !existing.productSpec || !existing.designSystem || !existing.architecture || existing.architecture.screens.length === 0) {
     await updateRun(runId, { status: "error", error: "This project has no established design state — run a full generation first." });
     emitEvent(runId, { type: "error", message: "This project has no established design state — run a full generation first." });
     if (holdId && userId) {
@@ -193,7 +226,6 @@ export async function startScreenDeltaLoop(
     forceSeed: existing.styleSeed ?? undefined,
     seedFiles,
   });
-
   try {
     await ctx.setPhase("brief", "running");
     ctx.activity(`Project state loaded — ${existing.productSpec.screens.length} screens, ${existing.architecture.components.length} contracts, ${ctx.registry.length} registry components`);
@@ -210,18 +242,15 @@ export async function startScreenDeltaLoop(
 
     await ctx.setPhase("build", "running");
     await implementStage(ctx, { screens: delta.newScreenNames, components: delta.newComponentNames });
-    // Re-emit reused registry sources for existing components referenced by
-    // new screens (files may predate this run and must exist under it).
     await ctx.setPhase("build", "done");
 
     await ctx.setPhase("verify", "running");
-    await verifyStage(ctx);
-    const verifyOk = ctx.failedScreens.length === 0;
-    await visualQaStage(ctx, delta.newScreenNames);
-    await ctx.setPhase("verify", verifyOk && ctx.failedScreens.length === 0 ? "done" : "error");
+    const loop = await repairLoopStage(ctx, { screens: delta.newScreenNames });
+    const verifyOk = loop.passed && ctx.failedScreens.length === 0;
+    await ctx.setPhase("verify", verifyOk ? "done" : "error");
 
     await ctx.setPhase("present", "running");
-    await publishStage(ctx, { verifyOk: verifyOk && ctx.failedScreens.length === 0, screensAdded: delta.newScreenNames });
+    await publishStage(ctx, { verifyOk, screensAdded: delta.newScreenNames, repairIterations: loop.iterations });
     await ctx.setPhase("present", "done");
   } catch (err) {
     await failRun(ctx, err);

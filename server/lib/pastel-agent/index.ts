@@ -1,4 +1,4 @@
-export { runClarify } from "./stages/intake";
+export { runClarify } from "./stages/clarify";
 export { startAgentLoop, startScreenDeltaLoop } from "./orchestrator";
 export { selectStyleSeed, selectStyleSeedByName, selectStyleSeedDeterministic, seedPermissions } from "./style-seeds";
 export { verifyProject, verifyScreens, IncrementalScreenVerifier } from "./sandbox";

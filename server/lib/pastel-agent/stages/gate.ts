@@ -15,7 +15,7 @@ import {
   screenBlueprintToMarkdown,
   designSystemToMarkdown,
 } from "../codegen/markdown";
-import { screenDocPath, toPascalCase } from "../codegen/derive";
+import { normalizeComponentRef, screenDocPath, toPascalCase } from "../codegen/derive";
 import { saveProjectState } from "../state";
 import type { StageContext } from "./context";
 
@@ -158,7 +158,17 @@ export async function designGateStage(ctx: StageContext, opts: { onlyScreens?: s
         );
         ctx.trackCost("designGate-repair", MODELS.designGate, JSON.stringify(original).length + JSON.stringify(findings).length, JSON.stringify(corrected).length);
         if (corrected.name === original.name) {
-          plan = { ...plan, screens: plan.screens.map((s) => (s.name === original.name ? corrected : s)) };
+          // Normalize annotation-bearing refs (e.g. "HabitList (check-in
+          // mode)") before merge — unnormalized refs corrupt the architecture
+          // and explode later in delta validation.
+          const cleaned: ScreenBlueprint = {
+            ...corrected,
+            sections: corrected.sections.map((section) => ({
+              ...section,
+              components: section.components.map(normalizeComponentRef).filter((ref) => plan.components.some((c) => c.name === ref)).slice(0, 8),
+            })),
+          };
+          plan = { ...plan, screens: plan.screens.map((s) => (s.name === original.name ? cleaned : s)) };
           changedScreens.add(original.name);
           ctx.quality.repairs++;
           ctx.activity(`Design gate corrected screen blueprint: ${original.name}`);
@@ -201,7 +211,7 @@ export async function designGateStage(ctx: StageContext, opts: { onlyScreens?: s
 
   // Re-render only the affected docs.
   if (changedComponents) {
-    await ctx.saveDoc({ path: "docs/02-components.md", title: "Component Specifications", kind: "component-spec", content: componentContractsToMarkdown(plan.components) });
+    await ctx.saveDoc({ path: "docs/07-components.md", title: "Component Specifications", kind: "component-spec", content: componentContractsToMarkdown(plan.components) });
   }
   for (const name of changedScreens) {
     const blueprint = plan.screens.find((s) => s.name === name)!;

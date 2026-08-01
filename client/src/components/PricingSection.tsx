@@ -8,39 +8,54 @@ import { useToast } from "@/hooks/use-toast";
 import { PLAN_LIMITS, type PlanTier, type BillingPeriod } from "@shared/schema";
 
 type CurrentPlan = PlanTier;
-const PLAN_RANK: Record<CurrentPlan, number> = { free: 0, pro: 1, team: 2, enterprise: 3 };
 
-const TIERS: { key: PlanTier; description: string; badge?: string }[] = [
-  { key: "free", description: "For individuals getting started." },
-  { key: "pro", description: "For professional designers.", badge: "Popular" },
-  { key: "team", description: "For growing design teams." },
-  { key: "enterprise", description: "For large organizations." },
+// Tier keys map to: free=Hobby, pro=Individual, team=Professional, enterprise=Enterprise.
+// 1 credit = $0.01 of AI API usage.
+const TIERS: { key: PlanTier; description: string; badge?: string; features: string[] }[] = [
+  {
+    key: "free",
+    description: "For individuals getting started.",
+    features: [
+      "50 credits per day",
+      "150 credits per month",
+      "Private projects",
+      "Pastel Agent",
+      "10 projects",
+    ],
+  },
+  {
+    key: "pro",
+    description: "For professional designers.",
+    badge: "Popular",
+    features: [
+      "250 credits per day",
+      "1,000 credits per month",
+      "Export to Figma",
+      "Code export",
+      "Unlimited projects",
+    ],
+  },
+  {
+    key: "team",
+    description: "For growing design teams.",
+    features: [
+      "No daily cap",
+      "Unlimited credits a month*",
+      "Everything in Individual",
+    ],
+  },
+  {
+    key: "enterprise",
+    description: "For large organizations.",
+    features: [
+      "No daily cap",
+      "Unlimited credits a month*",
+      "Everything in Professional",
+      "SSO",
+      "Unlimited team members",
+    ],
+  },
 ];
-
-const METERED_FEATURES: Record<string, { label: string; render: (val: unknown) => string | null }> = {
-  projects: { label: "Projects", render: (v) => v === "unlimited" ? "Unlimited projects" : `${v} Projects` },
-  designFiles: { label: "Design files", render: (v) => v === "unlimited" ? "Unlimited design files" : `${v} Design files` },
-  editors: { label: "Editors", render: (v) => v === "unlimited" ? "Unlimited editors" : `${v} Editors` },
-  viewers: { label: "Viewers", render: (v) => v === "unlimited" ? "Unlimited viewers" : `${v} Viewers` },
-  storage: { label: "Storage", render: (v) => `${v} MB Storage` },
-  versionHistory: { label: "Version history", render: (v) => `${v}-day history` },
-  components: { label: "Components", render: (v) => `${v} Components` },
-};
-
-const BOOLEAN_FEATURES: Record<string, { label: string }> = {
-  customFonts: { label: "Custom fonts" },
-  exportPresets: { label: "Export presets" },
-  advancedPrototyping: { label: "Advanced prototyping" },
-  apiAccess: { label: "API access" },
-  ssO: { label: "SSO" },
-  prioritySupport: { label: "Priority support" },
-};
-
-const AI_FEATURE = {
-  label: "AI credits",
-  render: (monthly: number, daily: number) =>
-    monthly === 0 ? null : `${monthly}/mo AI credits (${daily}/day)`,
-};
 
 export function PricingSection() {
   const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
@@ -92,28 +107,7 @@ export function PricingSection() {
     },
   });
 
-  function featuresForPlan(key: PlanTier): string[] {
-    const limits = PLAN_LIMITS[key];
-    const features: string[] = [];
-
-    for (const [field, meta] of Object.entries(METERED_FEATURES)) {
-      const val = limits[field as keyof typeof limits];
-      const rendered = meta.render(val);
-      if (rendered) features.push(rendered);
-    }
-
-    const aiRendered = AI_FEATURE.render(limits.aiCredits.monthly, limits.aiCredits.daily);
-    if (aiRendered) features.push(aiRendered);
-
-    return features;
-  }
-
-  function booleanFeaturesForPlan(key: PlanTier): string[] {
-    const limits = PLAN_LIMITS[key];
-    return Object.entries(BOOLEAN_FEATURES)
-      .filter(([field]) => limits[field as keyof typeof limits])
-      .map(([, meta]) => meta.label);
-  }
+  /* Feature lists are explicit per tier (see TIERS above). */
 
   return (
     <section id="pricing" className="py-6 md:py-8">
@@ -133,7 +127,7 @@ export function PricingSection() {
         </div>
 
         <div className="flex flex-col md:flex-row md:items-stretch">
-          {TIERS.map(({ key, description, badge }, idx) => {
+          {TIERS.map(({ key, description, badge, features }, idx) => {
             const limits = PLAN_LIMITS[key];
             const displayPrice = billingPeriod === "annual" ? limits.prices.annual / 12 : limits.prices.monthly;
             return (
@@ -168,8 +162,8 @@ export function PricingSection() {
                   </div>
                   <div className="mt-5 flex-1">
                     <p className="mb-3 text-sm font-semibold text-brand">What's included</p>
-                    <ul className="space-y-2.5">
-                      {featuresForPlan(key).map((feature) => (
+                    <ul className="space-y-2.5 mb-6">
+                      {features.map((feature) => (
                         <li key={feature} className="flex items-start gap-2.5 text-sm leading-6 text-muted-foreground">
                           <Check className="h-3.5 w-3.5 mt-[5px] shrink-0 text-brand" strokeWidth={2.5} />
                           <span>{feature}</span>
@@ -177,19 +171,6 @@ export function PricingSection() {
                       ))}
                     </ul>
                   </div>
-                  {booleanFeaturesForPlan(key).length > 0 && (
-                    <>
-                      <div className="my-4 border-t border-border/60" />
-                      <ul className="space-y-2.5 mb-6">
-                        {booleanFeaturesForPlan(key).map((feature) => (
-                          <li key={feature} className="flex items-start gap-2.5 text-sm leading-6 text-muted-foreground">
-                            <Check className="h-3.5 w-3.5 mt-[5px] shrink-0 text-brand" strokeWidth={2.5} />
-                            <span>{feature}</span>
-                          </li>
-                        ))}
-                      </ul>
-                    </>
-                  )}
                   <div className="mt-auto">
                     {key === "enterprise" ? (
                       <div className="flex gap-2">
@@ -252,9 +233,12 @@ export function PricingSection() {
             );
           })}
         </div>
-        <div className="mt-8 text-center">
+        <div className="mt-8 text-center space-y-1.5">
           <p className="text-sm text-muted-foreground">
             Need more AI credits? Buy credit packs — they never expire.
+          </p>
+          <p className="text-xs text-muted-foreground/80">
+            1 credit = $0.01 of AI API usage. *Depending on heavy usage, lite caps may be enforced to ensure fair use.
           </p>
         </div>
       </div>

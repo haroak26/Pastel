@@ -834,11 +834,13 @@ export function registerRemainingRoutes(app: Express): void {
   });
 
   // ── Credits ─────────────────────────────────────────────────────────────
+  // 1 credit = $0.01 of API usage; packs are priced at a slight discount
+  // off face value. `usd` is cents.
   const CREDIT_PACKS = [
-    { id: "credits_100", credits: 100, label: "Starter Pack", usd: 1500, priceId: process.env.STRIPE_PRICE_CREDITS_100 },
-    { id: "credits_500", credits: 500, label: "Growth Pack", usd: 6000, priceId: process.env.STRIPE_PRICE_CREDITS_500 },
-    { id: "credits_2000", credits: 2000, label: "Pro Pack", usd: 20000, priceId: process.env.STRIPE_PRICE_CREDITS_2000 },
-    { id: "credits_5000", credits: 5000, label: "Team Pack", usd: 45000, priceId: process.env.STRIPE_PRICE_CREDITS_5000 },
+    { id: "credits_1000", credits: 1000, label: "Starter Pack", usd: 900, priceId: process.env.STRIPE_PRICE_CREDITS_1000 },
+    { id: "credits_2500", credits: 2500, label: "Growth Pack", usd: 2000, priceId: process.env.STRIPE_PRICE_CREDITS_2500 },
+    { id: "credits_6000", credits: 6000, label: "Pro Pack", usd: 5000, priceId: process.env.STRIPE_PRICE_CREDITS_6000 },
+    { id: "credits_15000", credits: 15000, label: "Team Pack", usd: 12000, priceId: process.env.STRIPE_PRICE_CREDITS_15000 },
   ] as const;
 
   app.get("/api/credits/packs", (_req, res) => {

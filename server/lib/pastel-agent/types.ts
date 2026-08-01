@@ -112,6 +112,10 @@ export interface AgentManifest {
   quality?: RunQualityStats;
   /** delta runs: screens added by this run */
   screensAdded?: string[];
+  /** stage 11: how the pattern set was sourced */
+  patternRetrieval?: { provider: "pgvector" | "static"; count: number };
+  /** stage 17: repair-loop iterations used and final pass state */
+  repairLoop?: { iterations: number; passed: boolean };
 }
 
 export interface GeneratedFile {

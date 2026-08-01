@@ -3,5 +3,5 @@
  * stage orchestrator. Kept as a module so existing dynamic imports in the
  * route layer continue to resolve.
  */
-export { runClarify } from "./stages/intake";
+export { runClarify } from "./stages/clarify";
 export { startAgentLoop, startScreenDeltaLoop } from "./orchestrator";

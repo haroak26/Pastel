@@ -66,20 +66,33 @@ async function main() {
   const assertions: Array<[boolean, string]> = [
     [state.run.status === "done", "run completed"],
     [(manifest.screens?.length ?? 0) >= 2, "at least 2 screens"],
-    [docs.some((d) => d.startsWith("brief:docs/00-brief.md")), "brief doc"],
-    [docs.some((d) => d.startsWith("system:docs/01-design-system.md")), "design system doc"],
-    [docs.some((d) => d.startsWith("system:docs/02-architecture.md")), "architecture doc"],
-    [docs.some((d) => d.startsWith("component-spec:docs/02-components.md")), "components doc"],
-    [docs.some((d) => d.startsWith("screen-spec:docs/screens/")), "screen spec docs"],
-    [docs.some((d) => d.startsWith("visual-review:docs/04-visual-review.md")), "visual review doc"],
+    [docs.some((d) => d.startsWith("brief:docs/00-creative-brief.md")), "creative brief doc"],
+    [docs.some((d) => d.startsWith("brief:docs/01-product-spec.md")), "product spec doc"],
+    [docs.some((d) => d.startsWith("system:docs/02-brand-strategy.md")), "brand strategy doc"],
+    [docs.some((d) => d.startsWith("system:docs/03-brand-kit.md")), "brand kit doc"],
+    [docs.some((d) => d.startsWith("system:docs/04-architecture.md")), "information architecture + flows doc"],
+    [docs.some((d) => d.startsWith("system:docs/05-screen-plan.md")), "screen plan doc"],
+    [docs.some((d) => d.startsWith("system:docs/06-layout.md")), "layout plan doc"],
+    [docs.some((d) => d.startsWith("component-spec:docs/07-components.md")), "components doc"],
+    [docs.some((d) => d.startsWith("screen-spec:docs/screens/")), "screen composition docs"],
+    [docs.some((d) => d.startsWith("system:docs/09-interactions.md")), "interaction plan doc"],
+    [docs.some((d) => d.startsWith("visual-review:docs/10-visual-review.md")), "visual review doc"],
     [files.some((f) => f === "style:src/styles.css"), "styles.css generated deterministically"],
     [components.length >= 3, "components generated"],
     [bundles.length >= 2, "verified bundles exist"],
     [(manifest.costs?.totalCredits ?? 999) > 0, "cost ledger tracked"],
   ];
   const projectState = await loadProjectState(project.id);
-  assertions.push([!!projectState?.designSystem, "design system persisted to project state"]);
-  assertions.push([!!projectState?.architecture, "architecture persisted to project state"]);
+  assertions.push([!!projectState?.creativeBrief, "creative brief persisted to project state"]);
+  assertions.push([!!projectState?.productSpec, "product spec persisted to project state"]);
+  assertions.push([!!projectState?.brandStrategy, "brand strategy persisted to project state"]);
+  assertions.push([!!projectState?.designSystem, "brand kit persisted to project state"]);
+  assertions.push([!!projectState?.informationArchitecture, "information architecture persisted"]);
+  assertions.push([!!projectState?.screenPlan, "screen plan persisted"]);
+  assertions.push([!!projectState?.layoutPlan, "layout plan persisted"]);
+  assertions.push([!!projectState?.patternContext, `pattern context persisted (${projectState?.patternContext?.provider ?? "none"})`]);
+  assertions.push([!!projectState?.interactionPlan, "interaction plan persisted"]);
+  assertions.push([!!projectState?.architecture && (projectState?.architecture.screens.length ?? 0) >= 2, "compositions assembled into architecture"]);
   const registry = await listRegistry(project.id);
   assertions.push([registry.length >= 3, `registry has components (${registry.length})`]);
 

@@ -68,35 +68,20 @@ function WorkspaceProviderInner({ children }: { children: React.ReactNode }) {
 
   const setActiveWorkspaceId = (id: string) => {
     if (id === activeWorkspaceId) return;
-    const target = workspaces.find(w => w.id === id);
-    const targetName = target?.name ?? 'Workspace';
-    const currentName = activeWorkspace?.name ?? 'Workspace';
-
-    setSwitchingWorkspace(true);
-    setSwitchingWsName(currentName);
-    setSwitchingWsPhase('logging-out');
-
-    setTimeout(() => {
-      setSwitchingWsPhase('signing-in');
-      setSwitchingWsName(targetName);
-
-      setTimeout(() => {
-        setSelectedId(id);
-        try { window.localStorage.setItem("pastel.activeWorkspaceId", id); } catch {}
-        setSwitchingWorkspace(false);
-        setSwitchingWsPhase('idle');
-        // Invalidate scoped data so stale cross-workspace data is cleared
-        queryClient.invalidateQueries({ queryKey: ['/api/spaces'] });
-        queryClient.invalidateQueries({ queryKey: ['/api/tickets'] });
-        // Persist to server
-        fetch('/api/me/last-workspace', {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ workspaceId: id }),
-        }).catch(() => {});
-      }, 600);
-    }, 500);
+    // Instant switch — scoped queries revalidate in the background while
+    // cached data keeps the UI populated (no artificial interstitial).
+    setSelectedId(id);
+    try { window.localStorage.setItem("pastel.activeWorkspaceId", id); } catch {}
+    // Invalidate scoped data so stale cross-workspace data is cleared
+    queryClient.invalidateQueries({ queryKey: ['/api/spaces'] });
+    queryClient.invalidateQueries({ queryKey: ['/api/tickets'] });
+    // Persist to server
+    fetch('/api/me/last-workspace', {
+      method: 'PUT',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ workspaceId: id }),
+    }).catch(() => {});
   };
 
   useEffect(() => {

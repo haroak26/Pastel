@@ -3,7 +3,7 @@ import { Redirect, useLocation } from "wouter";
 import { useUser } from "@/hooks/use-user";
 import { useSpace } from "@/contexts/space-context";
 import { useWorkspace } from "@/contexts/workspace-context";
-import { PastelLogo } from "@/components/PastelLogo";
+import { AppShellSkeleton } from "@/components/AppShellSkeleton";
 
 const ONBOARDING_COMPLETE_STEP = 5;
 
@@ -20,21 +20,17 @@ export function ProtectedRoute({ component: Component }: ProtectedRouteProps) {
   const isOnboardingPage = currentPath === "/auth/onboarding";
   const loading = userLoading || (!isOnboardingPage && !!(user && (spaceLoading || workspaceLoading)));
 
+  // With the persisted cache this only ever flashes on a first-ever visit;
+  // the shell skeleton matches the app layout so the swap-in is seamless.
   if (loading) {
-    return (
-      <div className="min-h-screen bg-background flex items-center justify-center">
-        <div className="flex flex-col items-center gap-5">
-          <div className="opacity-50">
-            <PastelLogo size={26} />
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="w-2 h-2 rounded-full bg-foreground/40 animate-pulse" style={{ animationDelay: "0ms" }} />
-            <span className="w-2 h-2 rounded-full bg-foreground/40 animate-pulse" style={{ animationDelay: "160ms" }} />
-            <span className="w-2 h-2 rounded-full bg-foreground/40 animate-pulse" style={{ animationDelay: "320ms" }} />
-          </div>
+    if (isOnboardingPage) {
+      return (
+        <div className="min-h-screen bg-background flex items-center justify-center">
+          <div className="w-5 h-5 border-2 border-border border-t-foreground/60 rounded-full animate-spin" />
         </div>
-      </div>
-    );
+      );
+    }
+    return <AppShellSkeleton />;
   }
 
   if (!user) {

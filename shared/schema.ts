@@ -10,6 +10,7 @@ import {
   boolean,
   index,
   uniqueIndex,
+  vector,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -200,37 +201,40 @@ export type PlanLimits = {
   apiAccess: boolean;
   ssO: boolean;
   prioritySupport: boolean;
-  aiCredits: { monthly: number; daily: number };
+  aiCredits: { monthly: number | "unlimited"; daily: number | "unlimited" };
 };
 
+// Tier keys map to the new plan lineup:
+//   free → Hobby, pro → Individual, team → Professional, enterprise → Enterprise
+// 1 credit = $0.01 of AI API usage.
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   free: {
-    label: "Free", prices: { monthly: 0, annual: 0 },
-    projects: 1, designFiles: 3, editors: 1, viewers: 1, storage: 100,
+    label: "Hobby", prices: { monthly: 0, annual: 0 },
+    projects: 10, designFiles: 10, editors: 1, viewers: 1, storage: 100,
     versionHistory: 7, components: 10, customFonts: false,
     exportPresets: false, advancedPrototyping: false, apiAccess: false, ssO: false,
-    prioritySupport: false, aiCredits: { monthly: 15, daily: 5 },
+    prioritySupport: false, aiCredits: { monthly: 150, daily: 50 },
   },
   pro: {
-    label: "Pro", prices: { monthly: 19, annual: 192 },
-    projects: 10, designFiles: 100, editors: 3, viewers: 10, storage: 2048,
+    label: "Individual", prices: { monthly: 25, annual: 255 },
+    projects: "unlimited", designFiles: 100, editors: 1, viewers: 10, storage: 2048,
     versionHistory: 30, components: 300, customFonts: true,
     exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: false,
-    prioritySupport: false, aiCredits: { monthly: 1000, daily: 100 },
+    prioritySupport: false, aiCredits: { monthly: 1000, daily: 250 },
   },
   team: {
-    label: "Team", prices: { monthly: 49, annual: 492 },
-    projects: 50, designFiles: 500, editors: 10, viewers: 50, storage: 10240,
+    label: "Professional", prices: { monthly: 50, annual: 510 },
+    projects: "unlimited", designFiles: 500, editors: 5, viewers: 50, storage: 10240,
     versionHistory: 90, components: 1000, customFonts: true,
-    exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: true,
-    prioritySupport: true, aiCredits: { monthly: 5000, daily: 500 },
+    exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: false,
+    prioritySupport: true, aiCredits: { monthly: "unlimited", daily: "unlimited" },
   },
   enterprise: {
-    label: "Enterprise", prices: { monthly: 99, annual: 996 },
+    label: "Enterprise", prices: { monthly: 75, annual: 765 },
     projects: "unlimited", designFiles: "unlimited", editors: "unlimited", viewers: "unlimited", storage: 51200,
     versionHistory: 365, components: 10000, customFonts: true,
     exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: true,
-    prioritySupport: true, aiCredits: { monthly: 20000, daily: 2000 },
+    prioritySupport: true, aiCredits: { monthly: "unlimited", daily: "unlimited" },
   },
 };
 
@@ -969,9 +973,17 @@ export type AgentFile = typeof agentFiles.$inferSelect;
 export const agentProjectState = pgTable("agent_project_state", {
   projectId: uuid("project_id").primaryKey().references(() => projects.id, { onDelete: "cascade" }),
   intake: jsonb("intake").$type<Record<string, unknown>>(),
+  creativeBrief: jsonb("creative_brief").$type<Record<string, unknown>>(),
   productSpec: jsonb("product_spec").$type<Record<string, unknown>>(),
-  designSystem: jsonb("design_system").$type<Record<string, unknown>>(),
-  architecture: jsonb("architecture").$type<Record<string, unknown>>(),
+  brandStrategy: jsonb("brand_strategy").$type<Record<string, unknown>>(),
+  designSystem: jsonb("design_system").$type<Record<string, unknown>>(), // stage 5 — the brand kit
+  informationArchitecture: jsonb("information_architecture").$type<Record<string, unknown>>(),
+  userFlowPlan: jsonb("user_flow_plan").$type<Record<string, unknown>>(),
+  screenPlan: jsonb("screen_plan").$type<Record<string, unknown>>(),
+  layoutPlan: jsonb("layout_plan").$type<Record<string, unknown>>(),
+  patternContext: jsonb("pattern_context").$type<Record<string, unknown>>(),
+  interactionPlan: jsonb("interaction_plan").$type<Record<string, unknown>>(),
+  architecture: jsonb("architecture").$type<Record<string, unknown>>(), // stage 10 + 12 assembled
   styleSeed: text("style_seed"),
   decisionLog: jsonb("decision_log").$type<unknown[]>().default([]).notNull(),
   artifactHashes: jsonb("artifact_hashes").$type<Record<string, string>>().default({}).notNull(),
@@ -1009,5 +1021,31 @@ export const agentComponentRegistry = pgTable("agent_component_registry", {
 ]);
 
 export type AgentComponentRegistryEntry = typeof agentComponentRegistry.$inferSelect;
+
+// ── Pastel Agent Design Patterns (curated library, embedding search) ────────
+//
+// Stage 11 (design pattern retrieval) embeds a query from the project's
+// brief/spec/brand strategy and cosine-searches this table. Seeded by
+// script/seed-design-patterns.ts. Requires the pgvector extension (migration
+// 0004 creates it); the pipeline falls back to the static pattern library
+// when this table is unavailable or empty.
+
+export const designPatterns = pgTable("design_patterns", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  category: text("category").notNull(),
+  name: text("name").notNull(),
+  summary: text("summary").notNull(),
+  /** structured anatomy: layout description, sections, component hints, spacing hints */
+  structure: jsonb("structure").$type<Record<string, unknown>>().default({}).notNull(),
+  /** product/screen types this pattern suits (used for ranking + filtering) */
+  bestFor: jsonb("best_for").$type<string[]>().default([]).notNull(),
+  embedding: vector("embedding", { dimensions: 1536 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+}, (t) => [
+  uniqueIndex("design_patterns_name_idx").on(t.name),
+  index("design_patterns_category_idx").on(t.category),
+]);
+
+export type DesignPattern = typeof designPatterns.$inferSelect;
 
 

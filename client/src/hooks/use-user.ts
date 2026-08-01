@@ -1,6 +1,6 @@
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import type { SafeUser, PlanTier } from "@shared/schema";
-import { prefetchAppData } from "@/lib/queryClient";
+import { prefetchAppData, wipeAppCache } from "@/lib/queryClient";
 
 export type AppUser = SafeUser & { hasPassword?: boolean; subscription?: { plan?: string } | null };
 
@@ -29,10 +29,10 @@ export type PlanInfo = {
   limits: {
     label: string;
     prices: { monthly: number; annual: number };
-    projects: number;
-    designFiles: number;
-    editors: number;
-    viewers: number;
+    projects: number | "unlimited";
+    designFiles: number | "unlimited";
+    editors: number | "unlimited";
+    viewers: number | "unlimited";
     storage: number;
     versionHistory: number;
     components: number;
@@ -42,7 +42,7 @@ export type PlanInfo = {
     apiAccess: boolean;
     ssO: boolean;
     prioritySupport: boolean;
-    aiCredits: { monthly: number; daily: number };
+    aiCredits: { monthly: number | "unlimited"; daily: number | "unlimited" };
   };
   usage: { storageUsed: number; projectsCount: number; designFilesCount: number; versionCount: number; componentCount: number };
 };
@@ -69,8 +69,8 @@ export type CreditBalance = {
   lifetimePurchased: number;
   lifetimeUsed: number;
   monthlyUsed: number;
-  monthlyAllowance: number;
-  dailyAllowance: number;
+  monthlyAllowance: number | "unlimited";
+  dailyAllowance: number | "unlimited";
 };
 
 async function fetchCredits(): Promise<CreditBalance | null> {
@@ -151,10 +151,10 @@ export function useLogout() {
       });
       if (!res.ok) throw new Error("Logout failed");
     },
-    onSuccess: () => {
+    onSuccess: async () => {
       queryClient.setQueryData(["/api/me"], null);
-      queryClient.removeQueries({ queryKey: ["/api/spaces"] });
-      queryClient.removeQueries({ queryKey: ["/api/workspaces"] });
+      await wipeAppCache();
+      queryClient.setQueryData(["/api/me"], null);
     },
   });
 }

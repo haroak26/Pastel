@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef, useMemo, useLayoutEffect } from "react";
 import { useLocation } from "wouter";
 import { useQuery } from "@tanstack/react-query";
+import { queryClient } from "@/lib/queryClient";
 import { motion, AnimatePresence } from "framer-motion";
 import { Sparkles, MousePointer2, Image, ZoomIn, ZoomOut, Layout, Plus, Hand, Code2, Eye, PaintBucket, FileImage, Share2, ChevronDown, RotateCcw, Copy, Search, Users, Info, MoreHorizontal, FileText, Loader2, AlertTriangle } from "lucide-react";
 import { ComputerIcon, SmartPhone01Icon } from "hugeicons-react";
@@ -54,34 +55,6 @@ const DEFAULT_RADIUS_VALUES: Record<string, string> = {
   "Extra Large": "20",
 };
 
-function CanvasElement({ type, x, y, w, h, label }: { type: string; x: number; y: number; w: number; h: number; label: string }) {
-  const base = "absolute rounded-[8px] border-2 border-transparent hover:border-brand/40 group cursor-default";
-  if (type === "image") {
-    return (
-      <div className={`${base} bg-gradient-to-br from-blue-50 to-purple-50 border-blue-200 flex items-center justify-center`} style={{ left: x, top: y, width: w, height: h }}>
-        <Image size={20} className="text-blue-300" strokeWidth={1} />
-        <div className="absolute bottom-1.5 left-2 text-[9px] text-fg-faint font-medium">{label}</div>
-      </div>
-    );
-  }
-  if (type === "text") {
-    return (
-      <div className={`${base} bg-transparent`} style={{ left: x, top: y, width: w, height: h }}>
-        <div className="text-[12px] font-semibold text-foreground leading-tight pt-1">{label}</div>
-        <div className="text-[9px] text-fg-muted mt-0.5 leading-relaxed">Lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor incididunt ut labore.</div>
-      </div>
-    );
-  }
-  if (type === "rect") {
-    return (
-      <div className={`${base} bg-gradient-to-br from-violet-50 to-blue-50 border-violet-200 flex items-center justify-center`} style={{ left: x, top: y, width: w, height: h }}>
-        <span className="text-[11px] font-medium text-violet-600">{label}</span>
-      </div>
-    );
-  }
-  return null;
-}
-
 export default function CanvasPage() {
   const [location, setLocation] = useLocation();
   const [activeTool, setActiveTool] = useState("select");
@@ -99,9 +72,20 @@ export default function CanvasPage() {
   const [fontValues, setFontValues] = useState<Record<string, string>>(DEFAULT_FONT_VALUES);
   const [colourValues, setColourValues] = useState<Record<string, string>>(DEFAULT_COLOUR_VALUES);
   const [sliderHues, setSliderHues] = useState<Record<string, number>>({});
-  const [mockScreens, setMockScreens] = useState<{ id: string; label: string; icon: React.ElementType }[]>([]);
-  const [selectedMockScreen, setSelectedMockScreen] = useState<string | null>(null);
-  const [projectName, setProjectName] = useState("Untitled");
+  const [projectName, setProjectName] = useState<string>(() => {
+    // Seed from the prefetched projects cache so a real name renders on
+    // first paint instead of an "Untitled" placeholder.
+    try {
+      const m = window.location.pathname.match(/^\/canvas\/([^/]+)/);
+      const id = m?.[1];
+      if (id && id !== "new") {
+        const list = queryClient.getQueryData<Array<{ id: string; name: string }>>(["/api/projects"]);
+        const found = list?.find((p) => p.id === id);
+        if (found) return found.name;
+      }
+    } catch {}
+    return "Untitled";
+  });
   const [editingProjectName, setEditingProjectName] = useState(false);
   const prevProjectName = useRef(projectName);
   const [inviteEmail, setInviteEmail] = useState("");
@@ -160,7 +144,7 @@ export default function CanvasPage() {
   const hasSession = status !== "idle" || awaitingAnswers;
 
   // Screens to display in the sidebar: live spec'd screens during a run,
-  // verified screens once done, mock screens when there's no session.
+  // verified screens once done.
   const specScreens = useMemo(
     () =>
       docs
@@ -197,8 +181,9 @@ export default function CanvasPage() {
 
   // ── Effects ──
 
-  // Project name (API projects only, not mocks)
-  const { data: apiProject } = useQuery({
+  // Project details: seeded instantly from the prefetched projects list
+  // cache (placeholderData) and revalidated in the background.
+  const { data: apiProject, isLoading: projectLoading } = useQuery({
     queryKey: ["/api/projects", projectId],
     queryFn: async () => {
       if (!projectId || isNewCanvas) return null;
@@ -209,6 +194,10 @@ export default function CanvasPage() {
     },
     enabled: !!projectId && !isNewCanvas,
     staleTime: 5 * 60 * 1000,
+    placeholderData: () => {
+      const list = queryClient.getQueryData<Array<{ id: string; name: string }>>(["/api/projects"]);
+      return list?.find((p) => p.id === projectId) ?? undefined;
+    },
   });
 
   useEffect(() => {
@@ -370,7 +359,9 @@ export default function CanvasPage() {
         <div className="w-[200px] shrink-0 flex flex-col bg-background shadow-[2px_0_12px_rgba(0,0,0,0.06)]">
           <div ref={sidebarHeaderRef} className="shrink-0 px-3 pt-3 pb-2 border-b border-border">
             <div className="h-[18px] flex items-center">
-              {editingProjectName ? (
+              {projectLoading && !apiProject && !isNewCanvas ? (
+                <span className="inline-block h-3 w-24 rounded-[4px] bg-muted animate-pulse" />
+              ) : editingProjectName ? (
                 <input
                   autoFocus
                   value={projectName}
@@ -396,7 +387,7 @@ export default function CanvasPage() {
             <p className="text-[11px] text-fg-faint mt-0.5">
               {hasSession
                 ? `${displayScreens.length} screens · ${docs.length} docs`
-                : `${mockScreens.length} screens`}
+                : `${displayScreens.length} screens`}
             </p>
           </div>
 
@@ -824,7 +815,7 @@ export default function CanvasPage() {
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-fg-muted">Screens</span>
-                    <span className="text-[10px] text-foreground">{hasSession ? displayScreens.length : mockScreens.length}</span>
+                    <span className="text-[10px] text-foreground">{displayScreens.length}</span>
                   </div>
                   <div className="flex items-center justify-between">
                     <span className="text-[10px] text-fg-muted">Documents</span>

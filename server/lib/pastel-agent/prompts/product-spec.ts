@@ -16,20 +16,25 @@ RULES:
 - responsive.notes: how layouts adapt at 768px and 375px.
 - technicalConstraints: honest limits (static React app, client-side state only, no real backend, no external images).
 - successMetrics: observable design-level outcomes (task findability, completion), not business KPIs.
+- The spec also covers system surfaces: every screen needs empty, loading and error states to be planned later — write sections so those states have somewhere to live.
 - Copy direction comes later — but sections must imply real content domains, not "features" placeholders.`;
 }
 
 export function specUserPrompt(
   userPrompt: string,
   intakeJson: string,
+  briefJson: string,
   answers: Record<string, string>,
 ): string {
   const answerLines = Object.entries(answers);
   return `USER REQUEST:
 ${userPrompt}
 
-INTAKE BRIEF (structured, from the intake stage):
+INTAKE BRIEF (structured, from the clarification stage):
 ${intakeJson}
+
+CREATIVE BRIEF (structured, from the creative-brief stage):
+${briefJson}
 
 ${answerLines.length > 0 ? `CLARIFICATION ANSWERS FROM THE USER:\n${answerLines.map(([k, v]) => `- ${k}: ${v}`).join("\n")}` : "No clarification answers were needed — intake confidence was sufficient."}
 

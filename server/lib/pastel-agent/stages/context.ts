@@ -59,8 +59,12 @@ export interface StageContext {
   saveFile(file: { path: string; kind: string; content: string }): Promise<void>;
   trackCost(stage: string, modelId: string, inputChars: number, outputChars: number): void;
   usedCredits(): number;
-  /** true while repair/optional model calls are affordable */
-  budgetAllowsModelCall(): boolean;
+  /**
+   * true while repair/optional model calls are affordable.
+   * headroom > 1 reserves allowance for non-negotiable gates (the visual
+   * design review runs even when routine repairs have consumed the budget).
+   */
+  budgetAllowsModelCall(headroom?: number): boolean;
 }
 
 export interface StageContextInit {
@@ -135,8 +139,8 @@ export function createStageContext(init: StageContextInit): StageContext {
       return Math.round(ctx.ledger.reduce((sum, entry) => sum + entry.credits, 0) * 100) / 100;
     },
 
-    budgetAllowsModelCall() {
-      return ctx.usedCredits() < ctx.maxCredits;
+    budgetAllowsModelCall(headroom = 1) {
+      return ctx.usedCredits() < ctx.maxCredits * headroom;
     },
   };
 

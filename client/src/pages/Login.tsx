@@ -56,7 +56,6 @@ export default function Login() {
         return;
       }
       await prefetchAppData();
-      await new Promise(r => setTimeout(r, 500));
       setLocation("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Login failed");
@@ -83,7 +82,6 @@ export default function Login() {
       if (!status.verified || !status.user) throw new Error("Verification is still pending. Please try again.");
       queryClient.setQueryData(["/api/me"], status.user);
       await prefetchAppData(queryClient);
-      await new Promise(r => setTimeout(r, 500));
       setLocation("/home");
     } catch (err) {
       setError(err instanceof Error ? err.message : "Invalid code");

@@ -1,5 +1,5 @@
 import { chatJSON, MODELS, MAX_TOKENS_PER_CALL } from "../gateway";
-import { designSystemSystemPrompt, designSystemUserPrompt } from "../prompts/design-system";
+import { brandKitSystemPrompt, brandKitUserPrompt } from "../prompts/brand-kit";
 import {
   designSystemSpecSchema,
   FIXED_BREAKPOINTS,
@@ -14,22 +14,36 @@ import type { BrandKit } from "../types";
 import type { StageContext } from "./context";
 
 /**
- * Design system — generated once, persisted, and inherited by every screen,
- * component, repair, and future run of the project.
+ * Stage 5 — Brand kit generation. The complete visual identity system:
+ * colour (incl. semantic + neutral scale), typography, radius, spacing scale,
+ * elevation, borders, icons, logo direction and motion. Generated once,
+ * persisted, and inherited by every screen, component, repair, and future run.
  */
 
-/** Deterministic quality gates on the model's design system. */
+/** Deterministic quality gates on the model's brand kit. */
 export function validateDesignSystemQuality(spec: DesignSystemSpec, seedName: string): DesignSystemSpec {
   const relaxedSeeds = new Set(["luxury-fashion", "monumental", "motion-first"]);
   if (!relaxedSeeds.has(seedName) && (spec.spacing.sectionGap > 96 || spec.spacing.verticalSectionPadding > 128)) {
     throw new Error("design system uses excessive spacing for its style seed");
   }
   const forbiddenColors = new Set(["#808080", "#808080ff", "#0000ff", "#0000ffff", "#800080", "#800080ff"]);
-  if (Object.values(spec.colors).some((color) => forbiddenColors.has(color.hex.toLowerCase()))) {
+  const allColors = [
+    ...Object.values(spec.colors),
+    ...Object.values(spec.semanticColors ?? {}).filter((c) => !!c),
+  ];
+  if (allColors.some((color) => forbiddenColors.has(color.hex.toLowerCase()))) {
     throw new Error("design system contains a forbidden default color");
   }
   if (spec.fonts.display.trim().toLowerCase() === "arial" || spec.fonts.display.trim().toLowerCase() === "roboto") {
     throw new Error("design system uses a generic display font");
+  }
+  // Enterprise discipline: hairline borders and sane radii are enforced.
+  if (spec.borders && spec.borders.widthPx > 2) {
+    throw new Error("brand kit permits borders thicker than 2px — enterprise surfaces use 1px hairlines");
+  }
+  const fatRadius = Object.entries(spec.radius).filter(([token, entry]) => token !== "full" && entry.px > 24);
+  if (fatRadius.length > 0) {
+    throw new Error(`brand kit radius exceeds 24px (non-pill): ${fatRadius.map(([t]) => t).join(", ")}`);
   }
   const contrastFailures = failingContrastPairs(spec);
   if (contrastFailures.length > 0) {
@@ -50,6 +64,13 @@ export function normalizeDesignSystem(spec: DesignSystemSpec): DesignSystemSpec 
       md: { value: "none", usage: "Not used" },
       lg: { value: "none", usage: "Not used" },
     };
+  }
+  // Semantic status colors merge into the flat token map so components can
+  // always reference --color-success / --color-warning / --color-error.
+  for (const [status, entry] of Object.entries(normalized.semanticColors ?? {})) {
+    if (entry?.hex && !normalized.tokens.colors[status]) {
+      normalized.tokens.colors[status] = entry.hex;
+    }
   }
   if (!normalized.tokens.shadows) {
     normalized.tokens.shadows = Object.fromEntries(Object.entries(normalized.shadows).map(([k, v]) => [k, v.value]));
@@ -79,6 +100,29 @@ export function fallbackDesignSystem(): DesignSystemSpec {
       accent: { hex: "#B5523C", usage: "Primary actions and key emphasis", contrastRatio: 4.7 },
       accentForeground: { hex: "#FFFFFF", usage: "Text on accent", contrastRatio: 4.7 },
     },
+    semanticColors: {
+      success: { hex: "#3E7B4F", usage: "Success and confirmation" },
+      warning: { hex: "#A8701B", usage: "Warnings and pending states" },
+      error: { hex: "#B5382E", usage: "Errors and destructive actions" },
+    },
+    neutralScale: {
+      "50": "#FAF9F6",
+      "100": "#F3F1EC",
+      "200": "#E7E4DD",
+      "300": "#D6D2C9",
+      "500": "#8A857A",
+      "700": "#4A463E",
+      "900": "#1D1B18",
+    },
+    logoDirection: {
+      style: "Minimal wordmark with a single geometric mark",
+      geometry: "Rounded square container, centered glyph",
+      iconApproach: "Abstract monogram, no literal illustration",
+      wordmarkStyle: "Display font, sentence case, tight tracking",
+    },
+    icons: { library: "inline SVG (stroke)", strokeWeight: "1.5", cornerStyle: "round" },
+    borders: { widthPx: 1, color: "border", opacityPct: 100 },
+    spacingScale: [4, 8, 12, 16, 24, 32, 48, 64],
     fonts: { display: "Space Grotesk", body: "DM Sans" },
     typeScale: {
       display: { px: 64, weight: 700, lineHeight: 1.05, tracking: "-0.03em", usage: "Hero statements" },
@@ -117,7 +161,7 @@ export function fallbackDesignSystem(): DesignSystemSpec {
       propConventions: ["children: ReactNode for slot content", "className: string escape hatch, defaults to empty string"],
     },
     tokens: {
-      colors: { background: "#F7F6F2", surface: "#FFFFFF", text: "#1D1B18", textMuted: "#625E56", border: "#DEDAD2", accent: "#B5523C", accentForeground: "#FFFFFF" },
+      colors: { background: "#F7F6F2", surface: "#FFFFFF", text: "#1D1B18", textMuted: "#625E56", border: "#DEDAD2", accent: "#B5523C", accentForeground: "#FFFFFF", success: "#3E7B4F", warning: "#A8701B", error: "#B5382E" },
       fonts: { display: "Space Grotesk", body: "DM Sans" },
       sizes: { display: "64px", h1: "48px", h2: "36px", h3: "24px", lead: "20px", body: "16px", small: "14px", caption: "12px", overline: "10px" },
       radius: { sm: "4px", md: "8px", lg: "16px", full: "9999px" },
@@ -126,15 +170,17 @@ export function fallbackDesignSystem(): DesignSystemSpec {
   };
 }
 
-export async function designSystemStage(ctx: StageContext): Promise<DesignSystemSpec> {
-  ctx.activity("Defining the design system");
+export async function brandKitStage(ctx: StageContext): Promise<DesignSystemSpec> {
+  ctx.activity("Generating the brand kit");
 
+  const brief = ctx.state.creativeBrief;
   const spec = ctx.state.productSpec;
-  if (!spec) throw new Error("design-system stage requires productSpec in state");
+  const strategy = ctx.state.brandStrategy;
+  if (!brief || !spec || !strategy) throw new Error("brand-kit stage requires creativeBrief, productSpec and brandStrategy in state");
 
   let designSystem: DesignSystemSpec;
-  const sys = designSystemSystemPrompt();
-  const user = designSystemUserPrompt(JSON.stringify(spec), designSystemKnowledge(), ctx.styleDirection);
+  const sys = brandKitSystemPrompt();
+  const user = brandKitUserPrompt(JSON.stringify(brief), JSON.stringify(spec), JSON.stringify(strategy), designSystemKnowledge(), ctx.styleDirection);
   try {
     const result = await chatJSON<DesignSystemSpec>(
       [
@@ -151,8 +197,8 @@ export async function designSystemStage(ctx: StageContext): Promise<DesignSystem
     designSystem = result;
     ctx.trackCost("designSystem", MODELS.designSystem, sys.length + user.length, JSON.stringify(result).length);
   } catch (err) {
-    console.warn("[pastel-agent] design system failed, using deterministic fallback:", err instanceof Error ? err.message : err);
-    ctx.activity("Design system completed with deterministic defaults");
+    console.warn("[pastel-agent] brand kit failed, using deterministic fallback:", err instanceof Error ? err.message : err);
+    ctx.activity("Brand kit completed with deterministic defaults");
     designSystem = fallbackDesignSystem();
   }
 
@@ -164,8 +210,8 @@ export async function designSystemStage(ctx: StageContext): Promise<DesignSystem
   await mergeManifest(ctx.runId, { brandKit: ctx.brandKit });
 
   await ctx.saveDoc({
-    path: "docs/01-design-system.md",
-    title: "Design System",
+    path: "docs/03-brand-kit.md",
+    title: "Brand Kit",
     kind: "system",
     content: designSystemToMarkdown(designSystem, ctx.styleDirection),
   });

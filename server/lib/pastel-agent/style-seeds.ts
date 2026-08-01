@@ -2,6 +2,15 @@ import type { StyleSeed } from "./types";
 
 export const STYLE_SEEDS: StyleSeed[] = [
   {
+    name: "product-default",
+    mood: ["restrained", "precise", "professional"],
+    spatialPhilosophy: "calm, structured product layouts — clear navigation chrome, a focused content column, breathing room earned by hierarchy rather than padding theatrics",
+    typographicAttitude: "one professional UI family throughout (Inter, DM Sans, IBM Plex Sans) with a supporting display face only when it stays corporate; hierarchy through weight and size steps, never novelty letterforms, extreme tracking, or all-caps-everything",
+    colorTemperature: "cool or warm neutral grays with deep ink text and exactly one confident accent",
+    textureApproach: "flat surfaces with 1px hairline borders and at most a whisper of elevation — no thick outlines, no textures, no gimmicks",
+    creativeDirection: "The house style of Linear, Stripe, Vercel, and Notion. An enterprise startup could ship this tomorrow. Light canvas (or a tasteful true-dark), whitespace that clarifies rather than performs, cards with 8-12px radius and hairline structure, subtle shadows only where elevation is functional. Typography is invisible — hierarchy does the work. Every product team would call this clean, and no one would guess a machine made it."
+  },
+  {
     name: "editorial",
     mood: ["typographic", "magazine", "print-legacy"],
     spatialPhilosophy: "asymmetric grid with a dominant reading column offset from center, framed by generous breathing room on one side to create visual tension",
@@ -208,6 +217,32 @@ export function selectStyleSeedDeterministic(key: string): StyleSeed {
     hash = (hash * 31 + key.charCodeAt(i)) >>> 0;
   }
   return STYLE_SEEDS[hash % STYLE_SEEDS.length];
+}
+
+/** Enterprise flag default — what an enterprise startup would actually ship. */
+export const DEFAULT_STYLE_SEED = "product-default";
+
+export function defaultStyleSeed(): StyleSeed {
+  return STYLE_SEEDS.find((s) => s.name === DEFAULT_STYLE_SEED) ?? STYLE_SEEDS[0];
+}
+
+/**
+ * Seed selection contract for the orchestrator:
+ *   delta's established seed > PASTEL_STYLE_SEED (name, or "variety" for the
+ *   creative roulette) > the enterprise product default.
+ */
+export function selectPipelineSeed(key: string, established?: string | null): StyleSeed {
+  if (established) {
+    const named = selectStyleSeedByName(established);
+    if (named) return named;
+  }
+  const env = process.env.PASTEL_STYLE_SEED?.trim();
+  if (env) {
+    const named = selectStyleSeedByName(env);
+    if (named) return named;
+    if (env === "variety") return selectStyleSeedDeterministic(key);
+  }
+  return defaultStyleSeed();
 }
 
 /**

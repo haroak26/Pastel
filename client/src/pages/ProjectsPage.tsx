@@ -3,6 +3,7 @@ import { useLocation } from 'wouter';
 import { useQuery } from '@tanstack/react-query';
 import { Plus, Search } from 'lucide-react';
 import { Button } from '@/components/button';
+import { Skeleton } from '@/components/ui/skeleton';
 
 interface ApiProject {
   id: string;
@@ -64,8 +65,16 @@ export default function ProjectsPage() {
         </div>
 
         {isLoading ? (
-          <div className="flex items-center justify-center py-16">
-            <div className="w-6 h-6 border-2 border-brand/30 border-t-brand rounded-full animate-spin" />
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+            {Array.from({ length: 6 }).map((_, i) => (
+              <div key={i} className="rounded-[12px] border border-border bg-background overflow-hidden">
+                <Skeleton className="aspect-[16/10] w-full rounded-none" />
+                <div className="px-3 py-2 space-y-1.5">
+                  <Skeleton className="h-3.5 w-2/3" />
+                  <Skeleton className="h-2.5 w-1/4" />
+                </div>
+              </div>
+            ))}
           </div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">

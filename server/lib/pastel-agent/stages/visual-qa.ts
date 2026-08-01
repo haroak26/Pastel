@@ -13,7 +13,7 @@ import type { StageContext } from "./context";
  * blueprints. Only verified screens are inspected; only the specific files
  * implicated by findings are repaired.
  */
-export async function visualQaStage(ctx: StageContext, screenFilter?: string[]): Promise<void> {
+export async function visualQaStage(ctx: StageContext, screenFilter?: string[]): Promise<VisualReview> {
   const plan = ctx.state.architecture;
   let visualReview: VisualReview = { passes: true, issues: [] };
   let skippedReason: string | undefined;
@@ -21,7 +21,9 @@ export async function visualQaStage(ctx: StageContext, screenFilter?: string[]):
 
   const screensToInspect = ctx.builtScreens.filter((name) => !screenFilter || screenFilter.includes(name));
 
-  if (screensToInspect.length > 0 && ctx.budgetAllowsModelCall()) {
+  // The visual design review is the pipeline's taste gate — it is budget-
+  // reserved (15% headroom) so routine repairs can never starve it.
+  if (screensToInspect.length > 0 && ctx.budgetAllowsModelCall(1.15)) {
     ctx.activity("Capturing verified screens for visual QA");
     const captured = await captureScreenshots(ctx.runId, screensToInspect, {
       includeMobile: process.env.PASTEL_VISUAL_MOBILE === "all",
@@ -56,7 +58,12 @@ export async function visualQaStage(ctx: StageContext, screenFilter?: string[]):
           ] as ChatMessage[],
           { model: "visualQA", temperature: 0.2, maxTokens: MAX_TOKENS_PER_CALL.visualQA, validate: (v) => visualReviewSchema.parse(v) },
         );
-        ctx.trackCost("visualQA", MODELS.visualQA, sys.length + JSON.stringify(visualContent).length, JSON.stringify(visualReview).length);
+        // Cost honesty: base64 image data is NOT text — billing it at text
+        // rates inflates the ledger ~10x. Approximate vision input at
+        // ~1100 tokens (≈4400 chars) per screenshot + real text chars.
+        const textChars = visualContent.reduce((sum, block) => sum + (typeof block.text === "string" ? block.text.length : 0), 0);
+        const imageCount = visualContent.filter((block) => block.type === "image").length;
+        ctx.trackCost("visualQA", MODELS.visualQA, sys.length + textChars + imageCount * 4400, JSON.stringify(visualReview).length);
         ctx.activity(visualReview.passes ? "Visual QA passed" : `Visual QA found ${visualReview.issues.length} issue(s)`);
       } catch (err) {
         skippedReason = "Visual review model was unavailable";
@@ -111,9 +118,10 @@ export async function visualQaStage(ctx: StageContext, screenFilter?: string[]):
   }
 
   await ctx.saveDoc({
-    path: "docs/04-visual-review.md",
-    title: "Visual QA Review",
+    path: "docs/10-visual-review.md",
+    title: "Visual Design Review",
     kind: "visual-review",
     content: visualReviewToMarkdown(visualReview, screenshotCount, skippedReason),
   });
+  return visualReview;
 }

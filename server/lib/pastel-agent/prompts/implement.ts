@@ -9,6 +9,8 @@ HARD RULES:
 - Icons: minimal inline SVG (stroke="currentColor", strokeWidth 1.5-2, 24x24 viewBox). No icon libraries. No external packages — react/react-dom only.
 - Interactive elements: hover/focus states with transition-colors (or the provided motion tokens).
 - Honor the style direction's permission guardrails (shadows, gradients, borders).
+- TRUNCATION IS A BUG: labels, KPI names and values must never ellipsize ("ANNUAL REC…"), never collapse to initials. Give stat/data displays enough room, wrap to a second line, or reduce columns — information always wins over symmetry.
+- Data charts: y-axis domain must cover the real data range in its native units (rates 0–100, money in the shown unit) and the plotted points must visibly vary with the data. Never render a flat line at 0 when the numbers say otherwise.
 - No prose, no markdown fences — JSON only.`;
 }
 
@@ -48,6 +50,9 @@ HARD RULES:
 - Responsive per the blueprint via Tailwind prefixes (sm:/md:/lg:) — self-sufficient at 1440px, complete at 375px.
 - Local useState for believable interactivity (mobile menu, tabs, accordions). Links: <a href="#" onClick={(e) => e.preventDefault()}>.
 - Complete page: navigation, main content, footer — via the blueprint's layout/components.
+- TRUNCATION IS A BUG: KPI labels, stat names, table cells must never ellipsize — give them room, wrap, or remove; information always wins over symmetry.
+- Data charts: y-axis domain must cover the real data range in its native units and points must visibly vary; a flat line at 0 when data says otherwise is a defect.
+- User-visible labels are humanized ("Churn Cohorts") — never camelCase identifiers.
 - No prose, no markdown fences — JSON only.`;
 }
 

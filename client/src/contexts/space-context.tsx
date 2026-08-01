@@ -141,10 +141,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
         verified.add(pendingSpaceId);
         saveVerifiedInboxes(verified);
       }
-      setSwitchingPhase('signing-in');
-      setTimeout(() => {
-        if (pendingSpaceId !== null) completeSwitch(pendingSpaceId);
-      }, 600);
+      if (pendingSpaceId !== null) completeSwitch(pendingSpaceId);
     } catch (err) {
       setTotpError(err instanceof Error ? err.message : 'Verification failed');
     }
@@ -167,13 +164,9 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
 
     if (needsTotp) {
       setSwitchingSpace(true);
-      setSwitchingSpaceName(currentName);
+      setSwitchingSpaceName(targetName);
       setPendingSpaceId(id);
-      setSwitchingPhase('logging-out');
-      setTimeout(() => {
-        setSwitchingPhase('totp');
-        setSwitchingSpaceName(targetName);
-      }, 400);
+      setSwitchingPhase('totp');
     } else {
       completeSwitch(id);
     }
@@ -186,14 +179,7 @@ export function SpaceProvider({ children }: { children: React.ReactNode }) {
     } else {
       try { window.localStorage.removeItem('pastel.selectedDomain'); } catch {}
     }
-    setSwitchingSpace(true);
-    setSwitchingPhase('logging-out');
-    setSwitchingSpaceName(activeSpace?.name ?? 'Space');
-    setTimeout(() => {
-      setActiveSpaceIdState(null);
-      setSwitchingSpace(false);
-      setSwitchingPhase('idle');
-    }, 800);
+    setActiveSpaceIdState(null);
   };
 
   const activeSpace = filteredSpaces.find(i => i.id === resolvedActiveSpaceId) ?? null;

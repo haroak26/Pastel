@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@/hooks/use-user';
 import { PromptInput } from '@/components/PromptInput';
+import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, ArrowRight } from 'lucide-react';
 import { useLocation } from 'wouter';
 
@@ -28,7 +29,14 @@ export default function HomePage() {
   const [, setLocation] = useLocation();
   const [loading, setLoading] = useState(false);
 
-  const { data: projects = [] } = useQuery<ApiProject[]>({
+  /* Pick up a prompt typed on the landing hero and prefill it for review. */
+  const [landingPrompt] = useState<string | undefined>(() => {
+    const v = sessionStorage.getItem('pastel-landing-prompt');
+    if (v) sessionStorage.removeItem('pastel-landing-prompt');
+    return v ?? undefined;
+  });
+
+  const { data: projects = [], isLoading: projectsLoading } = useQuery<ApiProject[]>({
     queryKey: ['/api/projects'],
     queryFn: async () => {
       const res = await fetch('/api/projects', { credentials: 'include' });
@@ -76,7 +84,7 @@ export default function HomePage() {
         </div>
 
         {/* Prompt Box */}
-        <PromptInput onSubmit={handlePrompt} isLoading={loading} />
+        <PromptInput onSubmit={handlePrompt} isLoading={loading} initialValue={landingPrompt} />
 
         {/* Recent Projects */}
         <div className="w-full max-w-3xl mx-auto mt-8 sm:mt-36">
@@ -91,7 +99,20 @@ export default function HomePage() {
           </div>
 
           <div className="flex gap-3 sm:gap-4 overflow-x-auto pb-2 -mx-4 sm:-mx-0 px-4 sm:px-0">
-            {recentProjects.length === 0 && (
+            {projectsLoading && (
+              <>
+                {Array.from({ length: 3 }).map((_, i) => (
+                  <div key={i} className="flex-shrink-0 w-[200px] rounded-[12px] border border-border bg-background overflow-hidden">
+                    <Skeleton className="aspect-[16/10] w-full rounded-none" />
+                    <div className="px-3 py-2 space-y-1.5">
+                      <Skeleton className="h-3.5 w-2/3" />
+                      <Skeleton className="h-2.5 w-1/4" />
+                    </div>
+                  </div>
+                ))}
+              </>
+            )}
+            {!projectsLoading && recentProjects.length === 0 && (
               <div className="flex-shrink-0 w-full text-center py-8">
                 <p className="text-[13px] text-fg-muted">No projects yet. Describe what you want to build above.</p>
               </div>

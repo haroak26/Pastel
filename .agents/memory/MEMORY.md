@@ -2,4 +2,4 @@
 - [Replit NODE_ENV npm issue](replit-node-env-npm.md) — NODE_ENV=production globally set in Replit causes npm to skip devDependencies; fix is `include=dev` in .npmrc.
 - [Google OAuth setup](google-oauth-setup.md) — Google OAuth added alongside GitHub; both use same `googleId` column with provider prefix; GOOGLE_CLIENT_ID/SECRET needed in secrets.
 - [Credit-based AI billing](credit-billing.md) — agentCredit/assistantCredit replace reply counts; drizzle-kit push fails non-interactively on column renames—use raw SQL instead.
-- [Pastel Agent v2 architecture](pastel-agent.md) — staged pipeline (intake→spec→designSystem→architecture→gate→implement→verify→visualQA→publish), Terra reasons / Luna implements, persistent project state + component registry, delta screen runs, gateway tag rules, esbuild double-prefix gotcha.
+- [Pastel Agent 2 (17-stage pipeline)](pastel-agent.md) — 17 stages mapped onto 6 wire phases (clarify→…→repairLoop→publish), per-artifact project state + component registry, pgvector pattern retrieval (design_patterns), Terra reasons / Luna implements / LIGHT for small roles, gateway tag rules, esbuild double-prefix gotcha, e2e + cost notes.

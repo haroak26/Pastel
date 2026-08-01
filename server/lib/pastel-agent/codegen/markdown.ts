@@ -1,11 +1,18 @@
 import type {
   ArchitecturePlan,
+  BrandStrategy,
   ComponentContract,
+  CreativeBrief,
   DesignSystemSpec,
+  InformationArchitecture,
+  InteractionPlan,
   IntakeBrief,
+  LayoutPlan,
   ProductSpec,
   ScreenBlueprint,
+  ScreenPlan,
   SpecScreen,
+  UserFlowPlan,
   VisualReview,
 } from "../schemas/plan-schemas";
 import { cssTokenName } from "./derive";
@@ -67,6 +74,157 @@ ${intake.assumptions.map((a) => `- ${a}`).join("\n") || "- None recorded"}
 ## Clarification Answers
 ${answerLines.length > 0 ? answerLines.map(([k, v]) => `- **${k}:** ${v}`).join("\n") : "- None provided (confidence was high enough to proceed)"}
 `;
+}
+
+export function creativeBriefToMarkdown(
+  brief: CreativeBrief,
+  intake: IntakeBrief | null,
+  answers: Record<string, string>,
+): string {
+  const answerLines = Object.entries(answers);
+  return `# Creative Brief
+
+## Product
+${brief.productSummary}
+
+## Audience
+- **Primary:** ${brief.audience.primary}
+${brief.audience.secondary.map((a) => `- **Secondary:** ${a}`).join("\n") || "- **Secondary:** none"}
+
+## User Goals
+${brief.userGoals.map((g) => `- ${g}`).join("\n")}
+
+## Business Goals
+${brief.businessGoals.map((g) => `- ${g}`).join("\n")}
+
+## Functional Requirements
+${brief.functionalRequirements.map((r) => `- ${r}`).join("\n")}
+
+## Success Criteria
+${brief.successCriteria.map((c) => `- ${c}`).join("\n")}
+
+## Constraints
+${brief.constraints.map((c) => `- ${c}`).join("\n") || "- None"}
+${intake ? `
+## Assumptions
+${intake.assumptions.map((a) => `- ${a}`).join("\n") || "- None recorded"}
+` : ""}
+## Clarification Answers
+${answerLines.length > 0 ? answerLines.map(([k, v]) => `- **${k}:** ${v}`).join("\n") : "- None provided (confidence was high enough to proceed)"}
+`;
+}
+
+export function brandStrategyToMarkdown(strategy: BrandStrategy, styleContext: string): string {
+  return `# Brand Strategy
+
+## Personality
+${strategy.personality.map((p) => `- ${p}`).join("\n")}
+
+## Design Direction
+${strategy.designDirection}
+
+## Emotional Tone
+${strategy.emotionalTone.map((t) => `- ${t}`).join("\n")}
+
+## Visual Keywords
+${strategy.visualKeywords.map((k) => `- ${k}`).join("\n")}
+
+## Market Positioning
+${strategy.positioning}
+
+## Active Style Direction
+${styleContext}`;
+}
+
+export function informationArchitectureToMarkdown(ia: InformationArchitecture): string {
+  return `# Information Architecture
+
+## Navigation (${ia.navigation.type})
+${ia.navigation.items
+  .map(
+    (item) =>
+      `- **${item.label}** → ${item.screen}${item.children?.length ? `\n${item.children.map((c) => `  - ${c.label} → ${c.screen}`).join("\n")}` : ""}`,
+  )
+  .join("\n")}
+
+**Entry screen:** ${ia.entryScreen}
+
+## Page Groups
+${ia.groups.map((g) => `- **${g.name}:** ${g.screens.join(", ")}`).join("\n") || "- Flat structure"}
+
+## Content Priority
+${ia.contentPriority
+  .map((entry) => `### ${entry.screen}\n${entry.priority.map((p, i) => `${i + 1}. ${p}`).join("\n")}`)
+  .join("\n\n")}`;
+}
+
+export function userFlowsToMarkdown(plan: UserFlowPlan): string {
+  return `# User Flows
+
+${plan.flows
+  .map(
+    (flow) => `## ${flow.name}
+${flow.description}
+
+${flow.steps.map((step, i) => `${i + 1}. **${step.screen}** — ${step.action}`).join("\n")}`,
+  )
+  .join("\n\n")}`;
+}
+
+export function screenPlanToMarkdown(plan: ScreenPlan): string {
+  return `# Screen Plan
+
+${plan.screens
+  .map(
+    (screen) => `## ${screen.name}
+- **Goal:** ${screen.goal}
+- **User:** ${screen.user}
+- **Primary action:** ${screen.primaryAction}
+- **Secondary actions:** ${screen.secondaryActions.join("; ") || "none"}
+- **Required components:** ${screen.requiredComponents.join(", ") || "—"}
+- **Required content:** ${screen.requiredContent.join("; ")}`,
+  )
+  .join("\n\n")}`;
+}
+
+export function layoutPlanToMarkdown(layout: LayoutPlan): string {
+  return `# Layout Plan
+
+## Grid
+- Columns: ${layout.grid.columns} · gap ${layout.grid.gapPx}px · margins ${layout.grid.marginPx}px · container ${layout.grid.containerWidthPx}px
+
+## Chrome
+- Navigation: ${layout.chrome.navigation}${layout.chrome.sidebarWidthPx ? ` (sidebar ${layout.chrome.sidebarWidthPx}px)` : ""}${layout.chrome.topbarHeightPx ? ` · topbar ${layout.chrome.topbarHeightPx}px` : ""}
+
+## Rhythm
+- Section gap: ${layout.sectionGapPx}px · vertical section padding: ${layout.verticalSectionPaddingPx}px
+- Breakpoints: mobile ${layout.breakpoints.mobile}px · tablet ${layout.breakpoints.tablet}px · desktop ${layout.breakpoints.desktop}px
+- Scroll: ${layout.scrollBehavior}
+
+## Per-screen Structure
+${layout.screens
+  .map((screen) => `### ${screen.screen}\n${screen.structure}${screen.notes ? `\n- ${screen.notes}` : ""}`)
+  .join("\n\n")}`;
+}
+
+export function interactionPlanToMarkdown(plan: InteractionPlan): string {
+  return `# Interaction Plan
+
+## Keyboard Shortcuts
+${plan.keyboardShortcuts.map((s) => `- \`${s.keys}\` — ${s.action}`).join("\n") || "- Standard browser shortcuts"}
+
+## Focus Management
+${plan.focusManagement.map((f) => `- ${f}`).join("\n") || "- Focus rings visible on all interactive elements"}
+
+${plan.screens
+  .map(
+    (screen) => `## ${screen.screen}
+- **Loading:** ${screen.loading}
+- **Empty:** ${screen.empty}
+- **Error:** ${screen.error}
+- **Transitions:**\n${screen.transitions.map((t) => `  - ${t}`).join("\n") || "  - Standard hover/focus transitions"}`,
+  )
+  .join("\n\n")}`;
 }
 
 export function designSystemToMarkdown(ds: DesignSystemSpec, styleContext: string): string {
@@ -137,6 +295,29 @@ ${ds.componentStandards.propConventions.map((c) => `- ${c}`).join("\n")}
 
 ## Elevation & Borders
 ${ds.shadows && Object.values(ds.shadows).some((s) => s.value !== "none") ? "This design system includes shadow tokens for depth. Use shadow-[var(--shadow-*)] for elevated elements. Never combine shadows with borders on the same element." : "Hairline 1px borders using the border color token. No shadows."}
+${ds.semanticColors && Object.values(ds.semanticColors).some(Boolean) ? `
+## Semantic Status Colors
+| Status | Hex | Usage |
+|---|---|---|
+${Object.entries(ds.semanticColors).filter(([, c]) => !!c).map(([status, c]) => `| ${status} | ${c!.hex} | ${c!.usage} |`).join("\n")}` : ""}
+${ds.neutralScale && Object.keys(ds.neutralScale).length > 0 ? `
+## Neutral Scale
+${Object.entries(ds.neutralScale).map(([step, hex]) => `- **${step}:** ${hex}`).join(" · ")}` : ""}
+${ds.logoDirection ? `
+## Logo Direction
+- **Style:** ${ds.logoDirection.style}
+- **Geometry:** ${ds.logoDirection.geometry}
+- **Icon approach:** ${ds.logoDirection.iconApproach}
+- **Wordmark:** ${ds.logoDirection.wordmarkStyle}` : ""}
+${ds.icons ? `
+## Icons
+- **Library:** ${ds.icons.library} · **Stroke:** ${ds.icons.strokeWeight} · **Corners:** ${ds.icons.cornerStyle}` : ""}
+${ds.borders ? `
+## Borders
+- ${ds.borders.widthPx}px, color token \`${ds.borders.color}\` at ${ds.borders.opacityPct}% opacity` : ""}
+${ds.spacingScale && ds.spacingScale.length > 0 ? `
+## Spacing Scale (the only permitted spacing values)
+${ds.spacingScale.map((v) => `${v}px`).join(" · ")}` : ""}
 
 \`\`\`json tokens
 ${tokensJson}

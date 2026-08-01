@@ -31,6 +31,7 @@ import {
 } from "../codegen/lint";
 import { scanAntiSlop, hasHighSeveritySlop } from "../codegen/anti-slop";
 import { implementerKnowledge } from "../knowledge";
+import { interactionsForScreen } from "./interactions";
 import { reusableComponent, upsertRegistryComponent } from "../registry";
 import { verifyScreens } from "../sandbox";
 import { persistFile } from "../run-store";
@@ -154,11 +155,15 @@ async function implementScreen(ctx: StageContext, screenName: string): Promise<v
     .join("\n");
 
   ctx.activity(`Composing screen: ${screenName}`);
+  // Screen composition JSON + this screen's interaction slice — the
+  // implementer translates both into code; it invents nothing.
+  const interactions = interactionsForScreen(ctx.state.interactionPlan, screenName);
+  const compositionJson = JSON.stringify(interactions ? { ...blueprint, interactions } : blueprint, null, 2);
   let content = "";
   const sys = screenCodeSystemPrompt();
   const user = screenCodeUserPrompt(
     screenName,
-    JSON.stringify(blueprint, null, 2),
+    compositionJson,
     importContracts,
     formatTokensForImplementer(ds),
     implementerKnowledge(),

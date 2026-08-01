@@ -42,6 +42,30 @@ export const FIXED_BREAKPOINTS = { mobile: 375, tablet: 768, desktop: 1440 } as 
 export const designSystemSpecSchema = z.object({
   concept: nonEmpty,
   colors: requiredRecordKeys(designColorSchema, REQUIRED_COLOR_TOKENS, "design system is missing required semantic colors"),
+  /** Brand-kit extensions (Stage 5) — semantic statuses, neutral ramp, identity direction. */
+  semanticColors: z.object({
+    success: designColorSchema.optional().nullable(),
+    warning: designColorSchema.optional().nullable(),
+    error: designColorSchema.optional().nullable(),
+  }).optional().nullable(),
+  neutralScale: z.record(z.string().regex(HEX, "neutral scale entries must be hex")).optional().nullable(),
+  logoDirection: z.object({
+    style: nonEmpty,
+    geometry: nonEmpty,
+    iconApproach: nonEmpty,
+    wordmarkStyle: nonEmpty,
+  }).optional().nullable(),
+  icons: z.object({
+    library: nonEmpty,
+    strokeWeight: nonEmpty,
+    cornerStyle: nonEmpty,
+  }).optional().nullable(),
+  borders: z.object({
+    widthPx: z.number().nonnegative(),
+    color: nonEmpty,
+    opacityPct: z.number().min(0).max(100),
+  }).optional().nullable(),
+  spacingScale: z.array(z.number().positive()).min(3).max(12).optional().nullable(),
   fonts: z.object({ display: nonEmpty, body: nonEmpty }),
   typeScale: requiredRecordKeys(typeScaleEntrySchema, REQUIRED_TYPE_TOKENS, "design system is missing required type scale tokens"),
   radius: requiredRecordKeys(radiusEntrySchema, REQUIRED_RADIUS_TOKENS, "design system is missing radius tokens"),
@@ -167,8 +191,8 @@ const blueprintSectionSchema = z.object({
   name: nonEmpty,
   /** composition pattern chosen from the layout-pattern library */
   pattern: nonEmpty,
-  /** registry/architecture component names used by this section */
-  components: z.array(nonEmpty).max(6),
+  /** registry/architecture component names used by this section (models over-list; 8 keeps parses alive) */
+  components: z.array(nonEmpty).max(8),
   /** final, verbatim copy strings for this section */
   copy: z.array(z.string()).max(24),
   notes: z.string().optional().nullable(),
@@ -196,6 +220,183 @@ export const architecturePlanSchema = z.object({
   lib: z.array(z.object({ name: nonEmpty, purpose: nonEmpty })).max(4).optional(),
 });
 export type ArchitecturePlan = z.infer<typeof architecturePlanSchema>;
+
+// ── Stage 2 — Creative brief ────────────────────────────────────────────────
+
+export const creativeBriefSchema = z.object({
+  productSummary: nonEmpty,
+  audience: z.object({
+    primary: nonEmpty,
+    secondary: z.array(nonEmpty).max(3),
+  }),
+  userGoals: z.array(nonEmpty).min(1).max(6),
+  businessGoals: z.array(nonEmpty).min(1).max(6),
+  functionalRequirements: z.array(nonEmpty).min(1).max(14),
+  successCriteria: z.array(nonEmpty).min(1).max(6),
+  constraints: z.array(nonEmpty).max(8),
+});
+export type CreativeBrief = z.infer<typeof creativeBriefSchema>;
+
+// ── Stage 4 — Brand strategy ────────────────────────────────────────────────
+
+export const brandStrategySchema = z.object({
+  personality: z.array(nonEmpty).min(2).max(6),
+  designDirection: nonEmpty,
+  emotionalTone: z.array(nonEmpty).min(1).max(5),
+  visualKeywords: z.array(nonEmpty).min(3).max(8),
+  positioning: nonEmpty,
+});
+export type BrandStrategy = z.infer<typeof brandStrategySchema>;
+
+// ── Stage 6 — Information architecture ──────────────────────────────────────
+
+const pascalName = z.string().trim().regex(/^[A-Z][a-zA-Z0-9]*$/, "name must be PascalCase");
+
+export const informationArchitectureSchema = z.object({
+  navigation: z.object({
+    type: z.enum(["sidebar", "topbar", "hybrid", "tabs"]),
+    items: z.array(z.object({
+      label: nonEmpty,
+      screen: pascalName,
+      children: z.array(z.object({ label: nonEmpty, screen: pascalName })).max(6).optional().nullable(),
+    })).min(1).max(10),
+  }),
+  groups: z.array(z.object({
+    name: nonEmpty,
+    screens: z.array(pascalName).min(1).max(8),
+  })).max(6),
+  entryScreen: pascalName,
+  contentPriority: z.array(z.object({
+    screen: pascalName,
+    priority: z.array(nonEmpty).min(1).max(8),
+  })).min(1).max(8),
+});
+export type InformationArchitecture = z.infer<typeof informationArchitectureSchema>;
+
+// ── Stage 7 — User flow planning ────────────────────────────────────────────
+
+export const userFlowPlanSchema = z.object({
+  flows: z.array(z.object({
+    name: nonEmpty,
+    description: nonEmpty,
+    steps: z.array(z.object({
+      screen: pascalName,
+      action: nonEmpty,
+    })).min(2).max(10),
+  })).min(1).max(6),
+});
+export type UserFlowPlan = z.infer<typeof userFlowPlanSchema>;
+
+// ── Stage 8 — Screen planning ───────────────────────────────────────────────
+
+export const screenPlanEntrySchema = z.object({
+  id: z.string().trim().regex(/^[a-z][a-z0-9-]{0,40}$/, "screen id must be kebab-case"),
+  name: pascalName,
+  goal: nonEmpty,
+  user: nonEmpty,
+  primaryAction: nonEmpty,
+  secondaryActions: z.array(nonEmpty).max(4),
+  requiredComponents: z.array(pascalName).max(10),
+  requiredContent: z.array(nonEmpty).max(10),
+});
+
+export const screenPlanSchema = z.object({
+  screens: z.array(screenPlanEntrySchema).min(1).max(6),
+});
+export type ScreenPlan = z.infer<typeof screenPlanSchema>;
+export type ScreenPlanEntry = z.infer<typeof screenPlanEntrySchema>;
+
+// ── Stage 9 — Layout planning ───────────────────────────────────────────────
+
+export const layoutPlanSchema = z.object({
+  grid: z.object({
+    columns: z.number().int().min(4).max(16),
+    gapPx: z.number().positive(),
+    marginPx: z.number().positive(),
+    containerWidthPx: z.number().positive(),
+  }),
+  chrome: z.object({
+    navigation: z.enum(["sidebar", "topbar", "hybrid", "tabs"]),
+    sidebarWidthPx: z.number().positive().optional().nullable(),
+    topbarHeightPx: z.number().positive().optional().nullable(),
+  }),
+  sectionGapPx: z.number().positive(),
+  verticalSectionPaddingPx: z.number().positive(),
+  breakpoints: z.object({
+    mobile: z.number().positive(),
+    tablet: z.number().positive(),
+    desktop: z.number().positive(),
+  }),
+  scrollBehavior: nonEmpty,
+  screens: z.array(z.object({
+    screen: pascalName,
+    structure: nonEmpty,
+    notes: z.string().optional().nullable(),
+  })).min(1).max(6),
+});
+export type LayoutPlan = z.infer<typeof layoutPlanSchema>;
+
+// ── Stage 13 — Interaction planning ─────────────────────────────────────────
+
+export const interactionPlanSchema = z.object({
+  keyboardShortcuts: z.array(z.object({
+    keys: nonEmpty,
+    action: nonEmpty,
+  })).max(8),
+  focusManagement: z.array(nonEmpty).max(6),
+  screens: z.array(z.object({
+    screen: pascalName,
+    loading: nonEmpty,
+    empty: nonEmpty,
+    error: nonEmpty,
+    transitions: z.array(nonEmpty).max(6),
+  })).min(1).max(6),
+});
+export type InteractionPlan = z.infer<typeof interactionPlanSchema>;
+
+// ── Stage 11 — Design pattern retrieval ─────────────────────────────────────
+
+export interface RetrievedPattern {
+  name: string;
+  category: string;
+  summary: string;
+  bestFor: string[];
+}
+
+export interface PatternContext {
+  provider: "pgvector" | "static";
+  patterns: RetrievedPattern[];
+  /** screen name → pattern names chosen for its sections */
+  assignments: Array<{ screen: string; patterns: string[] }>;
+}
+
+export const patternRankResultSchema = z.object({
+  assignments: z.array(z.object({
+    screen: pascalName,
+    patterns: z.array(nonEmpty).min(1).max(4),
+  })).min(1).max(6),
+});
+export type PatternRankResult = z.infer<typeof patternRankResultSchema>;
+
+// ── Stage 12 — Screen composition ───────────────────────────────────────────
+//
+// ScreenBlueprint IS the v2 screen-composition JSON: sections reference the
+// retrieved pattern library and the planned component system — nothing else.
+
+export const screenCompositionSchema = screenBlueprintSchema;
+export type ScreenComposition = ScreenBlueprint;
+
+export const screenCompositionSetSchema = z.object({
+  screens: z.array(screenBlueprintSchema).min(1).max(6),
+});
+export type ScreenCompositionSet = z.infer<typeof screenCompositionSetSchema>;
+
+export const componentSystemPlanSchema = z.object({
+  components: z.array(componentContractSchema).min(1).max(24),
+  hooks: z.array(z.object({ name: nonEmpty, purpose: nonEmpty })).max(4).optional().nullable(),
+  lib: z.array(z.object({ name: nonEmpty, purpose: nonEmpty })).max(4).optional().nullable(),
+});
+export type ComponentSystemPlan = z.infer<typeof componentSystemPlanSchema>;
 
 // ── Intake (ambiguity engine) ───────────────────────────────────────────────
 
@@ -431,5 +632,138 @@ export const GATE_SCHEMA_DESC = `{
       "issue": "What is wrong, precisely",
       "fix": "The smallest concrete change that resolves it"
     }
+  ]
+}`;
+
+// ── v2 (17-stage) prompt-injected schema descriptions ───────────────────────
+
+export const CREATIVE_BRIEF_SCHEMA_DESC = `{
+  "productSummary": "2-4 sentences: what the product is, who it serves, and why it exists.",
+  "audience": { "primary": "The single core audience", "secondary": ["Adjacent audiences"] },
+  "userGoals": ["What a user must be able to accomplish"],
+  "businessGoals": ["What the business needs this product to achieve"],
+  "functionalRequirements": ["Concrete capability the product must have"],
+  "successCriteria": ["Observable outcome that defines success"],
+  "constraints": ["Hard constraint from the request"]
+}`;
+
+export const BRAND_STRATEGY_SCHEMA_DESC = `{
+  "personality": ["Professional", "Calm", "Premium"],
+  "designDirection": "One paragraph: the creative direction every future stage must follow.",
+  "emotionalTone": ["Focused", "Trustworthy"],
+  "visualKeywords": ["precision", "whitespace", "restraint"],
+  "positioning": "Where this product sits in its market, in one or two sentences."
+}`;
+
+export const BRAND_KIT_ADDITIONS_DESC = `
+BRAND KIT EXTENSIONS (include these keys in the same JSON object):
+- "semanticColors": { "success": {hex, usage}, "warning": {hex, usage}, "error": {hex, usage} } — statuses must harmonize with the palette and pass 4.5:1 against background/surface.
+- "neutralScale": { "50": "#FAFAF8", ..., "900": "#1D1B18" } — 5-9 step neutral ramp derived from your color decisions.
+- "logoDirection": { "style", "geometry", "iconApproach", "wordmarkStyle" } — direction only (no assets are produced).
+- "icons": { "library": "inline SVG (stroke)", "strokeWeight": "1.5", "cornerStyle": "round" }.
+- "borders": { "widthPx": 1, "color": "border", "opacityPct": 100 }.
+- "spacingScale": [4, 8, 12, 16, 24, 32, 48, 64] — the ONLY spacing values layouts may use.`;
+
+export const IA_SCHEMA_DESC = `{
+  "navigation": {
+    "type": "sidebar | topbar | hybrid | tabs",
+    "items": [{ "label": "Dashboard", "screen": "Dashboard", "children": [{ "label": "Sub-page", "screen": "SubPage" }] }]
+  },
+  "groups": [{ "name": "Workspace", "screens": ["Dashboard", "Projects"] }],
+  "entryScreen": "Dashboard",
+  "contentPriority": [{ "screen": "Dashboard", "priority": ["Primary metric first", "Secondary list second"] }]
+}`;
+
+export const USER_FLOWS_SCHEMA_DESC = `{
+  "flows": [
+    {
+      "name": "First-run setup",
+      "description": "What this journey accomplishes",
+      "steps": [{ "screen": "Home", "action": "Arrives and scans the offer" }, { "screen": "Signup", "action": "Creates an account" }]
+    }
+  ]
+}`;
+
+export const SCREEN_PLAN_SCHEMA_DESC = `{
+  "screens": [
+    {
+      "id": "dashboard",
+      "name": "Dashboard",
+      "goal": "The single outcome this screen exists for",
+      "user": "Who is on this screen and in what situation",
+      "primaryAction": "The one action the screen is optimized around",
+      "secondaryActions": ["Supporting actions"],
+      "requiredComponents": ["Navbar", "DataTable"],
+      "requiredContent": ["Account balance", "Recent transactions"]
+    }
+  ]
+}`;
+
+export const LAYOUT_PLAN_SCHEMA_DESC = `{
+  "grid": { "columns": 12, "gapPx": 32, "marginPx": 32, "containerWidthPx": 1280 },
+  "chrome": { "navigation": "sidebar | topbar | hybrid | tabs", "sidebarWidthPx": 240, "topbarHeightPx": 56 },
+  "sectionGapPx": 72,
+  "verticalSectionPaddingPx": 72,
+  "breakpoints": { "mobile": 375, "tablet": 768, "desktop": 1440 },
+  "scrollBehavior": "Single page scroll; sidebar fixed",
+  "screens": [
+    { "screen": "Dashboard", "structure": "Fixed sidebar (240px) + top-aligned content column; stat row full width, then two-column 8/4 split", "notes": "Primary action stays above the fold" }
+  ]
+}`;
+
+export const INTERACTION_PLAN_SCHEMA_DESC = `{
+  "keyboardShortcuts": [{ "keys": "cmd+k", "action": "Open command palette" }],
+  "focusManagement": ["Focus rings always visible on interactive elements", "Tab order follows visual hierarchy"],
+  "screens": [
+    {
+      "screen": "Dashboard",
+      "loading": "Skeleton rows matching the final layout",
+      "empty": "Empty state explaining what appears here and how to create it",
+      "error": "Inline error panel with a retry action",
+      "transitions": ["Hover lifts cards subtly", "Menu opens with 150ms ease"]
+    }
+  ]
+}`;
+
+export const COMPONENT_SYSTEM_SCHEMA_DESC = `{
+  "components": [
+    {
+      "name": "DataTable",
+      "kind": "shared | layout | screen",
+      "ownerScreen": "Dashboard (only when kind is screen)",
+      "purpose": "What it does in one sentence",
+      "props": [{ "name": "children", "type": "ReactNode", "default": "undefined", "description": "Slot content" }],
+      "variants": [{ "name": "default", "description": "Standard presentation" }],
+      "states": ["hover", "active", "focus", "disabled"],
+      "tokens": ["color.accent", "size.body", "radius.md"],
+      "usedBy": ["Dashboard", "Settings"]
+    }
+  ],
+  "hooks": [{ "name": "useDisclosure", "purpose": "Optional local-state helper" }],
+  "lib": [{ "name": "formatters", "purpose": "Optional formatting helpers" }]
+}`;
+
+export const COMPOSE_SCHEMA_DESC = `{
+  "screens": [
+    {
+      "name": "Dashboard",
+      "layout": "AppShell (optional — a kind=layout component)",
+      "sections": [
+        {
+          "name": "Overview",
+          "pattern": "Stat Block (choose ONLY from the retrieved pattern set)",
+          "components": ["Navbar", "StatStrip"],
+          "copy": ["Final verbatim copy strings for this section"],
+          "notes": "Composition direction for the implementer"
+        }
+      ],
+      "responsive": { "tablet": "768px behavior", "mobile": "375px behavior" }
+    }
+  ]
+}`;
+
+export const PATTERN_RANK_SCHEMA_DESC = `{
+  "assignments": [
+    { "screen": "Dashboard", "patterns": ["Stat Block", "Master-Detail List"] }
   ]
 }`;

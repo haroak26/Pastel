@@ -29,7 +29,7 @@ export function SectionHeader({
         </div>
       )}
       <h2
-        className="text-[22px] sm:text-[26px] md:text-[30px] text-foreground font-semibold leading-[1.1] tracking-[-0.02em]"
+        className="text-[24px] sm:text-[28px] md:text-[34px] text-foreground font-semibold leading-[1.12] tracking-[-0.025em]"
       >
         {title}
       </h2>
@@ -99,6 +99,20 @@ export function FeatureCard({
       </div>
     </div>
   );
+}
+
+/*
+ * Soft marketing card — borderless muted surface with a generous radius.
+ * This is the approved marketing exception to the flat/hairline rule.
+ */
+export function SoftCard({
+  className,
+  children,
+}: {
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return <div className={cn("soft-card", className)}>{children}</div>;
 }
 
 export function MarketingHeroSection({

@@ -1,5 +1,5 @@
 // ── Per-token model pricing from OpenRouter ──────────────────────────────
-// 1 credit = $0.20 USD. Credits are rounded to 2 decimal places.
+// 1 credit = $0.01 USD of AI API usage. Credits are rounded to 2 decimal places.
 // Token count is approximated from character count (~4 chars/token).
 
 export interface ModelPricing {
@@ -25,7 +25,7 @@ export const MODEL_PRICING: Record<string, ModelPricing> = {
 
 export const DEFAULT_PRICING: ModelPricing = { inputCostPerToken: 0.00000050, outputCostPerToken: 0.00000150, charsPerToken: 4 };
 
-export const CREDIT_PER_DOLLAR = 5;
+export const CREDIT_PER_DOLLAR = 100;
 
 export function getModelPricing(modelId: string): ModelPricing {
   return MODEL_PRICING[modelId] ?? DEFAULT_PRICING;

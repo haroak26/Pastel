@@ -10,11 +10,11 @@ import {
   type ComponentContract,
 } from "../schemas/plan-schemas";
 import {
-  architectureToMarkdown,
   componentContractsToMarkdown,
   screenBlueprintToMarkdown,
 } from "../codegen/markdown";
 import { normalizeComponentRef, screenDocPath, validateArchitecture } from "../codegen/derive";
+import { fallbackScreenPlanEntry } from "./screen-plan";
 import { saveProjectState } from "../state";
 import type { StageContext } from "./context";
 
@@ -185,6 +185,29 @@ export async function deltaPlanStage(ctx: StageContext, additionPrompt: string):
     screens: [...architecture.screens, ...newBlueprints],
   };
 
+  // Keep the v2 planning artifacts consistent: the screen plan gains entries
+  // for the new screens (derived), and the interaction plan gains defaults.
+  if (ctx.state.screenPlan) {
+    ctx.state.screenPlan = {
+      screens: [...ctx.state.screenPlan.screens, ...newScreens.map((s) => fallbackScreenPlanEntry(s, ctx.state.productSpec!.audience.primary))],
+    };
+  }
+  if (ctx.state.interactionPlan) {
+    ctx.state.interactionPlan = {
+      ...ctx.state.interactionPlan,
+      screens: [
+        ...ctx.state.interactionPlan.screens,
+        ...newScreens.map((s) => ({
+          screen: s.name,
+          loading: "Skeleton placeholders mirroring the final layout",
+          empty: "Empty state explaining what appears here, with the primary action to create it",
+          error: "Inline error surface with a retry action",
+          transitions: ["Hover and focus states ease in per the motion tokens"],
+        })),
+      ],
+    };
+  }
+
   const structural = validateArchitecture(ctx.state.architecture, ctx.state.productSpec);
   if (structural.length > 0) {
     throw new Error(`delta merge produced an inconsistent architecture: ${structural.map((i) => i.message).join("; ")}`);
@@ -193,8 +216,7 @@ export async function deltaPlanStage(ctx: StageContext, additionPrompt: string):
   ctx.state.decisionLog = [...ctx.state.decisionLog, `Delta: added screens ${newScreens.map((s) => s.name).join(", ")} — ${delta.summary}`];
   await saveProjectState(ctx.state);
 
-  await ctx.saveDoc({ path: "docs/02-architecture.md", title: "Architecture Plan", kind: "system", content: architectureToMarkdown(ctx.state.architecture) });
-  await ctx.saveDoc({ path: "docs/02-components.md", title: "Component Specifications", kind: "component-spec", content: componentContractsToMarkdown(ctx.state.architecture.components) });
+  await ctx.saveDoc({ path: "docs/07-components.md", title: "Component Specifications", kind: "component-spec", content: componentContractsToMarkdown(ctx.state.architecture.components) });
   for (const blueprint of newBlueprints) {
     await ctx.saveDoc({
       path: screenDocPath(blueprint.name),

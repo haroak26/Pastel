@@ -1,25 +1,58 @@
 import { MergeGateway, type TagInput, type ThinkingConfig } from "merge-gateway-sdk";
 
 /**
- * Multi-model gateway for the Pastel Agent v2 pipeline.
+ * Multi-model gateway for the Pastel Agent 2 (17-stage) pipeline.
  *
- * Routing is by capability, not by pipeline phase:
- *   - Reasoner roles (Terra): intake, spec, designSystem, architecture,
- *     designGate, visualQA — planning, architecture, verification, reasoning.
+ * Routing is by capability, not by pipeline stage:
+ *   - Reasoner roles (Terra): intake, creativeBrief, spec, brandStrategy,
+ *     designSystem, screenPlan, layout, componentSystem, compose, architecture,
+ *     designGate, visualQA — planning, strategy, composition, verification.
+ *   - Light roles (PASTEL_MODEL_LIGHT, defaults to ministral-14b-2512 — fast,
+ *     cheap, and proven reliable on this gateway for structured JSON): ia,
+ *     flows, interactions, patternRank. (gpt-oss-20b returns empty responses
+ *     via this gateway — do not route roles to it.)
  *   - Implementer roles (Luna): component, screen, patch — deterministic
  *     React generation, component creation, targeted repair.
  *
  * Override any via env: PASTEL_MODEL_INTAKE, PASTEL_MODEL_COMPONENT, …
  */
 export const MODELS = {
+  // Stage 1 — clarification / intake
   intake: process.env.PASTEL_MODEL_INTAKE || "openai/gpt-5.6-terra",
+  // Stage 2 — creative brief
+  creativeBrief: process.env.PASTEL_MODEL_CREATIVE_BRIEF || "openai/gpt-5.6-terra",
+  // Stage 3 — product specification
   spec: process.env.PASTEL_MODEL_SPEC || "openai/gpt-5.6-terra",
+  // Stage 4 — brand strategy
+  brandStrategy: process.env.PASTEL_MODEL_BRAND_STRATEGY || "openai/gpt-5.6-terra",
+  // Stage 5 — brand kit (design system) generation
   designSystem: process.env.PASTEL_MODEL_DESIGN_SYSTEM || "openai/gpt-5.6-terra",
+  // Stage 6 — information architecture (light)
+  ia: process.env.PASTEL_MODEL_IA || process.env.PASTEL_MODEL_LIGHT || "mistralai/ministral-14b-2512",
+  // Stage 7 — user flow planning (light)
+  flows: process.env.PASTEL_MODEL_FLOWS || process.env.PASTEL_MODEL_LIGHT || "mistralai/ministral-14b-2512",
+  // Stage 8 — screen planning
+  screenPlan: process.env.PASTEL_MODEL_SCREEN_PLAN || "openai/gpt-5.6-terra",
+  // Stage 9 — layout planning
+  layout: process.env.PASTEL_MODEL_LAYOUT || "openai/gpt-5.6-terra",
+  // Stage 10 — component system planning
+  componentSystem: process.env.PASTEL_MODEL_COMPONENT_SYSTEM || "openai/gpt-5.6-terra",
+  // Stage 11 — pattern retrieval reranker (light)
+  patternRank: process.env.PASTEL_MODEL_PATTERN_RANK || process.env.PASTEL_MODEL_LIGHT || "mistralai/ministral-14b-2512",
+  // Stage 12 — screen composition
+  compose: process.env.PASTEL_MODEL_COMPOSE || "openai/gpt-5.6-terra",
+  // Stage 13 — interaction planning (light)
+  interactions: process.env.PASTEL_MODEL_INTERACTIONS || process.env.PASTEL_MODEL_LIGHT || "mistralai/ministral-14b-2512",
+  // Delta planning (screen additions onto established projects)
   architecture: process.env.PASTEL_MODEL_ARCHITECTURE || "openai/gpt-5.6-terra",
+  // Review phase — composition design gate
   designGate: process.env.PASTEL_MODEL_DESIGN_GATE || "openai/gpt-5.6-terra",
+  // Stage 16 — visual design review (multimodal)
   visualQA: process.env.PASTEL_MODEL_VISUAL_QA || "openai/gpt-5.6-terra",
+  // Stage 14 — code generation (implementer)
   component: process.env.PASTEL_MODEL_COMPONENT || "openai/gpt-5.6-luna",
   screen: process.env.PASTEL_MODEL_SCREEN || "openai/gpt-5.6-luna",
+  // Stages 15/17 — surgical repair (implementer)
   patch: process.env.PASTEL_MODEL_PATCH || "openai/gpt-5.6-luna",
 } as const;
 
@@ -29,8 +62,18 @@ export const PASTEL_GATEWAY_TAG_KEY = "betatesterid";
 
 const TAG_ENV_BY_ROLE: Record<ModelRole, string> = {
   intake: "PASTEL_MERGE_GATEWAY_TAG_INTAKE",
+  creativeBrief: "PASTEL_MERGE_GATEWAY_TAG_CREATIVE_BRIEF",
   spec: "PASTEL_MERGE_GATEWAY_TAG_SPEC",
+  brandStrategy: "PASTEL_MERGE_GATEWAY_TAG_BRAND_STRATEGY",
   designSystem: "PASTEL_MERGE_GATEWAY_TAG_DESIGN_SYSTEM",
+  ia: "PASTEL_MERGE_GATEWAY_TAG_IA",
+  flows: "PASTEL_MERGE_GATEWAY_TAG_FLOWS",
+  screenPlan: "PASTEL_MERGE_GATEWAY_TAG_SCREEN_PLAN",
+  layout: "PASTEL_MERGE_GATEWAY_TAG_LAYOUT",
+  componentSystem: "PASTEL_MERGE_GATEWAY_TAG_COMPONENT_SYSTEM",
+  patternRank: "PASTEL_MERGE_GATEWAY_TAG_PATTERN_RANK",
+  compose: "PASTEL_MERGE_GATEWAY_TAG_COMPOSE",
+  interactions: "PASTEL_MERGE_GATEWAY_TAG_INTERACTIONS",
   architecture: "PASTEL_MERGE_GATEWAY_TAG_ARCHITECTURE",
   designGate: "PASTEL_MERGE_GATEWAY_TAG_DESIGN_GATE",
   visualQA: "PASTEL_MERGE_GATEWAY_TAG_VISUAL_QA",
@@ -44,8 +87,18 @@ const TAG_ENV_BY_ROLE: Record<ModelRole, string> = {
 // If an org's tag config drifts, chat() retries once without tags.
 const DEFAULT_TAG_VALUE_BY_ROLE: Record<ModelRole, string> = {
   intake: "clarify",
+  creativeBrief: "brief",
   spec: "brief",
+  brandStrategy: "plan",
   designSystem: "plan",
+  ia: "plan",
+  flows: "plan",
+  screenPlan: "plan",
+  layout: "plan",
+  componentSystem: "componentPlan",
+  patternRank: "planFallback",
+  compose: "componentPlan",
+  interactions: "plan",
   architecture: "componentPlan",
   designGate: "planFallback",
   visualQA: "planFallback",
@@ -63,10 +116,22 @@ export function getPastelGatewayTags(
   return [{ key, value }];
 }
 
+// Budgets are right-sized to measured emission — oversized budgets cost
+// latency on every call (models fill headroom with reasoning).
 export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
   intake: Number(process.env.PASTEL_MAX_TOKENS_INTAKE) || 2500,
+  creativeBrief: Number(process.env.PASTEL_MAX_TOKENS_CREATIVE_BRIEF) || 2500,
   spec: Number(process.env.PASTEL_MAX_TOKENS_SPEC) || 6000,
-  designSystem: Number(process.env.PASTEL_MAX_TOKENS_DESIGN_SYSTEM) || 8000,
+  brandStrategy: Number(process.env.PASTEL_MAX_TOKENS_BRAND_STRATEGY) || 1600,
+  designSystem: Number(process.env.PASTEL_MAX_TOKENS_DESIGN_SYSTEM) || 9000,
+  ia: Number(process.env.PASTEL_MAX_TOKENS_IA) || 2000,
+  flows: Number(process.env.PASTEL_MAX_TOKENS_FLOWS) || 1600,
+  screenPlan: Number(process.env.PASTEL_MAX_TOKENS_SCREEN_PLAN) || 3500,
+  layout: Number(process.env.PASTEL_MAX_TOKENS_LAYOUT) || 2500,
+  componentSystem: Number(process.env.PASTEL_MAX_TOKENS_COMPONENT_SYSTEM) || 8000,
+  patternRank: Number(process.env.PASTEL_MAX_TOKENS_PATTERN_RANK) || 900,
+  compose: Number(process.env.PASTEL_MAX_TOKENS_COMPOSE) || 10000,
+  interactions: Number(process.env.PASTEL_MAX_TOKENS_INTERACTIONS) || 2000,
   architecture: Number(process.env.PASTEL_MAX_TOKENS_ARCHITECTURE) || 10000,
   designGate: Number(process.env.PASTEL_MAX_TOKENS_DESIGN_GATE) || 4000,
   visualQA: Number(process.env.PASTEL_MAX_TOKENS_VISUAL_QA) || 6000,
@@ -96,13 +161,18 @@ export function isTruncated(response: ChatResponse): boolean {
 }
 
 /** Thinking budget for reasoning models. PASTEL_THINKING_BUDGET=off disables reasoning. */
-function thinkingConfig(): ThinkingConfig | Record<string, unknown> {
+function thinkingConfig(role?: ModelRole): ThinkingConfig | Record<string, unknown> | undefined {
   const raw = process.env.PASTEL_THINKING_BUDGET;
   if (raw === "off") return { type: "disabled" };
+  // Light roles run small structured transforms on a mini model — reasoning
+  // config is skipped from the start (saves a whole retry round-trip).
+  if (role && LIGHT_ROLES.has(role) && raw === undefined) return undefined;
   const budget = Number(raw);
   if (Number.isFinite(budget) && budget > 0) return { type: "enabled", budget_tokens: Math.floor(budget) };
   return { type: "enabled", budget_tokens: DEFAULT_THINKING_BUDGET };
 }
+
+export const LIGHT_ROLES: ReadonlySet<ModelRole> = new Set<ModelRole>(["ia", "flows", "patternRank", "interactions"]);
 
 let cachedClient: MergeGateway | null = null;
 
@@ -172,7 +242,7 @@ export async function chat(
         tags: skipTags ? undefined : getPastelGatewayTags(opts.model),
         temperature: opts.temperature ?? 0.5,
         max_tokens: budget,
-        thinking: withThinking ? thinkingConfig() : undefined,
+        thinking: withThinking ? thinkingConfig(opts.model) : undefined,
         response_format:
           opts.responseFormat === "json_object"
             ? { type: "json_object" }

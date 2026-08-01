@@ -1,10 +1,11 @@
-import React, { useEffect, useState } from 'react';
+import React, { Suspense, useEffect, useState } from 'react';
 import { Link, useLocation } from 'wouter';
 import { Loading01Icon, SmartPhone01Icon } from 'hugeicons-react';
 import { SidebarContent } from '@/components/Sidebar';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useSpace } from '@/contexts/space-context';
 import { useWorkspace } from '@/contexts/workspace-context';
-import { useUser } from '@/hooks/use-user';
+import { useUser, useCredits } from '@/hooks/use-user';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Button } from '@/components/button';
 import { OtpInput } from '@/components/otp-input';
@@ -22,6 +23,26 @@ function initials(name: string | null | undefined, email: string | null | undefi
 
 const SIDEBAR_W = 216;
 
+/** Skeleton shown inside the app shell while a lazy page chunk loads. */
+function MainContentSkeleton() {
+  return (
+    <div className="flex-1 px-4 sm:px-6 md:px-8 py-6 overflow-hidden" aria-busy="true" aria-label="Loading">
+      <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex items-center justify-between">
+          <Skeleton className="h-5 w-40" />
+          <Skeleton className="h-8 w-28 rounded-[10px]" />
+        </div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
+          <Skeleton className="h-[130px] w-full rounded-[12px]" />
+          <Skeleton className="h-[130px] w-full rounded-[12px]" />
+          <Skeleton className="h-[130px] w-full rounded-[12px] hidden lg:block" />
+        </div>
+        <Skeleton className="h-[180px] w-full rounded-[12px]" />
+      </div>
+    </div>
+  );
+}
+
 export function AppLayout({
   children,
   subNav,
@@ -31,6 +52,7 @@ export function AppLayout({
 }) {
   const [locationPath] = useLocation();
   const { data: user } = useUser();
+  const { data: credits } = useCredits();
   const isAccountPage = locationPath.startsWith('/account');
   const showHeader = !isAccountPage;
   const { switchingSpace, switchingPhase, switchingSpaceName, requireTotp, totpError, verifyTotpForSpace, cancelTotp, activeSpace } = useSpace();
@@ -74,7 +96,13 @@ export function AppLayout({
                   )}
                 </div>
                 <div className="flex items-center gap-3">
-                  <Link href="/account/credits" className="text-[14px] font-medium text-fg-muted hover:text-foreground transition-colors no-underline">250 Credits Remaining</Link>
+                  {credits ? (
+                    <Link href="/account/credits" className="text-[14px] font-medium text-fg-muted hover:text-foreground transition-colors no-underline tabular-nums">
+                      {credits.balance % 1 === 0 ? credits.balance : credits.balance.toFixed(2)} Credits Remaining
+                    </Link>
+                  ) : (
+                    <Skeleton className="h-4 w-28" />
+                  )}
                   <div className="w-px h-4 bg-border/60" />
                   <Link href="/account/profile">
                     {user?.avatarUrl ? (
@@ -96,7 +124,9 @@ export function AppLayout({
               </div>
             )}
             <main className="flex-1 min-w-0 md:overflow-hidden flex flex-col page-enter">
-              {children}
+              <Suspense fallback={<MainContentSkeleton />}>
+                {children}
+              </Suspense>
             </main>
           </div>
         </div>

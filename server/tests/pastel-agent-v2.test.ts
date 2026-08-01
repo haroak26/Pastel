@@ -70,7 +70,7 @@ test("architecture validation catches unresolved references", () => {
 
 test("styles.css is generated deterministically from tokens (no model call)", async () => {
   process.env.DATABASE_URL ??= "postgres://runner:runner@localhost:5432/pastel_test";
-  const { fallbackDesignSystem } = await import("../lib/pastel-agent/stages/design-system");
+  const { fallbackDesignSystem } = await import("../lib/pastel-agent/stages/brand-kit");
   const css = designTokensToCss(fallbackDesignSystem());
   assert.match(css, /--color-text-muted: #625E56;/);
   assert.match(css, /--font-display: "Space Grotesk", sans-serif;/);
@@ -141,7 +141,7 @@ test("the project contract requires screens to import planned shared components"
 
 test("the ambiguity engine asks only material, below-threshold, non-cosmetic questions", async () => {
   process.env.DATABASE_URL ??= "postgres://runner:runner@localhost:5432/pastel_test";
-  const { selectClarifyQuestions } = await import("../lib/pastel-agent/stages/intake");
+  const { selectClarifyQuestions } = await import("../lib/pastel-agent/stages/clarify");
   const mk = (overrides: Record<string, unknown>) => ({
     titleSuggestion: "Test Product",
     productType: "saas",
@@ -202,7 +202,7 @@ test("the ambiguity engine asks only material, below-threshold, non-cosmetic que
 
 test("design-system validation enforces spacing caps, forbidden colors, fonts, and real contrast", async () => {
   process.env.DATABASE_URL ??= "postgres://runner:runner@localhost:5432/pastel_test";
-  const { fallbackDesignSystem, normalizeDesignSystem, validateDesignSystemQuality } = await import("../lib/pastel-agent/stages/design-system");
+  const { fallbackDesignSystem, normalizeDesignSystem, validateDesignSystemQuality } = await import("../lib/pastel-agent/stages/brand-kit");
   const ds = normalizeDesignSystem(fallbackDesignSystem());
   assert.deepEqual(ds.breakpoints, { mobile: 375, tablet: 768, desktop: 1440 });
   assert.equal(failingContrastPairs(ds).length, 0, "fallback tokens must pass WCAG AA");
@@ -227,7 +227,7 @@ test("design-system validation enforces spacing caps, forbidden colors, fonts, a
 test("intake briefs are cached by normalized prompt hash", async () => {
   process.env.DATABASE_URL ??= "postgres://runner:runner@localhost:5432/pastel_test";
   const { getCachedIntake, setCachedIntake, clearIntakeCache } = await import("../lib/pastel-agent/state");
-  const { fallbackIntake } = await import("../lib/pastel-agent/stages/intake");
+  const { fallbackIntake } = await import("../lib/pastel-agent/stages/clarify");
   clearIntakeCache();
   const intake = fallbackIntake("A dashboard for a bakery chain");
   assert.equal(getCachedIntake("A dashboard for a bakery chain"), null);

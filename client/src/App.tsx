@@ -10,10 +10,11 @@ import { ProtectedRoute } from "@/components/ProtectedRoute";
 import { SpaceProvider } from "@/contexts/space-context";
 import { WorkspaceProvider } from "@/contexts/workspace-context";
 import { ThemeController } from "@/hooks/use-theme-controller";
-import { Component, type ReactNode } from "react";
+import { Component, Suspense, lazy, type ReactNode } from "react";
 import { useNetworkStatus } from "@/hooks/useNetworkStatus";
 import { Analytics as VercelAnalytics } from "@vercel/analytics/react";
 import { SpeedInsights } from "@vercel/speed-insights/react";
+import { AppShellSkeleton } from "@/components/AppShellSkeleton";
 
 /* ── Eager (critical path, small) ── */
 import LoginPage from "@/pages/Login";
@@ -32,23 +33,22 @@ import VerifyEmailPage from "@/pages/VerifyEmail";
 import ForgotPasswordPage from "@/pages/ForgotPassword";
 import ResetPasswordPage from "@/pages/ResetPassword";
 import LoadingVerificationPage from "@/pages/LoadingVerification";
-import Onboarding from "@/pages/Onboarding";
-import CompleteGithubSignup from "@/pages/CompleteGithubSignup";
-import HomePage from "@/pages/HomePage";
-import CanvasPage from "@/pages/CanvasPage";
-import ProjectsPage from "@/pages/ProjectsPage";
-import ComponentsPage from "@/pages/ComponentsPage";
-import AssetsPage from "@/pages/AssetsPage";
-import AdminLogin from "@/pages/AdminLogin";
-import AdminPage from "@/pages/Admin";
-import Account from "@/pages/Account";
-import Settings from "@/pages/Settings";
 
-import CreateSpace from "@/pages/CreateSpace";
-
-import WorkspacePage from "@/pages/WorkspacePage";
-import TeamPage from "@/pages/TeamPage";
-import InviteAccept from "@/pages/InviteAccept";
+/* ── Lazy (code-split, loaded on demand + prefetched after sign-in) ── */
+const Onboarding = lazy(() => import("@/pages/Onboarding"));
+const CompleteGithubSignup = lazy(() => import("@/pages/CompleteGithubSignup"));
+const HomePage = lazy(() => import("@/pages/HomePage"));
+const CanvasPage = lazy(() => import("@/pages/CanvasPage"));
+const ProjectsPage = lazy(() => import("@/pages/ProjectsPage"));
+const ComponentsPage = lazy(() => import("@/pages/ComponentsPage"));
+const AssetsPage = lazy(() => import("@/pages/AssetsPage"));
+const AdminLogin = lazy(() => import("@/pages/AdminLogin"));
+const AdminPage = lazy(() => import("@/pages/Admin"));
+const Account = lazy(() => import("@/pages/Account"));
+const CreateSpace = lazy(() => import("@/pages/CreateSpace"));
+const WorkspacePage = lazy(() => import("@/pages/WorkspacePage"));
+const TeamPage = lazy(() => import("@/pages/TeamPage"));
+const InviteAccept = lazy(() => import("@/pages/InviteAccept"));
 
 class ErrorBoundary extends Component<{ children: ReactNode }, { hasError: boolean }> {
   state = { hasError: false };
@@ -82,6 +82,10 @@ function Router() {
   return (
     <>
       <ThemeController />
+      {/* Lazy page chunks: app-shell pages are caught by the Suspense
+          inside AppLayout; full-screen pages (canvas, admin) fall back
+          to the shell skeleton here. Chunks are warm-prefetched post-login. */}
+      <Suspense fallback={<AppShellSkeleton />}>
       <Switch>
       {/* Public */}
       <Route path="/" component={Landing} />
@@ -126,6 +130,7 @@ function Router() {
 
       <Route component={NotFound} />
     </Switch>
+    </Suspense>
     </>
   );
 }

@@ -6,7 +6,7 @@ import type { User, PlanTier } from "@shared/schema";
 import { requireAuth } from "./helpers";
 import { storage } from "../storage";
 import * as creditService from "../lib/credit-service";
-import { calcCost } from "../lib/pricing";
+import { calcCost, CREDIT_PER_DOLLAR } from "../lib/pricing";
 import { MODELS, MAX_TOKENS_PER_CALL } from "../lib/pastel-agent/gateway";
 import { intakeSystemPrompt } from "../lib/pastel-agent/prompts/intake";
 
@@ -363,35 +363,48 @@ async function getPlanTier(userId: string): Promise<PlanTier> {
 }
 
 /**
- * v2 cost model — matches the actual stage call graph:
- * reasoner (Terra): intake + spec + designSystem + architecture + designGate + visualQA;
- * implementer (Luna): components + screens + bounded repairs.
- * styles.css, sitemap derivation, lint, and anti-slop checks are deterministic (free).
+ * 17-stage cost model — matches the actual stage call graph:
+ *   reasoner: clarify(1) creativeBrief(2) spec(3) brandStrategy(4) brandKit(5)
+ *             screenPlan(8) layout(9) componentSystem(10) compose(12)
+ *             designGate(review) visualQA(16)
+ *   light:    ia(6) flows(7) patternRank(11) interactions(13)
+ *   implementer: components + screens + bounded repairs (14/15/17)
+ *   embeddings: pattern retrieval query (11) — sub-cent, folded into margin.
+ *   styles.css, derivation, lint, and anti-slop checks are deterministic (free).
  */
 function estimateRunCredits(prompt: string, opts?: { screens?: number }): number {
   const S = Math.max(1, Math.min(6, opts?.screens ?? 4));
-  const C = 6;
+  const C = 8; // components (hard-capped at 12, ~8 typical)
   const avgCharsPerToken = 4;
   const sum = (costs: Array<{ costDollars: number }>) => costs.reduce((s, c) => s + c.costDollars, 0);
 
   const reasonerCosts = [
-    calcCost(MODELS.intake, prompt.length + 3500, 2500),                                  // intake (0 when cached from /clarify)
-    calcCost(MODELS.spec, prompt.length + 6000, 6000),                                    // product spec
-    calcCost(MODELS.designSystem, 14000, 8000),                                           // design system
-    calcCost(MODELS.architecture, 16000, 12000),                                          // architecture + contracts + blueprints
-    calcCost(MODELS.designGate, 16000, 3000),                                             // design gate
+    calcCost(MODELS.intake, prompt.length + 3500, 2500),                                  // 1 clarification (0 when cached)
+    calcCost(MODELS.creativeBrief, prompt.length + 4000, 2000),                           // 2 creative brief
+    calcCost(MODELS.spec, prompt.length + 8000, 6000),                                    // 3 product spec
+    calcCost(MODELS.brandStrategy, 7000, 1200),                                           // 4 brand strategy
+    calcCost(MODELS.designSystem, 16000, 8000),                                           // 5 brand kit
+    calcCost(MODELS.ia, 6000, 1500),                                                      // 6 information architecture (light)
+    calcCost(MODELS.flows, 5000, 1200),                                                   // 7 user flows (light)
+    calcCost(MODELS.screenPlan, 8000, 3000),                                              // 8 screen planning
+    calcCost(MODELS.layout, 7000, 1800),                                                  // 9 layout planning
+    calcCost(MODELS.componentSystem, 12000, 6000),                                        // 10 component system (≤12 contracts)
+    calcCost(MODELS.patternRank, 6000, 600),                                              // 11 pattern rerank (light)
+    calcCost(MODELS.compose, 14000, 9000),                                                // 12 screen composition
+    calcCost(MODELS.interactions, 7000, 1600),                                            // 13 interaction planning (light)
+    calcCost(MODELS.designGate, 16000, 3000),                                             // review gate
     calcCost(MODELS.designGate, 6000, 4000),                                              // expected targeted gate repair
-    calcCost(MODELS.visualQA, 20000, 4000),                                               // visual QA
+    calcCost(MODELS.visualQA, 20000, 4000),                                               // 16 visual design review (budget-reserved)
   ];
 
   const implementerCosts = [
-    calcCost(MODELS.component, 5000 * C, 4500 * avgCharsPerToken * C),                    // components
-    calcCost(MODELS.screen, 8000 * S, 7500 * avgCharsPerToken * S),                       // screens
-    calcCost(MODELS.patch, 6000 * 3, 5000 * 3),                                           // bounded artifact repairs (expected case)
+    calcCost(MODELS.component, 5000 * C, 4500 * avgCharsPerToken * C),                    // 14 components
+    calcCost(MODELS.screen, 8000 * S, 7500 * avgCharsPerToken * S),                       // 14 screens
+    calcCost(MODELS.patch, 6000 * 4, 5000 * 4),                                           // 15/17 bounded artifact repairs
   ];
 
   const totalDollars = sum(reasonerCosts) + sum(implementerCosts) + 0.01;
-  return Math.max(5, Math.ceil(totalDollars * 5 * 100) / 100);
+  return Math.max(5, Math.ceil(totalDollars * CREDIT_PER_DOLLAR * 100) / 100);
 }
 
 function intakeSystemPromptLength(): number {

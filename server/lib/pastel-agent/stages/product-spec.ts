@@ -1,17 +1,18 @@
 import { chatJSON, MODELS, MAX_TOKENS_PER_CALL } from "../gateway";
-import { specSystemPrompt, specUserPrompt } from "../prompts/spec";
+import { specSystemPrompt, specUserPrompt } from "../prompts/product-spec";
 import { productSpecSchema, type ProductSpec, type IntakeBrief } from "../schemas/plan-schemas";
 import { briefToMarkdown } from "../codegen/markdown";
 import { updateRun } from "../run-store";
 import { storage } from "../../../storage";
 import { saveProjectState } from "../state";
-import { fallbackIntake } from "./intake";
+import { fallbackIntake } from "./clarify";
 import type { StageContext } from "./context";
 
 /**
- * Product specification — goals, audience, IA, flows, accessibility, and
- * success metrics, as ONE structured artifact. Replaces the old markdown
- * brief (which mixed prose and fenced machine blocks).
+ * Stage 3 — Product specification: features, pages, navigation, states,
+ * responsive and accessibility requirements as ONE structured artifact
+ * (screen detail is refined by the screen-planning stage; system states by
+ * the interaction-planning stage).
  */
 
 function specScreensFromPrompt(prompt: string): ProductSpec["screens"] {
@@ -66,7 +67,7 @@ export async function specStage(ctx: StageContext): Promise<ProductSpec> {
 
   let spec: ProductSpec;
   const sys = specSystemPrompt();
-  const user = specUserPrompt(ctx.prompt, JSON.stringify(intake), ctx.answers);
+  const user = specUserPrompt(ctx.prompt, JSON.stringify(intake), JSON.stringify(ctx.state.creativeBrief ?? {}), ctx.answers);
   try {
     spec = await chatJSON<ProductSpec>(
       [
@@ -96,8 +97,8 @@ export async function specStage(ctx: StageContext): Promise<ProductSpec> {
   }
 
   await ctx.saveDoc({
-    path: "docs/00-brief.md",
-    title: "Build Brief",
+    path: "docs/01-product-spec.md",
+    title: "Product Specification",
     kind: "brief",
     content: briefToMarkdown(spec, intake, ctx.answers),
   });

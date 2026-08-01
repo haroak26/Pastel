@@ -13,6 +13,7 @@ type Props = {
   isLoading?: boolean;
   placeholder?: string;
   systemError?: boolean;
+  initialValue?: string;
 };
 
 const MODELS = [
@@ -71,8 +72,8 @@ function MenuRow({ label, current, onClick }: { label: string; current: React.Re
   );
 }
 
-export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you like to design?', systemError }: Props) {
-  const [prompt, setPrompt] = useState('');
+export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you like to design?', systemError, initialValue }: Props) {
+  const [prompt, setPrompt] = useState(initialValue ?? '');
   const [model, setModel] = useState<string>(MODELS[0].value);
   const [mode, setMode] = useState<string>(MODES[0].value);
   const [variations, setVariations] = useState<string>(VARIATIONS[0]);

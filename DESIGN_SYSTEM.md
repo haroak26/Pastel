@@ -413,6 +413,18 @@ Generic form row with label left, content right. Use for custom form layouts.
 <FeatureGrid items={[{ icon: ..., title: ..., description: ... }]} />
 ```
 
+### Marketing-only exceptions (landing page)
+
+The landing page (`client/src/pages/Landing.tsx`) deliberately bends the core rules for a more expressive, banani-inspired marketing look. These patterns are **approved for marketing surfaces only — never in-app**:
+
+- **Oversized display type**: hero H1 runs 36–58px semibold (not the `lds-display` 52px/500 preset); section headers use `SectionHeader` at 24–34px.
+- **Pill CTAs**: primary marketing actions use `Button design="pill"` with bumped padding (`h-[44px] px-6`).
+- **Soft cards**: feature cards use `.soft-card` (`marketing.tsx > SoftCard`) — borderless `surface-muted` with a 20px radius. This is the *one* allowed exception to "hairlines, not cards".
+- **Shadow on floating elements only**: the hero prompt bar and floating mockup cards use a soft drop shadow (same rule as dropdowns/modals).
+- **`.hero-glow`**: subtle brand-blue radial glow anchored to the bottom of the hero/final-CTA sections.
+- **Decorative pastel dots**: small floating color dots (`.animate-float-slow`), desktop-only and `aria-hidden`.
+- **Scroll-reveal**: sections fade/slide in via framer-motion (`whileInView`, `once`), always gated by `useReducedMotion`.
+
 ---
 
 ## Settings Components
