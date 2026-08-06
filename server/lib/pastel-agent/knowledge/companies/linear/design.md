@@ -1,123 +1,59 @@
-# Linear UI — Design Replication Specification
+# Linear UI - Replication Specification
 
-> **Purpose:** This document is the build spec for reproducing the Linear visual
-> language — the app and marketing site for a developer-grade issue tracker.
-> It is written for an AI coding agent to consume directly: every value is
-> explicit, tokens are exact, and the signature moves are the ground truth for
-> what makes Linear feel like Linear.
+## Scope and reference
+`references/home.jpg` is Linear's dark product-development marketing page. It uses a black
+topbar, left-aligned white section titles, dark UI screenshots, thin dividers, alternating
+feature rows, small "Learn more" links, changelog/testimonial tiles and a minimal footer.
 
----
-
-## 1. Design Tokens
-
-Declare these once, globally, and reference everywhere. Never hardcode values
-inline.
-
-### 1.1 Color tokens
-
+## Tokens
 ```css
-:root {
-  --color-bg-app: #FFFFFF;            /* app + marketing background */
-  --color-bg-elevated: #FFFFFF;       /* popovers, sheets */
-  --color-bg-secondary: #F7F8F9;      /* hover, secondary surfaces */
-  --color-bg-overlay: rgba(0, 0, 0, 0.5);
-  --color-text-primary: #1A1C1E;      /* near-black ink */
-  --color-text-secondary: #6E7074;    /* muted meta */
-  --color-text-tertiary: #9A9CA0;     /* faint hints */
-  --color-text-inverse: #FFFFFF;
-  --color-primary: #5E6AD2;           /* Linear indigo — the ONLY accent */
-  --color-primary-hover: #525DC4;
-  --color-success: #46A758;
-  --color-warning: #FFB224;
-  --color-danger: #E5484D;
-  --color-border: #E7E8EA;            /* hairline dividers */
-  --color-border-strong: #D4D6D8;
-  --border-radius: 6px;               /* buttons, inputs, small panels */
-  --border-radius-lg: 10px;           /* sheets, dropdowns */
-}
+:root { --bg:#080b0d;--elevated:#111518;--ink:#f5f6f7;--muted:#8c9095;--faint:#555b61;
+  --indigo:#5e6ad2;--indigo-hover:#525dc4;--green:#46a758;--yellow:#ffb224;--red:#e5484d;
+  --line:#202529;--font:Inter,Arial,sans-serif;--mono:"JetBrains Mono",monospace;
+  --s1:4px;--s2:8px;--s3:12px;--s4:16px;--s6:24px;--s8:32px;--s12:48px;--s16:64px;
+  --r-sm:6px;--r-md:10px;--r-pill:999px;--shadow:none; }
 ```
+Type: hero `40px/1.05/600`, section `24px/1.1/500`, body `14px/1.45/400`, label
+`11px/1.2/500`, mono `12px/1.35/500`. Keep app-like density, even on marketing sections.
 
-Dark mode: background `#0E0F11`, elevated `#17181A`, text `#E9EAEC`,
-secondary text `#8C8F94`, borders `#2A2C30`, primary stays `#5E6AD2`.
+## Page recipe
+Topbar is 48px, tiny Linear mark and links Product, Resources, Customers, Pricing, Company,
+right `Get started`. Hero is 2-column with 42px title "The product development system for
+teams and agents", muted paragraph, small `Get started` link, and a dark framed product UI
+screenshot. Subsequent `FeatureRow`s alternate text and UI screenshot, but remain left aligned
+and max-width 1160px; each has a short eyebrow, title, paragraph, learn link and 2-3 small
+metrics. A changelog row uses thin timeline points. Final testimonials are dark colored
+tiles, then centered "Built for the future" CTA and 5-column footer.
 
-### 1.2 Type scale
+UI screenshot frames use `--elevated`, 1px border, 6px radius and no shadow. Links are
+indigo. Buttons are 34px, 6px radius; hover darkens, focus has a 2px indigo ring, pressed
+state scales only 0.99. Respect reduced motion. At 800px stack feature rows, at 560px use
+24px gutters, 32px hero and let screenshots overflow-x within a clipped frame. Voice is
+precise and technical: "Move work forward", "Understand progress at scale".
 
-| Token | Size | Weight | Used for |
-|---|---|---|---|
-| display | 32–40px | 700 | Page title ("Issues", "My work") |
-| title | 20–23px | 600 | Section titles, dialogs |
-| body | 14px | 400 | App body text |
-| body-medium | 14px | 500 | Rows, buttons |
-| small | 13px | 400 | Meta, table cells |
-| caption | 11.5px | 500 | Labels, shortcuts, overlines |
-| mono | 12px | 500 | Issue IDs, numbers (`JetBrains Mono`) |
-
-Body copy is **14px** — Linear is dense by design. Never inflate app type.
-
-### 1.3 Spacing & radius
-
-- Base unit **4px**; hairline grid; rows 32–40px tall in lists.
-- Panel padding 16px; section gap 24–48px; no giant whitespace.
-- Radius: 6px controls, 10px overlays. Sharp over round.
-
----
-
-## 2. Signature moves (the Linear "tells")
-
-1. **The indigo primary on white.** One `#5E6AD2` button per screen
-   ("Create issue", "Update"). Everything else is ink/ghost.
-2. **Dense divided issue lists.** Rows with ID (`ENG-123`, mono), title,
-   status pill, assignee avatar, and priority icon — separated by 1px
-   hairlines, never cards.
-3. **Keyboard-first affordances.** The topbar search placeholder says
-   "Search or jump to…" with a `⌘K` hint; sidebar rows show shortcut hints.
-4. **Status pills with precise tones** (success/warning/destructive),
-   small, tight, capitalized.
-5. **Hairline border language.** Flat surfaces, zero shadows in the app;
-   dividers are 1px `--color-border`.
-
----
-
-## 3. Layout law (Linear-specific)
-
-- **Density is the brand.** Lists and tables use 32–40px rows with 13–14px
-  type. Never add gratuitous padding to "breathe".
-- **Cards are rare.** Lists divide with hairlines; surfaces are flat. A card
-  appears only for a single focused object (issue detail, sheet).
-- **One accent.** Indigo only for the primary action, active nav, and links.
-  Status colors are semantic, never decorative.
-- **Sidebar + topbar shell.** Left rail (nav rows with shortcut hints) +
-  dense topbar (search left, actions right, hairline bottom border).
-- **Tabular numerics** for all counts (story points, counts, dates).
-- **Empty states are useful:** one sentence, one indigo action, no art.
-
----
-
-## 4. Interaction & state
-
-| Element | Default | Hover | Active/Focus |
-|---|---|---|---|
-| Primary button | indigo fill | `#525DC4` | pressed `#464FAE`, focus ring indigo |
-| Ghost/outline | hairline border | muted fill `#F7F8F9` | ink text |
-| List row | white | `#F7F8F9` fill | indigo left rail highlight |
-| Status pill | tone fill | 5% darken | — |
-| Input | hairline border | `--color-border-strong` | 2px indigo ring |
-
-Transitions 100–150ms; no bouncy animation; no gradients.
-
----
-
-## 5. Avoid (hard)
-
-- Rounded "friendly" cards, gradients, big marketing headlines in the app.
-- Warm colors anywhere; the palette is cool monochrome + indigo.
-- Centered layouts; everything is left-aligned and dense.
-- Cute empty-state illustrations; oversized empty whitespace.
-
----
-
-## Reference imagery
-
-Reference images for this brand live in `preview.png` and `references/` inside
-this company folder — use them as ground truth for brand fidelity (density,
-hairlines, the indigo accent, the sidebar+topbar shell).
+## 6. Detailed build contract
+Global shell: dark `--bg`, exact tokens, 1160px rail, 48px topbar, 24px gutters below 560px.
+Recipe 1: topbar -> two-column system hero -> product frame -> FeatureRows -> changelog -> testimonials -> footer.
+Recipe 2: topbar -> eyebrow/title -> screenshot -> metrics -> next FeatureRow -> future CTA.
+Recipe 3: topbar -> changelog heading -> timeline rows -> testimonial tiles -> five-column footer.
+Topbar: 48px, small mark/links, 34px action, 6px radius; headings remain left aligned.
+FeatureRow: 50/50 columns, 24px title, 14px body, 11px eyebrow, 12px metrics.
+ScreenshotFrame: `--elevated`, 1px `--line`, 6px radius, no shadow, clipped on narrow screens.
+MetricRow: 2-3 tabular values with muted labels and 1px separators.
+TimelineRow: point, date, title, category, indigo learn link, compact line-height.
+TestimonialTile: dark colored surface, 16px padding, quote then attribution, no large portrait.
+Use exact existing colors `--bg:#080b0d`, `--ink:#f5f6f7`, `--indigo:#5e6ad2`, `--line:#202529`.
+Indigo links darken on hover; pressed buttons scale .99; focus is a 2px indigo ring; honor reduced motion.
+At 800px stack rows; at 560px use 32px hero, 24px gutters, horizontally clipped frames.
+Voice is precise: `Move work forward`, `Understand progress at scale`, `Learn more`.
+Hard avoids: light SaaS cards, fake issue data, gradients, invented empty panels, dense nav.
+Keep loading frames dimensioned and empty rather than inserting UI or data.
+Reference Caveats
+- Preserve dark frames even when internal UI is not legible.
+- Keep timeline points and rules aligned to the same rail.
+- Status colors are semantic, not decoration; controls retain 34px targets.
+- Frames may clip horizontally on mobile without shifting surrounding rows.
+- Reference Caveats: blank and unloaded intervals are excluded from design inference.
+The screenshot is an unusually tall capture with dark empty intervals around some loaded
+feature modules. Treat those as capture composition/loading artifacts. Reproduce the visible
+headings, screenshot frames, metrics, quotes, links and footer, not invented empty panels.

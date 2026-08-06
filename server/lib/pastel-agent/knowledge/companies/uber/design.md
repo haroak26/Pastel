@@ -1,109 +1,64 @@
-# Uber — Design Reference
+# Uber UI - Replication Specification
 
-## Overview
+## Scope and references
+Use `references/home.jpg` and `references/riders.jpg` as two marketing/service states.
+Visible UI is a white, black-type mobility site: compact black header, location crumb,
+ride/search form, illustration or rider imagery, service cards, Reserve panel, compare
+travel options, account/business sections, FAQ and black footer. The map in the reference
+is a gray loaded placeholder and must stay a map panel, not a decorative photo.
 
-Uber's design language is **utilitarian, bold, and built for effortless movement**. It is
-map-first, high-contrast (black + green), and famous for the bottom-sheet interaction pattern.
-For a mobility/transport/location product "inspired by Uber," the goal is a UI that feels fast,
-transactional, and reassuringly clear.
+## Tokens
+```css
+:root { --bg:#fff;--ink:#000;--muted:#545454;--soft:#f6f6f6;--line:#ddd;--green:#06c167;
+  --red:#da291c;--font:Arial,Helvetica,sans-serif;--s1:4px;--s2:8px;--s3:12px;
+  --s4:16px;--s6:24px;--s8:32px;--s12:48px;--s16:64px;--r-sm:4px;--r-md:12px;
+  --r-sheet:20px;--r-pill:999px;--shadow-sheet:0 -4px 20px rgba(0,0,0,.16); }
+```
+Type: hero `40px/1.05/700`, section `26px/1.15/700`, body `14px/1.45/400`, labels
+`11px/1.2/700` uppercase, price/ETA `18px/1.1/700` tabular.
 
-**Archetypes:** mobility · ride-hailing · delivery · map-first · transactional
+## Recipes
+Header 48px black with Uber mark, Ride, Eat, Business, Uber for Business, About and right
+Help, Log in, `Sign up`. `RideHero` max-width 1180px is a 2-column 520px region: left
+headline "Go anywhere with Uber", pickup/dropoff fields, `See prices`; right loaded ride
+illustration/photo with a small schedule card. `ServiceGrid` is 3 cards per row, pale
+surface, tiny image/icon, title, description, `Details` link.
 
-## Brand Personality
+`Reserve` is a pale-blue media card with black title, date/time fields and one black CTA,
+beside a white Benefits list. `Compare` is a trip form beside a gray map rectangle with
+zoom controls. `AccountSplit` pairs short copy and black action with rider image. Later
+sections use 3-column text blocks and one black business band. FAQ is thin white rows with
+chevrons; footer is black, 4 link columns and language/location controls.
 
-- Utilitarian and confident
-- Effortless — the interface gets out of the way
-- Reassuring and trustworthy (you always know where your ride is)
-- Bold without being flashy
+Fields are 44px, 4px radius, gray border; focus is black 2px ring. Black buttons invert
+white on hover; green is reserved for confirmed/live/one primary action. Loading forms keep
+their dimensions. At 900px stack hero and compare columns; at 640px use 24px gutters,
+stack service cards, turn sheets into rounded-top bottom panels, and make map 280px tall.
+Voice is concrete: "Pickup location", "Arriving in 3 min", "$14.20", "Reserve".
 
-## Voice & Tone
-
-- Terse and functional: "Arriving in 3 min", "$14.20", "PICKUP".
-- Time and money are always concrete. Never vague.
-- Address the user by destination, not identity. Zero marketing fluff.
-
-## Visual Language
-
-### Color System
-
-| Token | Light | Usage |
-|---|---|---|
-| background | `#FFFFFF` | Canvas |
-| foreground | `#000000` | Ink — pure black |
-| primary | `#000000` | Primary CTAs |
-| accent | `#06C167` | The ONE green primary action |
-| secondary | `#F6F6F6` | Subtle fills |
-| mutedForeground | `#545454` | Secondary text |
-| destructive | `#DA291C` | Errors |
-| success | `#06C167` | Live/confirmed states |
-
-Rules:
-- Green is reserved for the **single primary action** per screen. Everything else is black/white/gray.
-- High contrast always. Never gray-on-gray.
-- Status is always legible: green = live/confirmed, red = failed.
-
-### Typography
-
-- **Display/Body:** Space Grotesk — clean, geometric, contemporary.
-- Labels are terse and uppercase where functional ("PICKUP", "ETA").
-- Prices and times are large, readable, tabular-nums.
-
-### Spacing, Radius, Elevation, Motion
-
-- Spacing: 8px rhythm, functional density.
-- Radius: generous on interactive surfaces (bottom sheets, cards = 14–20px), small on fields.
-- Elevation: flat with hairlines. Bottom sheets cast a soft shadow to lift off the map.
-- Motion: quick, 150–200ms, nothing decorative.
-
-### Iconography
-
-- Minimal functional line icons, 1.5–2px stroke. Map pins and status glyphs prominent.
-
-### Imagery
-
-- Real locations, maps, vehicles, food photography. Functional, not decorative.
-
-## Component Language
-
-- **Button** — solid black with white label; the green variant is the one primary action.
-- **Card** — flat white, hairline border; bottom-sheet cards have rounded top corners.
-- **Input** — contained, subtle border; search bars are rounded-full with icon.
-- **Navigation** — topbar/tabbar. Terse: status left, profile right.
-- **Table** — dense readable rows: destination, fare, ETA, status; right-aligned prices.
-- **StatCard** — big bold number, terse label.
-- **Badge** — flat pills in black/white/green; status only when meaningful.
-
-## Signature Patterns
-
-1. **Map-first home** — full-bleed map + floating search bar + bottom summary card.
-2. **Bottom sheet** — rounded-top card docked at screen bottom with options + one green CTA.
-3. **Trip/order cards** — destination, price, ETA, status in one readable row.
-4. **Live status timeline** — requested → driver assigned → arriving → picked up.
-
-## Screen Recipes
-
-See `manifest.screenRecipes`. The recurring thread: map hero with a bottom action sheet, activity
-lists with trip detail panes, and payment/preferences forms.
-
-## Rules
-
-- High contrast black/white with ONE green primary action.
-- Map is the hero for location products; info lives in floating cards and bottom sheets.
-- Time and money are always concrete.
-- No decorative illustration; icons are minimal and functional.
-
-## Avoid
-
-- Playful colorful illustrations and soft pastels
-- Heavy marketing copy
-- Gradients and decorative flourish
-- Ambiguous pricing or ETA
-- Cluttered dense tables without hierarchy
-
-## Reference imagery
-
-Reference images for this brand live in `preview.png` and `references/` inside
-this company's knowledge folder. The visual review attaches them to judge
-screenshots against the real brand — colors, type, spacing, component shapes,
-and mood. Add a `preview.png` (wide shot of the brand's signature interface)
-and up to three `references/` screenshots when tuning this company's fidelity.
+## 6. Detailed build contract
+Global shell: white body, black 48px header, exact tokens, 1180px rail, 24px mobile gutters.
+Recipe 1: header -> location crumb -> Go anywhere hero -> pickup/dropoff fields -> See prices -> ride media.
+Recipe 2: header -> riders intro/image -> ServiceGrid -> Reserve panel -> Benefits -> business band.
+Recipe 3: header -> trip form -> gray map with zoom -> travel options -> FAQ -> black footer.
+Header: black 48px, mark left, section links, Help/Login/Sign up right; mobile keeps mark/menu.
+Ride form: 520px left column, 44px fields, 4px radius, black CTA, tabular ETA/price.
+Service card: pale surface, 12px radius, tiny image/icon, title, description, Details link; three columns.
+Reserve panel: pale blue media card, 20px top radius mobile, date/time fields, black CTA.
+Compare map: gray 280px minimum mobile panel, zoom controls, adjacent option rows with price/ETA.
+FAQ: thin white rows with chevron and expanded body; footer has four columns and location controls.
+Use exact existing colors `--ink:#000`, `--soft:#f6f6f6`, `--green:#06c167`, `--line:#ddd`.
+Black actions invert on hover; focus is a black 2px ring; green is confirmed/live only.
+At 900px stack hero/compare; at 640px stack cards, use rounded-top sheets, and make map 280px tall.
+Loading forms retain dimensions; map controls stay in the map corner.
+Voice is concrete: `Pickup location`, `Arriving in 3 min`, `$14.20`, `Reserve`.
+Hard avoids: decorative map photo, fake routes, signed-in dashboard, extra blank sections, invented map labels.
+Reference Caveats
+- Pickup/dropoff fields retain order and dimensions while loading.
+- Map controls stay inside the map rectangle and prices use tabular numerals.
+- Reserve becomes a rounded-top sheet only at mobile width.
+- Reference Caveats: blank and unloaded intervals are excluded from design inference.
+Both captures include very large white gaps between loaded sections and a gray map block.
+Those are capture/loading artifacts, not intentional blank design. Implement only visible
+loaded text, forms, cards, imagery, map placeholder and footer; do not reproduce vertical
+emptiness as extra sections or claim a blank hero is a product state.

@@ -1,106 +1,91 @@
-# Figma UI — Design Replication Specification
+# Figma UI - Replication Specification
 
-> **Purpose:** This document is the build spec for reproducing the Figma visual
-> language — the design tool's workspace shell and its marketing site. It is
-> written for an AI coding agent to consume directly: tokens are exact and the
-> signature moves are the ground truth for what makes Figma feel like Figma.
+## Scope and reference reading
+Replicate the marketing home in `references/home.jpg` and the community home in
+`references/community.jpg`. The home is a white, editorial landing page: a very small
+utility nav, oversized left headline, centered dark video panel, a purple campaign strip,
+large vertical gaps, resource rails, proof logos, community cards, and a black footer.
+The community page is a dense white discovery catalog with a centered search hero, image
+cards, creator rows, and blue links. Do not invent an app canvas when reproducing these
+captures.
 
----
-
-## 1. Design Tokens
-
-Declare these once, globally, and reference everywhere.
-
-### 1.1 Color tokens
-
+## Tokens
 ```css
 :root {
-  --color-bg-workspace: #E6E6E6;      /* the gray CANVAS behind panels */
-  --color-bg-panel: #FFFFFF;          /* white floating panels */
-  --color-bg-hover: #F0F0F0;
-  --color-bg-selected: #E5F3FF;
-  --color-text-primary: #242424;
-  --color-text-secondary: #7A7A7A;
-  --color-text-tertiary: #B3B3B3;
-  --color-text-inverse: #FFFFFF;
-  --color-primary: #0D99FF;           /* Figma blue */
-  --color-primary-hover: #007BE6;
-  --color-success: #1BC47D;
-  --color-warning: #FFCD29;
-  --color-danger: #F24822;
-  --color-border: #E2E2E2;            /* hairline dividers */
-  --color-border-strong: #CCCCCC;
-  --radius-sm: 6px;                   /* buttons, inputs */
-  --radius-md: 10px;                  /* panels, cards */
-  --shadow-panel: 0 1px 4px rgba(0, 0, 0, 0.08);
+  --bg: #fff; --ink: #000; --muted: #666; --faint: #f5f5f5;
+  --blue: #0d99ff; --blue-hover: #007be6; --purple: #c9a0d6;
+  --line: #e5e5e5; --dark: #050505; --white: #fff;
+  --font: Inter, Arial, sans-serif; --mono: "Roboto Mono", monospace;
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s6: 24px;
+  --s8: 32px; --s12: 48px; --s16: 64px; --s24: 96px; --s32: 128px;
+  --r-sm: 4px; --r-md: 8px; --r-lg: 12px; --r-pill: 999px;
+  --shadow-card: 0 1px 4px rgba(0,0,0,.08);
 }
 ```
+Typography: use Inter; display `48px/1.02/700`, section heading `32px/1.05/700`,
+card title `16px/1.25/600`, body `15px/1.45/400`, caption `11px/1.3/500`.
+Use `letter-spacing: -.04em` on display and `font-variant-numeric: tabular-nums` for counts.
 
-### 1.2 Type scale
+## Page recipe
+1. `Header`: 56px high, 16px desktop padding; tiny 10-11px links for Products,
+   Solutions, Community, Resources, Pricing; right links Log in, Contact sales, and black
+   `Get started for free` button. Keep the Figma wordmark at left.
+2. `Hero`: max-width 1280px, min-height 360px, grid `1fr 1fr`, align center. Put the
+   56px headline "The intelligent canvas for infinite creativity" at left. Put a 360x360
+   dark video/error panel at center/right with a small centered error message and two dark
+   buttons; black `Get started` is a separate CTA to its right at wide widths.
+3. `CampaignBar`: full width, 32px lavender strip, black campaign mark left, short copy,
+   black `Apply` button right and close icon. It is not a permanent product toolbar.
+4. `FeatureLinks`: two small columns after a large blank-looking vertical interval,
+   each with a black square icon, bold title, one muted line, and underlined arrow link.
+5. `Proof`: max-width 1180px; heading "The products you love are designed in Figma",
+   quote/stat two-column row, partner logos, and a 3-column resource carousel.
+6. `CommunityRail`: section title plus "Browse all templates", 4-5 image cards with
+   4:5 artwork, title and arrow. Use horizontal overflow, not a wrapped dense grid.
+7. `Footer`: black, white Figma wordmark and social circles, 4-5 link columns, language
+   selector, 56px top/bottom padding. The community footer is white with small columns.
 
-| Token | Size | Weight | Used for |
-|---|---|---|---|
-| display | 36px | 700 | Marketing headlines |
-| title | 24px | 600 | Panel/file titles |
-| body | 15px | 400 | App body |
-| body-medium | 15px | 500 | Rows, buttons |
-| small | 13.5px | 400 | Meta, table cells |
-| caption | 12px | 500 | Labels, shortcuts |
-| mono | 12px | 500 | Values, counts |
+## Components and states
+Buttons are 34-40px, square radius `--r-sm`, black or `--blue`; hover darkens/fills
+the border, focus uses `0 0 0 2px #fff, 0 0 0 4px var(--blue)`, disabled is 40% opacity.
+Cards use hairlines, no heavy shadow; image loading uses a pale gray rectangle and keeps
+the title metadata visible. Rails have left/right chevrons only when scrollable.
+Search is 44px, centered, rounded `--r-pill`, blue search icon and "Search the community".
+Use 1px dividers, compact labels, and black/blue underlined links. Error video is a loaded
+visible state from the reference, not a reason to add a fake video.
 
-### 1.3 Spacing & radius
+## Responsive behavior and voice
+At 1100px cap content at 1120px and reduce hero gap. At 760px collapse the hero to one
+column, move CTA below video, make nav a menu button, and turn rails into horizontal scroll.
+At 480px use 24px gutters, display 36px, 16px campaign text, and 2-column proof cards.
+Voice is direct and creative: "Make anything", "Explore templates", "Get started".
+Avoid exclamation marks, decorative gradients, and rounded SaaS dashboards.
 
-- 8px rhythm; 40px controls; panel padding 16–24px; hairlines everywhere.
-- Radius: 6px controls, 10px panels. Elevation comes from LAYERS (white on
-  gray), not shadows — shadows stay subtle.
-
----
-
-## 2. Signature moves (the Figma "tells")
-
-1. **Panels on a gray canvas.** The shell is `#E6E6E6` workspace with white
-   floating panels — the single most recognizable Figma cue.
-2. **Figma blue as the interaction color.** Links, primary buttons, active
-   tabs, and selection all use `#0D99FF`.
-3. **Presence avatars on the topbar.** Collaborators stack as small colored
-   circles near the Share button — collaboration is always visible.
-4. **Inspect-style stat rows.** Dense divided rows: muted label left,
-   value right (mono for coordinates/counts).
-5. **Hairline precision.** 1px `--color-border` dividers, exact alignment,
-   small type — the interface disappears into the work.
-
----
-
-## 3. Layout law (Figma-specific)
-
-- **Workspace shell:** gray canvas fills the page; a white topbar (file
-  name, presence, Share) and white panels float above it. Never render
-  content cards directly on white.
-- **Toolbar discipline:** one search, one filter Select, one blue primary
-  ("Share", "New file"). Never chip groups.
-- **Density:** comfortable but exact — 40px controls, 15px body, clear 8px
-  rhythm. No cramped SaaS tables, no huge marketing padding in-app.
-- **One blue moment per screen.** Everything else is ink on white.
-
----
-
-## 4. Avoid (hard)
-
-- Warm palettes, heavy shadows, playful illustrations, gradient buttons,
-  oversized marketing type in-app, cards-on-white (no canvas separation),
-  dark canvases.
-
----
-
-## 5. Voice
-
-Precise and functional: "Share", "Add comment", "New file". Exact counts,
-short labels. The tool stays out of the way.
-
----
-
-## Reference imagery
-
-Reference images for this brand live in `preview.png` and `references/` inside
-this company folder — use them as ground truth for brand fidelity (the gray
-canvas + white panels, Figma blue, presence avatars, hairline precision).
+## 6. Detailed build contract
+Global shell: use the existing page background, exact token colors, centered max rail, and compact header.
+Recipe 1: header -> primary hero -> first visible feature panel -> card/list section -> footer.
+Recipe 2: header -> secondary product/account hero -> visible cards -> FAQ or proof rows -> footer.
+Recipe 3: header -> detail title and metadata -> visible media -> related content -> footer.
+Header geometry: keep the supplied height, horizontal padding, brand left, navigation center, actions right.
+Hero geometry: use the supplied heading size, two-column desktop layout, and one-column mobile layout.
+Feature geometry: use visible panel radius, 1px rules, explicit padding, and stable media aspect ratios.
+Card hierarchy: eyebrow or metadata, title, short body, then one clear action; do not add secondary noise.
+Use exact existing CSS custom properties for every color; do not introduce approximate inline hex values.
+Typography follows the existing font pairing and stated sizes/line-heights; headings retain their visual family.
+Spacing follows the existing 4px-based scale; section gaps are deliberate and not replaced with arbitrary margins.
+Radii follow the existing small/medium/large/full scale; shadows are only used where the existing spec names one.
+Focus is a 2px contrasting ring with 2px offset; hover changes color/border before adding motion.
+Pressed controls move at most 1-2px; disabled controls use reduced opacity and retain their geometry.
+Keyboard order follows visual order; all icon-only actions have 32-44px hit areas and accessible labels.
+At the desktop breakpoint keep the full shell and multi-column recipes from the source specification.
+At the tablet breakpoint stack secondary columns, preserve media ratios, and reduce gutters rather than content.
+At the mobile breakpoint collapse navigation, use 16-24px gutters, and make primary actions full width.
+Never let loading media collapse its reserved box; show only the source-grounded placeholder treatment.
+Content voice is short, concrete, and faithful to visible labels; do not add marketing claims.
+Hard avoids: invented dashboards, fake data, extra navigation, decorative gradients, and unsupported imagery.
+Hard avoids: using blank capture areas as components, adding controls not visible in the reference, or changing page genre.
+Reference Caveats
+`home.jpg` is a very tall capture with large white intervals and several unloaded-looking
+resource tiles. Treat those as capture/loading conditions: implement only the visible
+headings, links, cards, and loaded artwork described above. Do not create intentional blank
+hero bands or empty gray panels to match the page height.
