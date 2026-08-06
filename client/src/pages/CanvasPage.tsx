@@ -8,7 +8,7 @@ import { ComputerIcon, SmartPhone01Icon } from "hugeicons-react";
 import { PromptInput } from "@/components/PromptInput";
 import { CanvasPromptInput } from "@/components/CanvasPromptInput";
 import { CanvasDropdown } from "@/components/CanvasDropdown";
-import { usePastelAgent } from "@/hooks/use-pastel-agent";
+import { usePastelAgent, type VisualReferenceInput } from "@/hooks/use-pastel-agent";
 import { AgentRunCard } from "@/components/agent/AgentRunCard";
 import { CompanyGallery } from "@/components/agent/CompanyGallery";
 import { ScreenPreview } from "@/components/agent/ScreenPreview";
@@ -142,6 +142,7 @@ export default function CanvasPage() {
     suggestedCompanies,
     inspiration,
     secondaryInspiration,
+    setVisualReferenceImages,
     clarify,
     setAnswer,
     chooseInspiration,
@@ -264,7 +265,12 @@ export default function CanvasPage() {
   // ── Handlers ──
 
   const handlePrompt = useCallback(
-    async (prompt: string) => {
+    async (prompt: string, referenceImages?: VisualReferenceInput[]) => {
+      setVisualReferenceImages(referenceImages ?? []);
+      try {
+        if (referenceImages?.length) sessionStorage.setItem("pastel-visual-reference", JSON.stringify(referenceImages));
+        else sessionStorage.removeItem("pastel-visual-reference");
+      } catch {}
       if (isNewCanvas) {
         setIsCreating(true);
         try {
@@ -292,7 +298,7 @@ export default function CanvasPage() {
       setActiveDocPath(null);
       clarify(prompt);
     },
-    [clarify, isNewCanvas, setLocation],
+    [clarify, isNewCanvas, setLocation, setVisualReferenceImages],
   );
 
   const handleReset = useCallback(() => {

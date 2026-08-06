@@ -8,8 +8,14 @@ type Attachment = {
   name: string;
 };
 
+export type VisualReferenceInput = {
+  name: string;
+  mimeType: 'image/png' | 'image/jpeg' | 'image/webp';
+  data: string;
+};
+
 type Props = {
-  onSubmit: (prompt: string) => void;
+  onSubmit: (prompt: string, referenceImages?: VisualReferenceInput[]) => void;
   isLoading?: boolean;
   placeholder?: string;
   systemError?: boolean;
@@ -82,6 +88,8 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
   const [panelView, setPanelView] = useState<PanelView>('main');
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [referenceImage, setReferenceImage] = useState<VisualReferenceInput | null>(null);
+  const referenceInputRef = useRef<HTMLInputElement>(null);
   const customizeRef = useRef<HTMLDivElement>(null);
   const attachRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -110,8 +118,8 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
   const handleSubmit = useCallback(() => {
     const trimmed = prompt.trim();
     if (!trimmed || isLoading) return;
-    onSubmit(trimmed);
-  }, [prompt, isLoading, onSubmit]);
+    onSubmit(trimmed, referenceImage ? [referenceImage] : undefined);
+  }, [prompt, isLoading, onSubmit, referenceImage]);
 
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -136,7 +144,25 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
   }, []);
 
   const removeAttachment = useCallback((id: string) => {
-    setAttachments(prev => prev.filter(a => a.id !== id));
+    setAttachments(prev => {
+      const removed = prev.find(a => a.id === id);
+      if (removed?.type === 'image') setReferenceImage(null);
+      return prev.filter(a => a.id !== id);
+    });
+  }, []);
+
+  const handleReferenceFile = useCallback((event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    event.target.value = '';
+    if (!file || !/^image\/(png|jpeg|webp)$/.test(file.type) || file.size > 1_500_000) return;
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result !== 'string') return;
+      const id = crypto.randomUUID?.() || Math.random().toString(36).slice(2, 11);
+      setAttachments([{ id, type: 'image', name: file.name }]);
+      setReferenceImage({ name: file.name, mimeType: file.type as VisualReferenceInput['mimeType'], data: reader.result });
+    };
+    reader.readAsDataURL(file);
   }, []);
 
   return (
@@ -157,6 +183,7 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
           rows={2}
           className="w-full resize-none bg-transparent text-[14px] outline-none border-none leading-relaxed placeholder:text-fg-faint px-3 sm:px-3 pt-3 sm:pt-3 pb-0 sm:pb-1 text-foreground"
         />
+        <input ref={referenceInputRef} type="file" accept="image/png,image/jpeg,image/webp" onChange={handleReferenceFile} className="hidden" aria-label="Attach visual reference" />
 
         {attachments.length > 0 && (
           <div className="flex items-center gap-2 px-3 pb-2 flex-wrap">
@@ -210,8 +237,8 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setAttachOpen(false)} />
                   <div className="absolute left-0 bottom-full mb-1 z-20 min-w-[200px] bg-background border border-border rounded-[20px] p-1.5 shadow-lg">
-                    <button onClick={() => { addAttachment('image'); setAttachOpen(false); }} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
-                      <Image size={15} className="text-foreground" /> Photo Library
+                     <button onClick={() => { referenceInputRef.current?.click(); setAttachOpen(false); }} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
+                       <Image size={15} className="text-foreground" /> Figma / visual reference
                     </button>
                     <button onClick={() => { addAttachment('file'); setAttachOpen(false); }} className="flex w-full items-center gap-2.5 px-2.5 py-2 rounded-[14px] text-[13px] font-medium text-foreground hover:text-foreground hover:bg-surface-hover transition-colors border-none bg-transparent cursor-pointer text-left">
                       <FolderOpen size={15} className="text-foreground" /> File Library

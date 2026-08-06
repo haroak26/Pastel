@@ -1,5 +1,6 @@
 import type { ProductBrief, WireframePlan, ComponentInventory, CopyPlan, ResolvedTheme, BlockInstance, WireframeScreen, UxDesignPlan } from "./schemas-v6";
 import { mockDataset, normalizeUnit, hashSeed, type MockDataset } from "./lib/content";
+import { DOMAIN_PRIMARY_CTA, DOMAIN_HOME_CTA, PRICE_SUFFIX, REVIEW_HEADING, TRUST_ITEMS } from "./lib/domains";
 import { baseComponentCode } from "./base-components/index";
 import { uxLayoutFor } from "./lib/ux-design";
 import { sectionPad, padCls, BAND_PAD, type PadContext } from "./lib/layout";
@@ -69,109 +70,9 @@ export interface ComposeInput {
 
 // ── Data file ─────────────────────────────────────────────────────────────
 
-/** Domain-aware primary action for the detail page's summary card + band. */
-const DOMAIN_PRIMARY_CTA: Record<string, string> = {
-  travel: "Reserve",
-  rentals: "Reserve",
-  ecommerce: "Add to cart",
-  fitness: "Start workout",
-  media: "Play now",
-  social: "Join",
-  productivity: "Open project",
-  finance: "Continue",
-};
-
 /** Catalog-led products: the home hero is a search hero ("Where to?" +
  * dates + guests + Search), not a metric band — the catalog is the story. */
 const CATALOG_DOMAINS = new Set(["travel", "rentals", "ecommerce"]);
-
-/** Fallback CTA for the non-catalog home hero. */
-const DOMAIN_HOME_CTA: Record<string, string> = {
-  travel: "Explore stays",
-  rentals: "Explore stays",
-  ecommerce: "Shop now",
-  fitness: "Start today",
-  media: "Listen now",
-  social: "Join the community",
-  productivity: "Get started",
-  finance: "Open account",
-};
-
-/** Nightly-price suffix on catalog cards (rentals are priced per night). */
-const PRICE_SUFFIX: Record<string, string> = {
-  rentals: " night",
-  travel: " total",
-};
-
-const REVIEW_PHRASES: Record<string, string[]> = {
-  travel: [
-    "Immaculate place — exactly as pictured, in a great neighbourhood.",
-    "The host was wonderful and the location could not be better.",
-    "Beautiful stay. Quiet at night, coffee round the corner, walkable to everything.",
-    "Photos don't do it justice — spacious, spotless, and very comfortable.",
-    "Perfect base for exploring. We would absolutely stay again.",
-    "Great value for the area, check-in was effortless.",
-  ],
-  ecommerce: [
-    "Quality is excellent — even better than the photos.",
-    "Fast shipping and the fit is true to size.",
-    "Bought this as a gift and it was a hit.",
-    "Solid build, looks premium in person.",
-    "Exactly what I needed, arrived in two days.",
-    "Would recommend to anyone on the fence.",
-  ],
-  fitness: [
-    "Best workout for building speed — felt it in the first session.",
-    "Clear coaching cues and a great pace for a weekday run.",
-    "Challenging but doable; the pacing guide really helps.",
-    "My favourite interval session this season.",
-    "Perfect recovery-run length with solid guidance.",
-    "Took my 5K time down a full minute.",
-  ],
-  media: [
-    "Incredible production — the mix is so clean.",
-    "On repeat all week, every track lands.",
-    "A new favourite. The vocals are unreal.",
-    "Great energy from start to finish.",
-    "Perfect soundtrack for late drives.",
-    "Best release this month, hands down.",
-  ],
-  social: [
-    "Active community with genuinely helpful people.",
-    "Great discussions and zero drama.",
-    "Found collaborators here within a week.",
-    "Well moderated and welcoming to newcomers.",
-    "The weekly threads are worth it alone.",
-    "My favourite corner of the internet.",
-  ],
-  productivity: [
-    "Streamlined our whole workflow in a day.",
-    "Simple, fast, and the integrations just work.",
-    "Our team finally stopped living in spreadsheets.",
-    "The automation rules saved us hours every week.",
-    "Clean UI and rock-solid reliability.",
-    "Best tool we added this year.",
-  ],
-  finance: [
-    "Clear statements and instant transfers.",
-    "The reconciliation view saves me so much time.",
-    "Reliable and fast — support answered in minutes.",
-    "Accurate forecasts and easy exports.",
-    "Set up in ten minutes, zero friction.",
-    "Exactly the control we needed over cash flow.",
-  ],
-};
-
-function makeReviews(data: MockDataset): Array<{ name: string; initials: string; hue: number; rating: number; text: string }> {
-  const phrases = REVIEW_PHRASES[data.domain] ?? REVIEW_PHRASES.travel;
-  return data.people.slice(0, 6).map((p, i) => ({
-    name: p.name,
-    initials: p.initials,
-    hue: p.hue,
-    rating: 4 + (i % 5) * 0.2,
-    text: phrases[i % phrases.length],
-  }));
-}
 
 export function composeDataFile(input: ComposeInput): string {
   const { data, copy, brief } = input;
@@ -232,9 +133,11 @@ export function composeDataFile(input: ComposeInput): string {
           label,
           value: first?.fields?.[i] ?? data.detailValues[i] ?? "—",
         })),
-        reviews: makeReviews(data),
+        // V14: social proof comes from the DATA agent's dataset (fallback
+        // fills it from the domain packs) — never baked template phrases.
+        reviews: data.reviews,
         summary,
-        primaryCta: DOMAIN_PRIMARY_CTA[data.domain] ?? "Continue",
+        primaryCta: data.primaryCta ?? DOMAIN_PRIMARY_CTA[data.domain] ?? "Continue",
       },
     },
   };
@@ -419,6 +322,18 @@ function copyFor(copy: CopyPlan, screenId: string) {
   return copy.screens.find((s) => s.screenId === screenId) ?? { screenId, headline: screenId };
 }
 
+/** V14: the home hero's action — the DATA agent's homeCta wins; the domain
+ * pack map is the deterministic fallback. */
+function homeCtaOf(input: ComposeInput): string {
+  return input.data.homeCta ?? DOMAIN_HOME_CTA[input.data.domain] ?? "Get started";
+}
+
+/** V14: the price suffix on catalog cards — the DATA agent's priceSuffix
+ * wins (nightly " night" / " total"); fallback keeps the domain map. */
+function priceSuffixOf(input: ComposeInput): string {
+  return input.data.priceSuffix ?? PRICE_SUFFIX[input.data.domain] ?? "";
+}
+
 function jstr(s: string | undefined): string {
   return `'${(s ?? "").replace(/\\/g, "\\\\").replace(/'/g, "\\'").replace(/\r?\n/g, " ")}'`;
 }
@@ -530,6 +445,33 @@ function blockHero(input: ComposeInput, screen: WireframeScreen, inst: PaddedBlo
   switch (inst.variant) {
     case "app": {
       comps.add("Badge");
+      const fitnessProduct = input.data.domain === "fitness" && input.data.strengthMode === true;
+      if (fitnessProduct) {
+        // V12 coaching dashboard hero: one clear action, one calm tonal
+        // surface, and the useful session facts visible without scrolling.
+        jsx = `<section className="pastel-frame ${padCls(inst)}">
+  <div className="rounded-[var(--radius-lg)] bg-secondary p-6 sm:p-8">
+    <div className="flex flex-col gap-6 lg:flex-row lg:items-start lg:justify-between">
+      <div className="min-w-0">
+        {copy.overline && <p className="text-sm font-medium text-primary">{copy.overline}</p>}
+        <h1 className="mt-2 max-w-2xl text-4xl font-semibold tracking-tight leading-tight text-foreground">{copy.headline}</h1>
+        {copy.description && <p className="mt-3 max-w-xl text-base leading-relaxed text-muted-foreground">{copy.description}</p>}
+      </div>
+      <Button size="lg" className="shrink-0">{copy.primaryCta ?? "Start workout"}</Button>
+    </div>
+    <div className="mt-7 grid gap-3 sm:grid-cols-3">
+      {DATA.screens.home.metrics.slice(0, 3).map((m) => (
+        <div key={m.label} className="rounded-[var(--radius-md)] bg-background p-4">
+          <p className="text-sm text-muted-foreground">{m.label}</p>
+          <p className="mt-2 text-2xl font-semibold tracking-tight tabular-nums">{m.value}<span className="ml-1 text-sm font-medium text-muted-foreground">{m.unit}</span></p>
+          <p className="mt-1 text-xs text-muted-foreground">{m.note}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>`;
+        break;
+      }
       // V9: catalog-led products (rentals/travel/ecommerce) open with the
       // Airbnb-style SEARCH HERO — "Where to?" + dates + guests on a dark
       // band. The search bar IS the dominant moment; no metric band competes
@@ -563,7 +505,7 @@ function blockHero(input: ComposeInput, screen: WireframeScreen, inst: PaddedBlo
       {copy.description && <p className="mt-2 max-w-xl text-base text-muted-foreground">{copy.description}</p>}
     </div>
     <div className="shrink-0">
-      <Button size="lg">{copy.primaryCta ?? (DOMAIN_HOME_CTA[input.data.domain] ?? "Get started")}</Button>
+      <Button size="lg">{copy.primaryCta ?? (homeCtaOf(input))}</Button>
     </div>
   </div>
   <div className="mt-6 grid gap-4 lg:grid-cols-3">
@@ -577,7 +519,7 @@ function blockHero(input: ComposeInput, screen: WireframeScreen, inst: PaddedBlo
       </p>
       <p className="mt-1 text-sm text-background/60">{DATA.screens.home.metrics[0].note}</p>
       <div className="mt-5">
-        <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 border-none">{copy.primaryCta ?? (DOMAIN_HOME_CTA[input.data.domain] ?? "Get started")}</Button>
+        <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 border-none">{copy.primaryCta ?? (homeCtaOf(input))}</Button>
       </div>
     </div>
     <div className="grid gap-4">
@@ -601,7 +543,7 @@ function blockHero(input: ComposeInput, screen: WireframeScreen, inst: PaddedBlo
       <h1 className="${headlineSize} font-semibold tracking-tight leading-tight">{copy.headline}</h1>
       {copy.description && <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">{copy.description}</p>}
       <div className="mt-6 flex flex-wrap items-center gap-3">
-        <Button size="lg">{copy.primaryCta ?? (DOMAIN_HOME_CTA[input.data.domain] ?? "Get started")}<ArrowRight className="h-4 w-4" /></Button>
+        <Button size="lg">{copy.primaryCta ?? (homeCtaOf(input))}<ArrowRight className="h-4 w-4" /></Button>
         <Button size="lg" variant="outline">{copy.secondaryCta ?? "Learn more"}</Button>
       </div>
     </div>
@@ -633,7 +575,7 @@ function blockHero(input: ComposeInput, screen: WireframeScreen, inst: PaddedBlo
     <h1 className="mx-auto mt-3 max-w-2xl ${headlineSize} font-semibold tracking-tight leading-tight">{copy.headline}</h1>
     {copy.description && <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground">{copy.description}</p>}
     <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-      <Button size="lg">{copy.primaryCta ?? (DOMAIN_HOME_CTA[input.data.domain] ?? "Get started")}</Button>
+      <Button size="lg">{copy.primaryCta ?? (homeCtaOf(input))}</Button>
       <Button size="lg" variant="outline">{copy.secondaryCta ?? "Learn more"}</Button>
     </div>
   </div>
@@ -647,7 +589,7 @@ function blockHero(input: ComposeInput, screen: WireframeScreen, inst: PaddedBlo
     <h1 className="mt-3 max-w-3xl text-4xl font-black uppercase tracking-tight leading-tight">{copy.headline}</h1>
     {copy.description && <p className="mt-4 max-w-xl text-base leading-relaxed text-background/70">{copy.description}</p>}
     <div className="mt-7 flex flex-wrap items-center gap-3">
-      <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 border-none">{copy.primaryCta ?? (DOMAIN_HOME_CTA[input.data.domain] ?? "Get started")}</Button>
+      <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 border-none">{copy.primaryCta ?? (homeCtaOf(input))}</Button>
       <Button size="lg" variant="outline" className="border-background/30 text-background hover:bg-background/10">{copy.secondaryCta ?? "Learn more"}</Button>
     </div>
   </div>
@@ -680,7 +622,7 @@ function blockHero(input: ComposeInput, screen: WireframeScreen, inst: PaddedBlo
           </div>
           <Badge variant="success" dot>Live</Badge>
         </div>
-        <Button size="md" className="mt-3 w-full">{copy.primaryCta ?? (DOMAIN_HOME_CTA[input.data.domain] ?? "Get started")}</Button>
+        <Button size="md" className="mt-3 w-full">{copy.primaryCta ?? (homeCtaOf(input))}</Button>
       </div>
     </div>
   </div>
@@ -859,6 +801,23 @@ function blockDetail(input: ComposeInput, screen: WireframeScreen, inst: PaddedB
   const comps = new Set(["Card", "Badge", "Avatar", "Button"]);
   const icons = new Set(["star"]);
 
+  if (input.data.domain === "fitness" && input.data.strengthMode === true && inst.variant !== "bottom") {
+    const jsx = `<section className="pastel-frame ${padCls(inst)}">
+  <div className="grid items-start gap-8 lg:grid-cols-[1fr_360px]">
+    <div className="min-w-0">
+      <p className="text-sm font-medium text-primary">Guided exercise</p>
+      <h1 className="mt-2 text-4xl font-semibold tracking-tight leading-tight">{DATA.screens.detail.item?.name}</h1>
+      <p className="mt-3 max-w-xl text-base leading-relaxed text-muted-foreground">{copy.description ?? "A controlled strength block selected from your recent training history and recovery score."}</p>
+      <dl className="mt-7 grid max-w-xl gap-x-8 sm:grid-cols-2">{DATA.screens.detail.fields.map((f, i) => <div key={i} className="flex items-baseline justify-between gap-4 border-b py-3"><dt className="text-sm text-muted-foreground">{f.label}</dt><dd className="text-sm font-semibold tabular-nums">{f.value}</dd></div>)}</dl>
+    </div>
+    <Card className="lg:sticky lg:top-6">
+      <div className="px-6 py-5"><p className="text-sm text-muted-foreground">Today's target</p><p className="mt-2 text-2xl font-semibold tracking-tight">{DATA.screens.detail.item?.detail}</p><p className="mt-2 text-sm text-muted-foreground">Suggested load: <span className="font-medium text-foreground">{DATA.screens.detail.item?.amount}</span></p><Button size="lg" className="mt-5 w-full">{DATA.screens.detail.primaryCta}</Button></div>
+    </Card>
+  </div>
+</section>`;
+    return { jsx, comps, icons };
+  }
+
   if (inst.variant === "bottom") {
     const jsx = `<section className="pastel-frame ${padCls(inst)}">
   <Card className="rounded-t-2xl">
@@ -903,22 +862,28 @@ function blockDetail(input: ComposeInput, screen: WireframeScreen, inst: PaddedB
         ))}
       </dl>`;
 
-  const jsx = `<section className="pastel-frame ${padCls(inst)}">
-  <div className="grid items-start gap-8 lg:grid-cols-3">
-    <div className="min-w-0 lg:col-span-2">
-      <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+  // V14 (de-Airbnb): the marketplace summary card (price/dates/guests/total +
+  // verified host) renders ONLY for genuine commerce/travel products. Every
+  // other product gets a focused record card — the item's value, status,
+  // date, and its one primary action. No booking language leaks into a
+  // dashboard/coaching/workspace detail.
+  const isMarketDetail = CATALOG_DOMAINS.has(input.data.domain);
+  const headerRow = isMarketDetail
+    ? `<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
         <span className="inline-flex items-center gap-1 font-medium text-foreground">
           <Star className="h-4 w-4 fill-current text-accent" />{DATA.screens.detail.reviews[0] ? DATA.screens.detail.reviews[0].rating.toFixed(1) : "4.8"} · {DATA.screens.detail.reviews.length} reviews
         </span>
         <span>{DATA.screens.detail.item?.detail}</span>
-      </div>
-      <h1 className="mt-2 text-4xl font-bold tracking-tight leading-tight">{DATA.screens.detail.item?.name}</h1>
-      {copy.description && <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">{copy.description}</p>}
-${fieldRows}
-    </div>
-    <Card className="lg:sticky lg:top-6">
-      <div className="px-6 py-5">
-        <div className="flex items-baseline justify-between gap-3">
+      </div>`
+    : `<div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-muted-foreground">
+        <span className="inline-flex items-center gap-1 font-medium text-foreground">
+          <Badge variant={TONE[DATA.screens.detail.item?.status ?? ""] ?? "secondary"} dot>{DATA.screens.detail.item?.status ?? "Ready"}</Badge>
+        </span>
+        <span>{DATA.screens.detail.item?.detail}</span>
+      </div>`;
+
+  const summaryCard = isMarketDetail
+    ? `<div className="flex items-baseline justify-between gap-3">
           <span className="text-2xl font-bold tracking-tight tabular-nums">{DATA.screens.detail.summary.price}<span className="text-sm font-medium text-muted-foreground">{DATA.screens.detail.summary.nightly}</span></span>
           <Badge variant="success" dot>${txt(copy.overline ?? "Available")}</Badge>
         </div>
@@ -942,7 +907,33 @@ ${fieldRows}
             <span className="block truncate text-sm font-medium text-foreground">{DATA.screens.detail.reviews[0]?.name ?? DATA.people[0].name}</span>
             ${txt(copy.secondaryCta ?? "Verified host")}
           </span>
+        </div>`
+    : `<div className="flex items-baseline justify-between gap-3">
+          <span className="text-2xl font-bold tracking-tight tabular-nums">{DATA.screens.detail.item?.amount}</span>
+          <Badge variant={TONE[DATA.screens.detail.item?.status ?? ""] ?? "secondary"} dot>{DATA.screens.detail.item?.status ?? "Ready"}</Badge>
         </div>
+        <div className="mt-5 space-y-3 border-t pt-4 text-sm">
+          <div className="flex items-center justify-between">
+            <span className="text-muted-foreground">Last updated</span>
+            <span className="font-medium tabular-nums">{DATA.screens.detail.item?.date ?? "Today"}</span>
+          </div>
+          <div className="flex items-center justify-between border-t pt-3">
+            <span className="font-semibold">${txt(copy.overline ?? "Summary")}</span>
+            <span className="text-sm font-semibold tabular-nums">{DATA.screens.detail.item?.detail}</span>
+          </div>
+        </div>`;
+
+  const jsx = `<section className="pastel-frame ${padCls(inst)}">
+  <div className="grid items-start gap-8 lg:grid-cols-3">
+    <div className="min-w-0 lg:col-span-2">
+${headerRow}
+      <h1 className="mt-2 text-4xl font-bold tracking-tight leading-tight">{DATA.screens.detail.item?.name}</h1>
+      {copy.description && <p className="mt-4 max-w-xl text-base leading-relaxed text-muted-foreground">{copy.description}</p>}
+${fieldRows}
+    </div>
+    <Card className="lg:sticky lg:top-6">
+      <div className="px-6 py-5">
+${summaryCard}
         <Button size="lg" className="mt-5 w-full">{DATA.screens.detail.primaryCta}</Button>
         <Button size="md" variant="outline" className="mt-2 w-full">Save</Button>
       </div>
@@ -1027,15 +1018,40 @@ function blockList(input: ComposeInput, _screen: WireframeScreen, inst: PaddedBl
   const comps = new Set(["Card", "Avatar"]);
   const icons = new Set(["check", "play", "heart", "image", "star"]);
 
+  if (inst.variant === "sequence" && input.data.domain === "fitness" && input.data.strengthMode === true) {
+    const jsx = `<section className="pastel-frame ${padCls(inst)}">
+  <div className="flex items-baseline justify-between gap-4">
+    <h2 className="text-2xl font-semibold tracking-tight">${txt(inst.content ?? "Today's sequence")}</h2>
+    <button type="button" className="text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring">Adjust</button>
+  </div>
+  <ol className="mt-4 divide-y rounded-[var(--radius-lg)] border bg-card">
+    {DATA.screens.home.rows.slice(0, 3).map((r, i) => (
+      <li key={r.id} className="flex items-center gap-4 px-4 py-4 sm:px-5">
+        <span className={"flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] text-sm font-semibold " + (i === 0 ? "bg-primary text-primary-foreground" : "bg-secondary text-primary")}>{i + 1}</span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-base font-medium">{r.name}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{r.detail}</p>
+          <p className="mt-2 text-xs text-muted-foreground"><span className="font-medium text-foreground">{i === 0 ? "Drive through your heels" : i === 1 ? "Pause one beat at the top" : "Keep ribs down and breathe slow"}</span></p>
+        </div>
+        <button type="button" className="shrink-0 text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring">Swap</button>
+      </li>
+    ))}
+  </ol>
+</section>`;
+    return { jsx, comps: new Set<string>(), icons };
+  }
+
   if (inst.variant === "activity") {
-    // V9: on the detail screen this section is GUEST REVIEWS — divided rows
+    // V9: on the detail screen this section is SOCIAL PROOF — divided rows
     // with star ratings and a real review line (no cards, quiet type).
-    // V11: the heading is deterministic + data-derived — never model-written
-    // prose that contradicts the reviews below it.
+    // V14: the heading is domain-aware (guest reviews for stays, customer
+    // reviews for shops, community for feeds) and overridable via content —
+    // a non-commerce product never inherits Airbnb "Guest reviews" copy.
     if (_screen.id === "detail") {
+      const heading = inst.content ?? input.data.reviewHeading ?? REVIEW_HEADING[input.data.domain] ?? "What people say";
       const jsx = `<section className="pastel-frame ${padCls(inst)}">
   <div className="flex flex-wrap items-baseline justify-between gap-3">
-    <h3 className="text-2xl font-semibold tracking-tight">Guest reviews</h3>
+    <h3 className="text-2xl font-semibold tracking-tight">${txt(heading)}</h3>
     <p className="text-sm text-muted-foreground"><span className="font-semibold text-foreground">{DATA.screens.detail.reviews[0] ? DATA.screens.detail.reviews[0].rating.toFixed(1) : "4.8"}</span> average · {DATA.screens.detail.reviews.length} reviews</p>
   </div>
   <ul className="mt-4 divide-y border-t">
@@ -1116,7 +1132,7 @@ function blockList(input: ComposeInput, _screen: WireframeScreen, inst: PaddedBl
             <p className="truncate text-base font-semibold tracking-tight">{r.name}</p>
             <p className="mt-0.5 truncate text-xs text-muted-foreground">{r.detail}</p>
           </div>
-          <span className="shrink-0 text-sm font-bold tracking-tight tabular-nums">{r.amount}<span className="text-xs font-medium text-muted-foreground">${txt(PRICE_SUFFIX[input.data.domain] ?? "")}</span></span>
+          <span className="shrink-0 text-sm font-bold tracking-tight tabular-nums">{r.amount}<span className="text-xs font-medium text-muted-foreground">${txt(priceSuffixOf(input))}</span></span>
         </div>
       </a>
     ))}
@@ -1147,7 +1163,7 @@ function blockList(input: ComposeInput, _screen: WireframeScreen, inst: PaddedBl
             </div>
             <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">{r.detail}</p>
             <div className="mt-3 flex items-center justify-between border-t pt-3">
-              <span className="text-base font-bold tracking-tight tabular-nums">{r.amount}<span className="text-xs font-medium text-muted-foreground">${txt(PRICE_SUFFIX[input.data.domain] ?? "")}</span></span>
+              <span className="text-base font-bold tracking-tight tabular-nums">{r.amount}<span className="text-xs font-medium text-muted-foreground">${txt(priceSuffixOf(input))}</span></span>
               <span className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground">
                 <Star className="h-3.5 w-3.5 fill-current text-accent" />{(4 + (i % 5) * 0.2).toFixed(1)}
               </span>
@@ -1339,15 +1355,6 @@ function blockPricing(input: ComposeInput, _screen: WireframeScreen, inst: Padde
  * band: single-word slogan in accent on the foreground band). On the detail
  * screen the band is a quiet trust-signal strip — the summary card owns the
  * primary action (V9: one conversion point per page). */
-const TRUST_ITEMS: Record<string, string[]> = {
-  travel: ["Free cancellation", "Instant confirmation", "Verified host"],
-  ecommerce: ["Free returns", "Ships within 24h", "Secure checkout"],
-  fitness: ["No equipment needed", "Coach-guided", "All levels welcome"],
-  media: ["Offline listening", "Lossless audio", "Ad-free"],
-  social: ["Active community", "Zero spam", "Newcomer friendly"],
-  productivity: ["Free trial", "Team-ready", "Data encrypted"],
-  finance: ["Bank-grade security", "Instant transfers", "No hidden fees"],
-};
 
 function blockCta(input: ComposeInput, _screen: WireframeScreen, inst: PaddedBlock): RecipeResult {
   const comps = new Set(["Button"]);
@@ -1355,7 +1362,7 @@ function blockCta(input: ComposeInput, _screen: WireframeScreen, inst: PaddedBlo
   const copy = copyFor(input.copy, _screen.id);
 
   if (_screen.id === "detail") {
-    const items = TRUST_ITEMS[input.data.domain] ?? TRUST_ITEMS.travel;
+    const items = input.data.trustItems ?? TRUST_ITEMS[input.data.domain] ?? TRUST_ITEMS.travel;
     const jsx = `<section className="pastel-frame ${padCls(inst)}">
   <div className="rounded-xl bg-muted/50 px-6 py-5">
     <ul className="flex flex-wrap items-center justify-center gap-x-8 gap-y-2">
@@ -1378,7 +1385,7 @@ function blockCta(input: ComposeInput, _screen: WireframeScreen, inst: PaddedBlo
     <h2 className="mt-4 text-4xl font-black uppercase tracking-tight">{copy.slogan ?? copy.headline?.split(" ")[0].toUpperCase()}</h2>
     {copy.description && <p className="mx-auto mt-4 max-w-xl text-base text-background/70">{copy.description}</p>}
     <div className="mt-7">
-      <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 border-none">{copy.primaryCta ?? (DOMAIN_HOME_CTA[input.data.domain] ?? "Get started")}</Button>
+      <Button size="lg" className="bg-accent text-accent-foreground hover:bg-accent/90 border-none">{copy.primaryCta ?? (homeCtaOf(input))}</Button>
     </div>
   </div>
 </section>`;
@@ -1389,7 +1396,7 @@ function blockCta(input: ComposeInput, _screen: WireframeScreen, inst: PaddedBlo
   <div className="flex flex-col items-center rounded-xl bg-muted/50 px-6 py-12 text-center">
     <h2 className="max-w-xl text-2xl font-semibold tracking-tight">${txt(copy.headline ?? `Try ${input.brief.title} today`)}</h2>
     <p className="mt-2 max-w-md text-sm text-muted-foreground">${txt(copy.description ?? input.brief.description.slice(0, 120))}</p>
-    <div className="mt-6"><Button size="lg">${txt(copy.primaryCta ?? (DOMAIN_HOME_CTA[input.data.domain] ?? "Get started"))}</Button></div>
+    <div className="mt-6"><Button size="lg">${txt(copy.primaryCta ?? (homeCtaOf(input)))}</Button></div>
   </div>
 </section>`;
   return { jsx, comps, icons };
@@ -1412,8 +1419,29 @@ function blockFooter(): RecipeResult {
 function blockCustom(input: ComposeInput, screen: WireframeScreen, inst: PaddedBlock): RecipeResult {
   const comps = new Set<string>();
   if (!inst.component) return { jsx: "", comps, icons: new Set<string>() };
-  comps.add(inst.component);
   const copy = copyFor(input.copy, screen.id);
+  if (input.data.domain === "fitness" && input.data.strengthMode === true) {
+    const wrapper = (body: string) => `<section className="pastel-frame ${padCls(inst)}">${body}</section>`;
+    if (inst.component === "ReadinessMeter") {
+      return { jsx: wrapper(`<div className="flex flex-wrap items-center justify-between gap-4 border-b pb-4"><div><p className="text-sm font-medium text-muted-foreground">Readiness score</p><p className="mt-1 text-3xl font-semibold tabular-nums">{DATA.screens.home.metrics[0].value}<span className="ml-1 text-sm text-muted-foreground">/ 100</span></p></div><span className="rounded-full bg-success/15 px-3 py-1 text-sm font-medium text-success">Ready to train</span></div>`), comps, icons: new Set<string>() };
+    }
+    if (inst.component === "CoachInsight") {
+      return { jsx: wrapper(`<div className="rounded-[var(--radius-lg)] bg-muted/50 p-5"><div className="flex items-start gap-3"><div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[var(--radius-md)] bg-primary text-primary-foreground">+</div><div className="min-w-0"><h2 className="text-base font-semibold">Coach insight</h2><p className="mt-1 max-w-2xl text-sm leading-relaxed text-muted-foreground">Your lower-body load is trending up. Keep today controlled and add one extra mobility block after round two.</p><div className="mt-4 flex flex-wrap gap-2"><button type="button" className="rounded-[var(--radius-md)] bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 focus-visible:outline-2 focus-visible:outline-ring active:scale-[.98]">Ask for form tips</button><button type="button" className="rounded-[var(--radius-md)] bg-secondary px-4 py-2 text-sm font-medium text-primary hover:bg-secondary/80 focus-visible:outline-2 focus-visible:outline-ring active:scale-[.98]">Shorten workout</button></div></div></div></div>`), comps, icons: new Set<string>() };
+    }
+    if (inst.component === "RecoveryBlock") {
+      return { jsx: wrapper(`<div className="rounded-[var(--radius-lg)] bg-muted/50 p-5"><div className="flex items-baseline justify-between gap-4"><h2 className="text-xl font-semibold">After workout</h2><button type="button" className="text-sm font-medium text-primary hover:underline focus-visible:outline-2 focus-visible:outline-ring">Why this matters</button></div><div className="mt-4 grid gap-3 sm:grid-cols-2"><div className="rounded-[var(--radius-md)] bg-background p-4"><p className="text-sm text-muted-foreground">Recovery block</p><p className="mt-2 text-base font-medium">6 min guided stretch</p></div><div className="rounded-[var(--radius-md)] bg-background p-4"><p className="text-sm text-muted-foreground">Coach check-in</p><p className="mt-2 text-base font-medium">Log energy and soreness</p></div></div></div>`), comps, icons: new Set<string>() };
+    }
+    if (inst.component === "ExerciseTarget") {
+      return { jsx: wrapper(`<div className="grid gap-3 sm:grid-cols-3"><div><p className="text-sm text-muted-foreground">Target</p><p className="mt-1 text-lg font-semibold">{DATA.screens.detail.item?.detail}</p></div><div><p className="text-sm text-muted-foreground">Suggested load</p><p className="mt-1 text-lg font-semibold tabular-nums">{DATA.screens.detail.item?.amount}</p></div><div><p className="text-sm text-muted-foreground">Rest</p><p className="mt-1 text-lg font-semibold">90 sec</p></div></div>`), comps, icons: new Set<string>() };
+    }
+    if (inst.component === "FormCues") {
+      return { jsx: wrapper(`<div className="border-t pt-5"><h2 className="text-xl font-semibold">Form cues</h2><div className="mt-4 grid gap-3 sm:grid-cols-3"><div><p className="text-sm font-medium">01 Setup</p><p className="mt-1 text-sm text-muted-foreground">Brace your core and plant both feet.</p></div><div><p className="text-sm font-medium">02 Execute</p><p className="mt-1 text-sm text-muted-foreground">Move slowly and keep the load close.</p></div><div><p className="text-sm font-medium">03 Watch for</p><p className="mt-1 text-sm text-muted-foreground">Do not let your knees cave inward.</p></div></div></div>`), comps, icons: new Set<string>() };
+    }
+    if (inst.component === "SessionHistory") {
+      return { jsx: wrapper(`<div className="border-t pt-5"><h2 className="text-xl font-semibold">Recent progression</h2><div className="mt-3 divide-y">{DATA.screens.home.activity.slice(0, 3).map((a, i) => <div key={i} className="py-3 text-sm"><span className="font-medium">{a}</span></div>)}</div></div>`), comps, icons: new Set<string>() };
+    }
+  }
+  comps.add(inst.component);
   // V10: custom components receive the SCREEN's own data view — the catalog
   // rows on home, the single item on detail. Never a global slice.
   const scope = screen.id === "detail" ? "detail" : "home";

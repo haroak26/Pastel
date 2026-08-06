@@ -1,13 +1,13 @@
 import { MergeGateway, type ThinkingConfig } from "merge-gateway-sdk";
 
 /**
- * Pastel Agent v6 — hybrid model gateway.
+ * Pastel Agent v14 — hybrid model gateway.
  *
- * V6 strategy: TWO models only. A CHEAP model (claude-haiku-4-5) carries the
- * bulk parallel work — clarify, per-component planner, per-component builder,
- * copy, assembly, and repair. A MID model (gpt-5.4-mini) handles the few
- * judgment stages — brief, wireframe, and review (incl. visual review on
- * rendered screenshots).
+ * V14 strategy: TWO models only. A CHEAP model (claude-haiku-4-5) carries the
+ * bulk mechanical work — clarify, per-component planner, per-component builder,
+ * and repair. A MID model (gpt-5.6-luna) handles every judgment stage —
+ * design (tokens), data (all page content), brief, wireframe, copy (the
+ * product voice), review, and visual review on rendered screenshots.
  *
  * The knowledge base (company design.md + megadesign.md) carries the visual
  * quality; models select and adapt within it. Override any role via env:
@@ -19,11 +19,13 @@ export const MID_DEFAULT = "openai/gpt-5.6-luna";
 
 export const MODELS = {
   clarify:      process.env.PASTEL_MODEL_CLARIFY      || CHEAP_DEFAULT,
+  design:       process.env.PASTEL_MODEL_DESIGN        || MID_DEFAULT,
+  data:         process.env.PASTEL_MODEL_DATA          || MID_DEFAULT,
   brief:        process.env.PASTEL_MODEL_BRIEF        || MID_DEFAULT,
   wireframe:    process.env.PASTEL_MODEL_WIREFRAME    || MID_DEFAULT,
   planner:      process.env.PASTEL_MODEL_PLANNER      || CHEAP_DEFAULT,
   builder:      process.env.PASTEL_MODEL_BUILDER      || CHEAP_DEFAULT,
-  copy:         process.env.PASTEL_MODEL_COPY         || CHEAP_DEFAULT,
+  copy:         process.env.PASTEL_MODEL_COPY         || MID_DEFAULT,
   assemble:     process.env.PASTEL_MODEL_ASSEMBLE     || CHEAP_DEFAULT,
   review:       process.env.PASTEL_MODEL_REVIEW       || MID_DEFAULT,
   visualReview: process.env.PASTEL_MODEL_VISUAL_REVIEW || MID_DEFAULT,
@@ -34,6 +36,8 @@ export type ModelRole = keyof typeof MODELS;
 
 export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
   clarify:      Number(process.env.PASTEL_MAX_TOKENS_CLARIFY)      || 2500,
+  design:       Number(process.env.PASTEL_MAX_TOKENS_DESIGN)       || 5000,
+  data:         Number(process.env.PASTEL_MAX_TOKENS_DATA)         || 6000,
   brief:        Number(process.env.PASTEL_MAX_TOKENS_BRIEF)        || 4000,
   wireframe:    Number(process.env.PASTEL_MAX_TOKENS_WIREFRAME)    || 9000,
   planner:      Number(process.env.PASTEL_MAX_TOKENS_PLANNER)      || 4000,
@@ -84,7 +88,7 @@ function thinkingConfig(role?: ModelRole): ThinkingConfig | Record<string, unkno
  * v6 defaults ALL roles to thinking-off (cheap + fast); set PASTEL_THINKING_BUDGET
  * to a number to enable it. */
 export const LIGHT_ROLES: ReadonlySet<ModelRole> = new Set<ModelRole>([
-  "clarify", "brief", "wireframe", "planner", "builder", "copy", "assemble", "review", "visualReview", "repair",
+  "clarify", "design", "data", "brief", "wireframe", "planner", "builder", "copy", "assemble", "review", "visualReview", "repair",
 ]);
 
 let cachedClient: MergeGateway | null = null;

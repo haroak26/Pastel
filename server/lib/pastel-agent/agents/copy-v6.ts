@@ -103,16 +103,17 @@ export function fallbackCopy(brief: ProductBrief, wireframe: WireframePlan, data
     travel: { primary: "Plan a trip", secondary: "Explore stays" },
   };
   const cta = DOMAIN_CTA[data.domain] ?? { primary: "Get started", secondary: "Learn more" };
+  const fitness = data.domain === "fitness";
   return {
     productTitle: title,
     tagline: brief.description.slice(0, 120),
     screens: wireframe.screens.map((s) => ({
       screenId: s.id,
-      headline: s.title === "Landing" ? title : `${title} · ${s.title}`.slice(0, 60) || title,
-      overline: brief.productType,
-      description: s.purpose.slice(0, 160),
-      primaryCta: cta.primary,
-      secondaryCta: cta.secondary,
+      headline: fitness ? (s.id === "home" ? "Train with your AI coach" : "Build better reps") : (s.title === "Landing" ? title : `${title} · ${s.title}`).slice(0, 60) || title,
+      overline: fitness ? (s.id === "home" ? "Wednesday plan" : "Guided exercise") : brief.productType,
+      description: fitness ? (s.id === "home" ? "A focused session built from your recovery, goals, and form history." : "Clear targets and form cues for the next movement in your plan.") : s.purpose.slice(0, 160),
+      primaryCta: fitness ? "Start workout" : cta.primary,
+      secondaryCta: fitness ? "Message coach" : cta.secondary,
       tableColumns: data.rows.length > 0 ? ["Name", "Detail", data.rows[0].amount.startsWith("$") ? "Amount" : "Value", "Status", "Date"] : ["Name", "Detail", "Value", "Status", "Date"],
       emptyTitle: data.emptyTitle,
       emptyBody: data.emptyBody,

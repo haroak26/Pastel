@@ -74,12 +74,13 @@ ignores rhythm reads as a template; a screen that follows it reads as designed.
 
 - **band** — tonal (`bg-muted/50`, `bg-foreground` inverted, `bg-accent`) full-width section for
   dominant moments, charts, stats, and closing CTAs. No card outline.
-- **card** — scarce, deliberate. The product grid on home and the ONE summary card on detail are
-  the only card clusters. Never wrap a list in cards when divided rows exist.
+- **card** — scarce, deliberate. The product grid on a browse home and the ONE summary card on
+  the detail screen are the only card clusters. Never wrap a list in cards when divided rows exist.
 - **rows** — `divide-y border-t` divided lists for reviews, activity, details. No card surface.
 - **tiles** — image/icon tiles in a mosaic or strip. No text cards.
-- **toolbar** — search + one Select + one button. Never chip groups.
-- **gallery** — a photo mosaic of ONE item's images (see §8).
+- **toolbar** — search + one Select + one button. Only on screens whose purpose genuinely
+  browses; never chip groups.
+- **gallery** — a photo mosaic of ONE item's images (only for media-rich detail items).
 
 ## 5. Component standards
 
@@ -161,18 +162,21 @@ Designs must feel authored by a professional, not generated from a catalog:
 - Transitions: 120–200ms, `cubic-bezier(0.22, 1, 0.36, 1)` for enters, `ease-out` for hovers.
 - No autoplaying carousels, no infinite animations. Subtle hover lifts are fine.
 
-## 8. Cross-screen integrity & the detail page (V10 — hard)
+## 8. Cross-screen integrity & the detail screen (V14 — hard)
 
 - **A screen shows ONLY its own data.** Every screen reads from its OWN scoped data view
-  (`DATA.screens.<screen-id>`): home renders the catalog; detail renders ONE item and nothing
-  else. Catalog grids, search bars, and metric bands NEVER appear on the detail page; the
-  detail page's photos/fields/reviews NEVER appear on home.
-- **The detail page is one item.** The gallery is 4–5 photos of THE SAME item (never other
-  items from the catalog — that renders as a catalog grid on a detail page). Its fact rows,
-  reviews, and price all describe that item.
-- **Detail-page law:** gallery (dominant moment) → summary card (price + dates + primary
-  action, the ONE card, sticky on desktop) → fact rows → reviews as divided rows → one quiet
-  trust band. One conversion point.
+  (`DATA.screens.<screen-id>`): home renders its primary workflow; detail renders ONE item and
+  nothing else. Catalog grids, search bars, and metric bands NEVER appear on the detail screen;
+  the detail screen's photos/fields/reviews NEVER appear on home.
+- **The detail screen is ONE item.** Its gallery (when media-rich), fact rows, reviews, and price
+  all describe that item — never other items from the catalog.
+- **Detail-screen law (V14, product-led):** the detail screen serves the brief's focused
+  secondary workflow — for a media-rich item (listing, episode, product, photo-driven item):
+  gallery (dominant moment) → summary card (the ONE card, sticky on desktop) → fact rows →
+  reviews as divided rows → one quiet trust band. For a record/task/exercise: info pane
+  (dominant moment) → one primary action → fact rows. A booking summary (price + dates + guests)
+  is ONLY legal for commerce/travel products; a coaching or dashboard detail must never render
+  "Reserve", "Verified host", guest counts, or an Airbnb-shaped summary card.
 - **Media & imagery:** photo-first rendering. Every tile is a real visual — scene art or a
   photograph — never a colored block with a letter. Tiles keep fixed aspect ratios; overlay
   text sits on a scrim (`bg-background/90`) with AA contrast; heart/save controls float on

@@ -11,8 +11,9 @@ interface DocsPanelProps {
 
 const GROUPS: Array<{ id: string; label: string; match: (d: DocItem) => boolean }> = [
   { id: "brief", label: "Brief", match: (d) => d.kind === "brief" },
+  { id: "design", label: "Design System", match: (d) => d.kind === "design-tokens" },
   { id: "references", label: "Design References", match: (d) => d.kind === "megadesign" || d.kind === "company-design" },
-  { id: "planning", label: "Planning", match: (d) => d.kind === "wireframe-plan" || d.kind === "component-inventory" || d.kind === "copy-plan" },
+  { id: "planning", label: "Planning", match: (d) => d.kind === "wireframe-plan" || d.kind === "component-inventory" || d.kind === "copy-plan" || d.kind === "data-plan" },
   { id: "review", label: "Review", match: (d) => d.kind === "gate-report" || d.kind === "review-result" },
 ];
 

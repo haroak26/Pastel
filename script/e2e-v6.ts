@@ -496,20 +496,34 @@ async function main() {
   const homeSrc = screenSrc("home");
   const detailSrc = screenSrc("detail");
 
-  // Home must be a browse/catalog: a dominant moment (search hero band,
-  // metric band, or scoreboard) + search toolbar (Select dropdown) + the
-  // product grid. Detail must be an info page: photo gallery + sticky
-  // summary card + domain action + reviews.
+  // V14: home/detail requirements are PRODUCT-LED — derived from the run's
+  // own brief purposes. A browse/marketplace product demands search + grid +
+  // gallery + reviews; a dashboard/workspace product must NOT.
+  const briefDoc = state.docs.find((d) => d.kind === "brief" || d.path.endsWith("ProductBrief.json"));
+  let briefPurposes: Array<{ id: string; purpose: string }> = [];
+  try {
+    briefPurposes = JSON.parse(briefDoc?.content ?? "{}").screenPurposes ?? [];
+  } catch { /* keep [] */ }
+  const { isCatalogHome, isMediaDetail, detailWantsReviews } = await import("../server/lib/pastel-agent/lib/ux-design");
+  const homePurpose = briefPurposes.find((p) => p.id === "home")?.purpose ?? "";
+  const detailPurpose = briefPurposes.find((p) => p.id === "detail")?.purpose ?? "";
+  const briefIsCatalog = isCatalogHome(homePurpose);
+  const detailIsMediaRich = isMediaDetail(detailPurpose);
+  const detailWantsSocial = detailWantsReviews(detailPurpose);
+
+  // Home must have a dominant moment (search hero band, metric band, or
+  // scoreboard). Search toolbar + product grid are required ONLY for browse
+  // products; a dashboard/workspace home must NOT be forced into them.
   const homeHasMoment = /text-4xl font-black/.test(homeSrc) || /lg:col-span-2/.test(homeSrc) || /text-4xl sm:text-5xl font-black/.test(homeSrc);
   const homeHasSearch = /<Select/.test(homeSrc) && /placeholder=/.test(homeSrc);
   const homeHasGrid = /DATA\.screens\.home\.rows\.slice\(0, 6\)/.test(homeSrc) && /<Card\b/.test(homeSrc);
-  const homeIsCatalog = homeHasMoment && homeHasSearch && homeHasGrid;
+  const homeIsCatalog = homeHasMoment && (!briefIsCatalog || (homeHasSearch && homeHasGrid));
 
   const detailHasGallery = /DATA\.screens\.detail\.images\.map/.test(detailSrc) && /sceneTile|rounded-xl/.test(detailSrc);
   const detailHasSummary = /lg:sticky lg:top-6/.test(detailSrc) && /DATA\.screens\.detail\.primaryCta/.test(detailSrc) && /DATA\.screens\.detail\.summary/.test(detailSrc);
   const detailHasAction = /CheckCircle2/.test(detailSrc);
   const detailHasReviews = /DATA\.screens\.detail\.reviews\.map/.test(detailSrc) || /Guest reviews/.test(detailSrc);
-  const detailIsInfoPage = detailHasGallery && detailHasSummary && detailHasAction;
+  const detailIsInfoPage = detailHasSummary && detailHasAction && (!detailIsMediaRich || detailHasGallery) && (!detailWantsSocial || detailHasReviews);
 
   // Card budget: home = one grid cluster + at most the scoreboard moment;
   // detail = the single sticky summary card.
@@ -573,8 +587,8 @@ async function main() {
     [state.run.status === "done", `run completed (${state.run.status})`],
     [screens.length === 2, `exactly 2 screens (got ${screens.length})`],
     [twoScreensClean, `screens are the canonical pair: ${screens.join(", ")}`],
-    [homeIsCatalog, `home is a catalog screen: moment + search + grid (${homeHasMoment}/${homeHasSearch}/${homeHasGrid})`],
-    [detailIsInfoPage, `detail is an info page: gallery + sticky summary + action + reviews (${detailHasGallery}/${detailHasSummary}/${detailHasAction}/${detailHasReviews})`],
+    [homeIsCatalog, `home leads its primary workflow: moment${briefIsCatalog ? " + search + grid" : " (product-led, no forced browse)"} (${homeHasMoment}/${homeHasSearch}/${homeHasGrid})`],
+    [detailIsInfoPage, `detail is the focused secondary workflow: summary + action${detailIsMediaRich ? " + gallery" : ""}${detailWantsSocial ? " + reviews" : ""} (${detailHasGallery}/${detailHasSummary}/${detailHasAction}/${detailHasReviews})`],
     [cardsClean, `card budgets respected: home ${homeCards} ≤ 4, detail ${detailCards} ≤ 3`],
     [outlinesClean, `no outline-button stacks: home ${homeOutlines}, detail ${detailOutlines} (≤ 2 each)`],
     [screenFiles.length >= 1, `screen proof PNG captured (got ${screenFiles.length})`],

@@ -24,21 +24,10 @@ export function compileStyles(theme: ResolvedTheme): CompiledStyles {
     .map((c, i) => `  --chart-${i + 1}: ${c};`)
     .join("\n");
 
-  // V11: the interactive-control scale (8px rhythm: 32/40/48). Base
-  // components and builder output size buttons/inputs/selects from these
-  // tokens — never ad hoc h-9/h-11 utilities.
-  const controlVars = [
-    "  --control-sm: 32px;",
-    "  --control-md: 40px;",
-    "  --control-lg: 48px;",
-    "  --control-pad-x: 16px;",
-  ].join("\n");
-
   const css = [
     ":root {",
     vars,
     chartVars,
-    controlVars,
     "}",
     "",
     "/* ── Base ── */",

@@ -12,6 +12,127 @@
 
 import type { ProductBrief } from "../schemas-v6";
 
+// ── V14: fallback page-content vocabulary ─────────────────────────────────
+//
+// Everything the DATA agent normally generates lives here as the
+// DETERMINISTIC FALLBACK (the safety net, never the default). The data agent
+// (agents/data-v14.ts, mid-tier Luna) writes fresh content per run; when it
+// fails or its output fails validation, these packs produce the dataset.
+
+/** Domain-aware primary action for the detail page's summary card + band. */
+export const DOMAIN_PRIMARY_CTA: Record<string, string> = {
+  travel: "Reserve",
+  rentals: "Reserve",
+  ecommerce: "Add to cart",
+  fitness: "Start workout",
+  media: "Play now",
+  social: "Join",
+  productivity: "Open project",
+  finance: "Continue",
+};
+
+/** Fallback CTA for the non-catalog home hero. */
+export const DOMAIN_HOME_CTA: Record<string, string> = {
+  travel: "Explore stays",
+  rentals: "Explore stays",
+  ecommerce: "Shop now",
+  fitness: "Start today",
+  media: "Listen now",
+  social: "Join the community",
+  productivity: "Get started",
+  finance: "Open account",
+};
+
+/** Nightly-price suffix on catalog cards (rentals are priced per night). */
+export const PRICE_SUFFIX: Record<string, string> = {
+  rentals: " night",
+  travel: " total",
+};
+
+/** Fallback social-proof lines per domain (the data agent writes fresh ones). */
+export const REVIEW_PHRASES: Record<string, string[]> = {
+  travel: [
+    "Immaculate place — exactly as pictured, in a great neighbourhood.",
+    "The host was wonderful and the location could not be better.",
+    "Beautiful stay. Quiet at night, coffee round the corner, walkable to everything.",
+    "Photos don't do it justice — spacious, spotless, and very comfortable.",
+    "Perfect base for exploring. We would absolutely stay again.",
+    "Great value for the area, check-in was effortless.",
+  ],
+  ecommerce: [
+    "Quality is excellent — even better than the photos.",
+    "Fast shipping and the fit is true to size.",
+    "Bought this as a gift and it was a hit.",
+    "Solid build, looks premium in person.",
+    "Exactly what I needed, arrived in two days.",
+    "Would recommend to anyone on the fence.",
+  ],
+  fitness: [
+    "Best workout for building speed — felt it in the first session.",
+    "Clear coaching cues and a great pace for a weekday run.",
+    "Challenging but doable; the pacing guide really helps.",
+    "My favourite interval session this season.",
+    "Perfect recovery-run length with solid guidance.",
+    "Took my 5K time down a full minute.",
+  ],
+  media: [
+    "Incredible production — the mix is so clean.",
+    "On repeat all week, every track lands.",
+    "A new favourite. The vocals are unreal.",
+    "Great energy from start to finish.",
+    "Perfect soundtrack for late drives.",
+    "Best release this month, hands down.",
+  ],
+  social: [
+    "Active community with genuinely helpful people.",
+    "Great discussions and zero drama.",
+    "Found collaborators here within a week.",
+    "Well moderated and welcoming to newcomers.",
+    "The weekly threads are worth it alone.",
+    "My favourite corner of the internet.",
+  ],
+  productivity: [
+    "Streamlined our whole workflow in a day.",
+    "Simple, fast, and the integrations just work.",
+    "Our team finally stopped living in spreadsheets.",
+    "The automation rules saved us hours every week.",
+    "Clean UI and rock-solid reliability.",
+    "Best tool we added this year.",
+  ],
+  finance: [
+    "Clear statements and instant transfers.",
+    "The reconciliation view saves me so much time.",
+    "Reliable and fast — support answered in minutes.",
+    "Accurate forecasts and easy exports.",
+    "Set up in ten minutes, zero friction.",
+    "Exactly the control we needed over cash flow.",
+  ],
+};
+
+/** V14 fallback social-proof heading per domain — the data agent writes the
+ * real heading for the run; this map is only the deterministic safety net. */
+export const REVIEW_HEADING: Record<string, string> = {
+  rentals: "Guest reviews",
+  travel: "Guest reviews",
+  ecommerce: "Customer reviews",
+  media: "What listeners say",
+  social: "From the community",
+  fitness: "Member feedback",
+  productivity: "Team feedback",
+  finance: "Member feedback",
+};
+
+/** Fallback trust-signal items per domain (detail action band). */
+export const TRUST_ITEMS: Record<string, string[]> = {
+  travel: ["Free cancellation", "Instant confirmation", "Verified host"],
+  ecommerce: ["Free returns", "Ships within 24h", "Secure checkout"],
+  fitness: ["No equipment needed", "Coach-guided", "All levels welcome"],
+  media: ["Offline listening", "Lossless audio", "Ad-free"],
+  social: ["Active community", "Zero spam", "Newcomer friendly"],
+  productivity: ["Free trial", "Team-ready", "Data encrypted"],
+  finance: ["Bank-grade security", "Instant transfers", "No hidden fees"],
+};
+
 export interface DomainMetric {
   label: string;
   unit: string;
@@ -63,7 +184,7 @@ export interface DomainPack {
   /** Field labels for the detail pane (aligned with `detailValues`). */
   detailFields: () => string[];
   /** Display values for the detail pane's first/selected item, in the same
-   * order as `detailFields` (e.g. fitness: ["5.2 km", "~24 min", "4:35/km", "Moderate", "Speed"]). */
+   * order as `detailFields`. */
   detailValues: (rnd: () => number) => string[];
   settingsSections: () => DomainSettingsSection[];
   tableColumns: () => string[];
@@ -210,40 +331,44 @@ const fitness: DomainPack = {
   match: [/run/, /runn/, /workout/, /fitness/, /train/, /gym/, /sport/, /athlet/, /exercise/, /marathon/, /yoga/, /cycling/, /swim/, /streak/, /pace/, /calorie/, /cardio/],
   statuses: ["complete", "upcoming", "skipped"],
   metrics: (rnd) => [
-    metric("Weekly distance", "km", distance(rnd), pctDelta(rnd, 4, 18), "vs last week", rnd),
-    metric("Avg pace", "min/km", pace(rnd), pctDelta(rnd, -8, 2, false), "vs last week", rnd),
-    metric("Streak", "days", String(Math.floor(rnd() * 18 + 3)), pctDelta(rnd, 0, 6), "best 24 days", rnd),
-    metric("Calories", "kcal", fmtNum(rnd() * 1400 + 600), pctDelta(rnd, -10, 8), "vs last week", rnd),
+    metric("Readiness", "%", String(Math.floor(rnd() * 12 + 82)), pctDelta(rnd, 2, 9), "recovery is trending well", rnd),
+    metric("Weekly volume", "sets", String(Math.floor(rnd() * 12 + 28)), pctDelta(rnd, 4, 14), "vs last week", rnd),
+    metric("Training streak", "days", String(Math.floor(rnd() * 18 + 3)), pctDelta(rnd, 0, 6), "best 24 days", rnd),
+    metric("Next PR", "lb", String(Math.floor(rnd() * 20 + 155)), pctDelta(rnd, 1, 8), "estimated this month", rnd),
   ],
-  detailValues: (rnd) => [`${distance(rnd)} km`, `~${Math.floor(rnd() * 40 + 18)} min`, `${pace(rnd)}/km`, pick(rnd, ["Easy", "Moderate", "Hard"]), pick(rnd, ["Speed", "Endurance", "Recovery", "Base"])],
+  detailValues: (rnd) => [`${Math.floor(rnd() * 3 + 3)} sets`, `${Math.floor(rnd() * 5 + 6)} reps`, `${Math.floor(rnd() * 35 + 65)} lb`, pick(rnd, ["Moderate", "Hard", "Controlled"]), pick(rnd, ["Strength", "Mobility", "Power"])],
   series: (rnd) => [
+    { label: "Strength trend", unit: "lb", points: weekly(rnd, 7, 120, 210) },
+    { label: "Weekly volume", unit: "sets", points: weekly(rnd, 7, 18, 48) },
+    { label: "Readiness", unit: "%", points: weekly(rnd, 7, 72, 98) },
+    // Legacy fitness vocabulary remains available for existing persisted
+    // runs and copy-plan migrations; v12 prompts select the strength series.
     { label: "Weekly distance", unit: "km", points: weekly(rnd, 7, 8, 42) },
-    { label: "Avg pace", unit: "min/km", points: weekly(rnd, 7, 3.6, 6.2) },
     { label: "Calories", unit: "kcal", points: weekly(rnd, 7, 500, 1800) },
   ],
   items: (rnd) => {
-    const names = shuffled(rnd, ["5K tempo run", "Hill repeats", "Long run", "Recovery jog", "Intervals 8x400m", "Easy 10K", "Progression run", "Speed ladder", "Zone 2 base run"]);
-    const focus = ["Speed", "Endurance", "Recovery", "Strength", "Pacing", "Base"];
+    const names = shuffled(rnd, ["Goblet squat", "Single-arm row", "Dead bug hold", "Romanian deadlift", "Half-kneeling press", "Reverse lunge", "Plank shoulder tap", "Hip mobility flow", "Push-up tempo"]);
+    const focus = ["Lower body", "Pull", "Core", "Push", "Mobility", "Full body"];
     return names.map((name, i) => ({
       id: `wk${1000 + i}`,
       name,
-      detail: `${distance(rnd)} km · ${pick(rnd, focus)} focus`,
-      amount: `${pace(rnd)}/km`,
+      detail: `${Math.floor(rnd() * 3 + 2)} sets × ${Math.floor(rnd() * 6 + 8)} reps · ${pick(rnd, focus)}`,
+      amount: `${Math.floor(rnd() * 45 + 35)} lb`,
       status: pick(rnd, fitness.statuses),
       date: dateStr(rnd),
     }));
   },
   activity: (rnd) => [
-    `Finished a 5K tempo run · ${pace(rnd)}`,
-    "Set a new 10K PR · 52:18",
+    `Added 5 lb to goblet squat · ${Math.floor(rnd() * 3 + 3)} sets`,
+    "Set a new deadlift PR · 185 lb",
     `Hit a ${Math.floor(rnd() * 14 + 3)}-day streak`,
-    "Completed hill repeats · 8x400m",
-    `Logged ${fmtNum(rnd() * 60 + 10)} km this week`,
-    "New PB on 5K · 23:41",
-    "Finished an easy recovery run",
-    `Monthly distance record · ${fmtNum(rnd() * 120 + 90)} km`,
+    "Completed strength session · 42 min",
+    `Logged ${fmtNum(rnd() * 12 + 24)} working sets this week`,
+    "Improved single-arm row form",
+    "Finished a guided mobility block",
+    `Monthly volume record · ${fmtNum(rnd() * 80 + 140)} lb`,
   ],
-  detailFields: () => ["Distance", "Est. time", "Pace", "Difficulty", "Focus"],
+  detailFields: () => ["Sets", "Rep range", "Suggested load", "Intensity", "Training focus"],
   settingsSections: () => [
     {
       title: "Goals",
@@ -270,9 +395,9 @@ const fitness: DomainPack = {
     },
   ],
   tableColumns: () => ["Workout", "Focus", "Pace", "Status", "Date"],
-  searchPlaceholder: () => "Search workouts",
-  emptyTitle: () => "No runs yet",
-  emptyBody: () => "Log your first run and your training history will show up here.",
+  searchPlaceholder: () => "Search exercises",
+  emptyTitle: () => "No exercises yet",
+  emptyBody: () => "Complete your first coached session and your training history will show up here.",
 };
 
 const ecommerce: DomainPack = {

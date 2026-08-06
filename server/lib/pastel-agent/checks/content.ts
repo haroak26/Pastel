@@ -64,10 +64,11 @@ const PAGE_SCALE_IN_COMPONENT = [
 
 /** Hardcoded zero sample values rendered as data (v7 issue #2 — the four
  * "0.0 km / 0 min" tiles). Values are allowed in logic (slice(0, 4), len 0),
- * but never as rendered JSX text or expressions. */
+ * in attributes (aria-valuemin={0}), but never as rendered JSX text or
+ * expressions. */
 const HARDCODED_ZEROS = [
   />\s*0(?:\.0)?\s*(?:km|mi|m|min|kcal|cal|hrs?|hours?|days?|steps?|count|kg|lb)\b\s*</i,
-  /\{0(?:\.\d+)?\}\s*(?:km|mi|m|min|kcal|cal|hrs?|hours?|days?|steps?|count|kg|lb)?/i,
+  /(?<!=)\{0(?:\.\d+)?\}\s*(?:km|mi|m|min|kcal|cal|hrs?|hours?|days?|steps?|count|kg|lb)?/i,
   />\s*0\.0\s*</,
 ];
 
@@ -134,6 +135,9 @@ export function auditContent(data: MockDataset, files: Record<string, string>): 
     // 1. Finance/domain mismatch (the v6 Aperture-AI-in-a-fitness-app bug).
     if (!financeLegit) {
       for (const re of FINANCE_ONLY) {
+        // V14: "workspace" is legitimate product language for a workspace
+        // product — the B2B guard only applies to non-productivity domains.
+        if (re.source === "\\bworkspace\\b" && data.domain === "productivity") continue;
         if (re.test(content)) {
           issues.push({
             file: path,

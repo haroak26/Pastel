@@ -53,6 +53,15 @@ test("v11 knowledge: catalog lists every registered company with swatches + prev
   }
 });
 
+test("v12 knowledge: Figma product reference is available independently of inspiration", async () => {
+  const { visualReferenceImageBlocks, visualReferenceBlock } = await import("../lib/pastel-agent/knowledge/index");
+  const images = await visualReferenceImageBlocks("fitness-coach");
+  assert.equal(images.length, 1);
+  assert.equal(images[0].source.media_type, "image/jpeg");
+  assert.ok(images[0].source.data.length > 1000);
+  assert.ok((await visualReferenceBlock("fitness-coach")).includes("Figma Reference"));
+});
+
 test("v6 knowledge: every manifest validates against the schema", async () => {
   for (const slug of SLUGS) {
     const { manifest } = await import(`../lib/pastel-agent/knowledge/companies/${slug}/manifest.ts`);
@@ -466,10 +475,22 @@ test("v8 wireframe: enforceWireframeRules drops unmounted components and excess 
     ],
   };
   const { plan: clean, inventory: cleanInv, notes } = enforceWireframeRules(plan, inventory);
-  const blocks = clean.screens[0].blocks;
-  // Only ONE heavy block survives (detail or form, not both).
-  const heavies = blocks.filter((b: any) => ["detail", "form", "table", "media"].includes(b.block) || (b.block === "list" && b.variant === "cards"));
-  assert.equal(heavies.length, 1, `one heavy block per screen (got ${heavies.length})`);
+
+  const home = clean.screens[0];
+  const detail = clean.screens[1];
+  // V14 product-led: a DASHBOARD home takes NO forced search toolbar or
+  // product grid — the Airbnb-shaped catalog default is gone. Only the
+  // mounted StreakModule survives; off-archetype blocks are dropped.
+  assert.ok(!home.blocks.some((b: any) => b.block === "search"), "no forced search on a dashboard home");
+  assert.ok(!home.blocks.some((b: any) => b.block === "list" && b.variant === "cards"), "no forced product grid on a dashboard home");
+  assert.ok(home.blocks.some((b: any) => b.block === "custom" && b.component === "StreakModule"), "dashboard home keeps its product component");
+  // The secondary screen (a browse workout library) becomes the focused
+  // detail workflow: info pane + action band, no gallery forced.
+  assert.ok(detail.blocks.some((b: any) => b.block === "detail" && b.variant === "pane"), "focused detail guarantees the info pane");
+  assert.ok(detail.blocks.some((b: any) => b.block === "cta" && b.variant === "band"), "focused detail guarantees the action band");
+  assert.ok(!detail.blocks.some((b: any) => b.block === "media"), "no gallery forced on a non-media detail");
+  for (const s of clean.screens) assert.equal(s.blocks.filter((b: any) => b.emphasis).length, 1, "exactly one dominant moment");
+
   assert.ok(cleanInv.components.some((c: any) => c.name === "StreakModule"));
   assert.ok(!cleanInv.components.some((c: any) => c.name === "UnusedWidget"), "unmounted component dropped");
   assert.equal(cleanInv.components.length, 6);
@@ -1236,4 +1257,325 @@ test("v11 gate: off-rhythm component sizes and unlabeled inputs are flagged; py-
   const unlabeled = gate.issues.filter((i) => i.category === "a11y" && i.description.includes("no <label>"));
   assert.equal(unlabeled.length, 1, "screen with inputs but no label is flagged");
   assert.ok(!gate.issues.some((i) => i.description.includes("py-16") && i.category === "anti-slop"), "py-16 is the legal band step, not slop");
+});
+
+// ── V14: de-Airbnb — design tokens + product-led structures + brief catalog ──
+
+test("v14 design: manifest-derived fallback tokens validate (WCAG + scales) and compile to a theme", async () => {
+  const { designTokensFromManifest, validateDesignTokens } = await import("../lib/pastel-agent/agents/design-v14");
+  const { themeFromDesignTokens } = await import("../lib/pastel-agent/knowledge/index");
+  const company = await loadCompany("stripe");
+  const tokens = designTokensFromManifest(company, "light");
+  const parsed = (await import("../lib/pastel-agent/schemas-v6")).designTokensSchema.parse(tokens);
+  assert.equal(parsed.version, "1.0.0");
+  const { ok, errors } = validateDesignTokens(parsed);
+  assert.ok(ok, `manifest-derived tokens must pass validation: ${errors.join("; ")}`);
+  const theme = themeFromDesignTokens(parsed, company);
+  assert.equal(theme.cssVars["--primary"], parsed.colors.primary);
+  assert.equal(theme.cssVars["--radius-md"], `${parsed.radius.md}px`);
+  assert.equal(theme.cssVars["--control-md"], "40px");
+  assert.ok(theme.fontFamilies.length >= 1);
+  const { css } = compileStyles(theme);
+  assert.ok(css.includes(`--primary: ${parsed.colors.primary};`), "cssVars carry the design-token colors");
+});
+
+test("v14 design: WCAG validator rejects a low-contrast palette", async () => {
+  const { validateDesignTokens } = await import("../lib/pastel-agent/agents/design-v14");
+  const company = await loadCompany("linear");
+  const good = (await import("../lib/pastel-agent/agents/design-v14")).designTokensFromManifest(company, "light");
+  const bad = structuredClone(good);
+  bad.colors.foreground = "#101010";
+  bad.colors.background = "#101010";
+  const badResult = validateDesignTokens(bad);
+  assert.equal(badResult.ok, false, "same-dark-on-dark palette must fail");
+  assert.ok(badResult.errors.some((e) => e.includes("foreground/background")), "the failing pair is named");
+  const goodResult = validateDesignTokens(good);
+  assert.equal(goodResult.ok, true);
+});
+
+test("v14 ux: home structure is product-led (dashboard-led unless the product browses)", async () => {
+  const { homeStructureFor, canonicalStructure } = await import("../lib/pastel-agent/lib/ux-design");
+  assert.equal(homeStructureFor("Dashboard with today's metrics"), "dashboard-led");
+  assert.equal(homeStructureFor("The community feed"), "dashboard-led");
+  assert.equal(homeStructureFor("Browse and explore the catalog of stays"), "catalog-classic");
+  assert.equal(canonicalStructure("home", "catalog-rail"), "catalog-rail", "catalog structures stay legal");
+  assert.equal(canonicalStructure("home", "two-column"), "catalog-classic", "legacy structures normalize");
+  assert.equal(canonicalStructure("home", "detail-asymmetric", false), "dashboard-led", "invalid non-catalog home falls back product-led");
+});
+
+test("v14 wireframe fallback: a dashboard product NEVER degrades into an Airbnb catalog", async () => {
+  const company = await loadCompany("linear");
+  const brief = productBriefSchema.parse({
+    version: "1.0.0",
+    title: "Trace",
+    productType: "project tracking workspace",
+    description: "A workspace for teams to track projects, goals, and progress.",
+    audience: { primary: "Product teams", needs: ["Track work"] },
+    goals: ["Ship faster"],
+    features: [{ name: "Projects", description: "Track project status and owners.", priority: "critical" }],
+    platform: "desktop",
+    screenPurposes: [
+      { id: "home", purpose: "Dashboard with today's work, goals, and progress" },
+      { id: "detail", purpose: "Focused view of one project with its facts and actions" },
+    ],
+    copyDirection: "Calm and specific.",
+    designLanguage: "Dense, precise, quiet.",
+    inspiration: { primary: "linear" },
+  });
+  const wf = fallbackWireframe(brief, company);
+  const home = wf.plan.screens.find((s) => s.id === "home")!;
+  const detail = wf.plan.screens.find((s) => s.id === "detail")!;
+  assert.ok(!home.blocks.some((b) => b.block === "search"), "no forced search on a workspace home");
+  assert.ok(!home.blocks.some((b) => b.block === "list" && b.variant === "cards"), "no product grid on a workspace home");
+  assert.ok(!detail.blocks.some((b) => b.block === "media"), "no photo gallery on a workspace detail");
+  assert.ok(detail.blocks.some((b) => b.block === "detail"), "focused record pane present");
+
+  // Compose + sandbox + gates must all pass on the product-led fallback.
+  const { designTokensFromManifest } = await import("../lib/pastel-agent/agents/design-v14");
+  const { themeFromDesignTokens } = await import("../lib/pastel-agent/knowledge/index");
+  const tokens = designTokensFromManifest(company, "light");
+  const theme = themeFromDesignTokens(tokens, company);
+  const { css } = compileStyles(theme);
+  const components: Record<string, string> = {};
+  for (const item of wf.inventory.components) {
+    const code = baseComponentCode(item.basedOn);
+    if (code) components[`src/components/${item.name}.jsx`] = code;
+  }
+  const data = mockDataset(brief, "v14-dash");
+  assert.equal(data.domain, "productivity");
+  const copy = fallbackCopy(brief, wf.plan, data);
+  const composed = composeAll({ brief, wireframe: wf.plan, inventory: wf.inventory, copy, theme, data, ux: fallbackUx(wf.plan) });
+  const files = { ...components, ...composed.files, ...composed.primitives, "src/styles.css": css };
+
+  const homeSrc = composed.files["src/screens/home.jsx"];
+  const detailSrc = composed.files["src/screens/detail.jsx"];
+  // The Airbnb-style surface language is GONE from a non-browse product.
+  assert.ok(!homeSrc.includes("Where to?"), "no destination search hero");
+  assert.ok(!detailSrc.includes("Guest reviews"), "no guest-reviews section on a workspace detail");
+  assert.ok(!detailSrc.includes("Verified host"), "no verified-host language on a workspace detail");
+  assert.ok(!detailSrc.includes(">Dates<"), "no booking dates on a workspace detail");
+  assert.ok(!detailSrc.includes(">Guests<"), "no guest counts on a workspace detail");
+
+  const verifier = new IncrementalScreenVerifier();
+  const result = await verifier.verify(files);
+  assert.ok(result.ok, `sandbox failed: ${result.errors.map((e) => e.message).join("; ")}`);
+  const { auditFiles } = await import("../lib/pastel-agent/checks/audit");
+  assert.ok(auditFiles(theme, files).passed, "gate passes on the product-led fallback");
+  const contentIssues = auditContent(data, files);
+  assert.equal(contentIssues.length, 0, `content gate failed: ${contentIssues.map((i) => i.description).join("; ")}`);
+});
+
+test("v14 wireframe fallback: a genuine catalog product keeps the browse structure", async () => {
+  const company = await loadCompany("airbnb");
+  const brief = productBriefSchema.parse({
+    version: "1.0.0",
+    title: "StayVista",
+    productType: "vacation rental booking app",
+    description: "Browse unique vacation rentals worldwide and book your perfect stay.",
+    audience: { primary: "Travelers", needs: ["Find stays", "Book quickly"] },
+    goals: ["Browse the catalog", "Book a stay"],
+    features: [{ name: "Search", description: "Find stays by destination.", priority: "critical" }],
+    platform: "all",
+    screenPurposes: [
+      { id: "home", purpose: "Browse and explore the catalog of stays" },
+      { id: "detail", purpose: "Full listing page with photos, details, and booking" },
+    ],
+    copyDirection: "Warm, specific, human.",
+    designLanguage: "Warm and photoreal.",
+    inspiration: { primary: "airbnb" },
+  });
+  const wf = fallbackWireframe(brief, company);
+  const home = wf.plan.screens.find((s) => s.id === "home")!;
+  const detail = wf.plan.screens.find((s) => s.id === "detail")!;
+  assert.ok(home.blocks.some((b) => b.block === "search"), "a browse product keeps the search toolbar");
+  assert.ok(home.blocks.some((b) => b.block === "list" && b.variant === "cards"), "a browse product keeps the grid");
+  assert.ok(detail.blocks.some((b) => b.block === "media" && b.variant === "gallery"), "a listing keeps the photo gallery");
+  assert.ok(detail.blocks.some((b) => b.block === "list" && b.variant === "activity"), "a listing keeps social proof");
+});
+
+test("v14 brief: the catalog is the only source of inspiration (no hardcoded fallback)", async () => {
+  const { inspirationFromAnswers } = await import("../lib/pastel-agent/agents/brief-v6");
+  assert.equal(inspirationFromAnswers({}).primary, null, "no answer → no hardcoded company");
+  const scored = await scoreCompanies("build a fitness training app for runners");
+  assert.ok(scored.length >= 10, "every registered company is scored");
+  const { listCompanySlugs } = await import("../lib/pastel-agent/knowledge/index");
+  const slugs = listCompanySlugs();
+  for (const s of scored) assert.ok(slugs.includes(s.slug), "scores only reference registered companies");
+});
+
+test("v14 pipeline: phases + model roles are in the wire contract", async () => {
+  const { PHASE_ORDER } = await import("../lib/pastel-agent/types");
+  assert.deepEqual(PHASE_ORDER, ["discovery", "design", "brief", "data", "wireframe", "build", "assemble", "present", "review"]);
+  const { designTokensSchema, dataPlanSchema } = await import("../lib/pastel-agent/schemas-v6");
+  assert.ok(designTokensSchema, "design-token schema exists");
+  assert.ok(dataPlanSchema, "data-plan schema exists");
+  const { MODELS, CHEAP_DEFAULT, MID_DEFAULT } = await import("../lib/pastel-agent/gateway");
+  assert.ok(MODELS.design, "design model role registered");
+  assert.ok(MODELS.data, "data model role registered");
+  // V14 tier allocation: judgment stages on Luna, mechanical stages on Haiku.
+  assert.equal(MODELS.planner, CHEAP_DEFAULT, "planner stays on Haiku");
+  assert.equal(MODELS.builder, CHEAP_DEFAULT, "builder stays on Haiku");
+  assert.equal(MODELS.repair, CHEAP_DEFAULT, "repair stays on Haiku");
+  assert.equal(MODELS.copy, MID_DEFAULT, "copy moved to Luna (product voice)");
+  assert.equal(MODELS.data, MID_DEFAULT, "data agent runs on Luna");
+  assert.equal(MODELS.brief, MID_DEFAULT, "brief runs on Luna");
+});
+
+// ── V14b: design-data agent + next-gen review ─────────────────────────────
+
+test("v14 data: fallback dataset fills every page-content slot from the packs", () => {
+  const rentals = mockDataset(fitnessBrief(), "v14b-fill");
+  assert.ok(rentals.reviews.length >= 4, "reviews exist in the dataset");
+  assert.ok(rentals.reviewHeading.length > 0, "review heading exists");
+  assert.ok(rentals.trustItems.length >= 3, "trust items exist");
+  assert.ok(rentals.primaryCta.length > 0, "primary CTA exists");
+  assert.ok(rentals.homeCta.length > 0, "home CTA exists");
+  for (const r of rentals.reviews) {
+    assert.ok(r.initials.length > 0 && r.hue >= 0, "review avatars are derived deterministically");
+  }
+});
+
+test("v14 data: sanitizeDataPlan rejects duplicate labels and off-domain currency", async () => {
+  const { sanitizeDataPlan } = await import("../lib/pastel-agent/agents/data-v14");
+  const { dataPlanSchema } = await import("../lib/pastel-agent/schemas-v6");
+  const base = {
+    version: "1.0.0" as const,
+    people: Array.from({ length: 6 }, (_, i) => ({ name: `Person ${i}`, role: "Member", email: `p${i}@example.com` })),
+    metrics: [
+      { label: "Volume", unit: "sets", value: "32", delta: 4, positive: true, note: "up", spark: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+      { label: "Streak", unit: "days", value: "12", delta: 2, positive: true, note: "best 24", spark: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+      { label: "Readiness", unit: "%", value: "88", delta: 3, positive: true, note: "trending", spark: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+      { label: "PR", unit: "lb", value: "180", delta: 5, positive: true, note: "soon", spark: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12] },
+    ],
+    series: [
+      { label: "Strength", unit: "lb", points: [{ x: "Mon", y: 120 }, { x: "Tue", y: 130 }, { x: "Wed", y: 125 }, { x: "Thu", y: 140 }] },
+      { label: "Volume", unit: "sets", points: [{ x: "Mon", y: 30 }, { x: "Tue", y: 36 }, { x: "Wed", y: 32 }, { x: "Thu", y: 40 }] },
+    ],
+    rows: Array.from({ length: 6 }, (_, i) => ({ id: `r${i}`, name: `Row ${i}`, detail: "d", amount: "40 lb", status: "done", date: "Aug 1" })),
+    activity: ["Logged a session", "Set a PR", "Hit a streak", "Finished a block"],
+    detailFields: ["Sets", "Reps", "Load", "Focus"],
+    detailValues: ["3", "8", "60 lb", "Strength"],
+    settingsSections: [
+      { title: "Goals", items: [{ label: "Weekly goal", value: "30 km", control: "select" as const }, { label: "PR alerts", value: "On", control: "toggle" as const }] },
+      { title: "Units", items: [{ label: "Distance", value: "km", control: "select" as const }, { label: "Weight", value: "lb", control: "select" as const }] },
+    ],
+    searchPlaceholder: "Search",
+    emptyTitle: "No data",
+    emptyBody: "Start a session.",
+    reviews: Array.from({ length: 4 }, (_, i) => ({ name: `Person ${i}`, rating: 4.5, text: "A specific, useful review line for the product." })),
+    reviewHeading: "Member feedback",
+    trustItems: ["A", "B", "C"],
+    primaryCta: "Start workout",
+    homeCta: "Start today",
+  };
+  assert.ok(dataPlanSchema.safeParse(base).success, "valid plan parses");
+
+  const dup = structuredClone(base);
+  dup.metrics[1] = { ...dup.metrics[0] };
+  assert.ok(sanitizeDataPlan(dataPlanSchema.parse(dup), "fitness").fatal.some((f) => f.includes("duplicate metric")), "duplicate metric labels are fatal");
+
+  const dirty = structuredClone(base);
+  dirty.rows[0].amount = "$22,091";
+  dirty.rows[0].name = "Invoice INV-0211";
+  assert.ok(sanitizeDataPlan(dataPlanSchema.parse(dirty), "fitness").fatal.some((f) => f.includes("currency")), "currency in a fitness product is fatal");
+
+  const clean = sanitizeDataPlan(dataPlanSchema.parse(base), "fitness");
+  assert.equal(clean.fatal.length, 0, "clean plan passes");
+  assert.ok(clean.plan.reviews[0].initials.length > 0, "review initials derived");
+});
+
+test("v14 data: runData falls back to the domain packs when the gateway is unavailable", async () => {
+  const { __setTestClient } = await import("../lib/pastel-agent/gateway");
+  const { runData } = await import("../lib/pastel-agent/agents/data-v14");
+  const brief = fitnessBrief();
+  try {
+    __setTestClient({ responses: { create: async () => { throw new Error("stub: gateway down"); } } });
+    const out = await runData({ brief, seed: "v14b-fallback" });
+    assert.equal(out.usedFallback, true, "gateway failure → deterministic fallback");
+    assert.equal(out.data.domain, "fitness");
+    assert.ok(out.data.rows.length >= 6);
+    assert.ok(out.data.reviews.length >= 4, "fallback dataset carries reviews");
+  } finally {
+    __setTestClient(null);
+  }
+});
+
+test("v14 data: compose reads the dataset's content (heading, trust items, CTA) instead of baked consts", async () => {
+  const company = await loadCompany("airbnb");
+  const theme = resolveCompanyTheme(company, { mode: "light", hue: company.hueBase });
+  const { css } = compileStyles(theme);
+  const brief = productBriefSchema.parse({
+    version: "1.0.0", title: "StayVista", productType: "vacation rental booking app",
+    description: "Browse unique vacation rentals worldwide.", audience: { primary: "Travelers", needs: ["x"] },
+    goals: ["g"], features: [{ name: "S", description: "d", priority: "critical" }], platform: "all",
+    screenPurposes: [
+      { id: "home", purpose: "Browse and explore the catalog of stays" },
+      { id: "detail", purpose: "Full listing page with photos, details, and booking" },
+    ],
+    copyDirection: "Warm", designLanguage: "x", inspiration: { primary: "airbnb" },
+  });
+  const plan: any = {
+    version: "1.0.0",
+    screens: [
+      { id: "home", archetype: "catalog", title: "Stays", purpose: "Browse", nav: "topbar",
+        blocks: [{ block: "hero", variant: "app", emphasis: true }, { block: "search", variant: "dropdown" }, { block: "list", variant: "cards" }] },
+      { id: "detail", archetype: "list-detail", title: "Villa", purpose: "Listing", nav: "topbar",
+        blocks: [{ block: "media", variant: "gallery", emphasis: true }, { block: "detail", variant: "pane" }, { block: "cta", variant: "band" }, { block: "list", variant: "activity" }] },
+    ],
+  };
+  const data = mockDataset(brief, "v14b-compose");
+  data.reviewHeading = "Traveller notes";
+  data.trustItems = ["Money-back promise", "Local guides", "Verified stays", "Instant chat"];
+  data.primaryCta = "Book my trip";
+  const copy = fallbackCopy(brief, plan, data);
+  const composed = composeAll({ brief, wireframe: plan, inventory: { version: "1.0.0", components: [] }, copy, theme, data, ux: fallbackUx(plan) });
+  const detail = composed.files["src/screens/detail.jsx"];
+  const dataFile = composed.files["src/data.js"];
+  assert.ok(detail.includes("Traveller notes"), "review heading comes from the dataset");
+  assert.ok(detail.includes("Money-back promise"), "trust items come from the dataset");
+  assert.ok(dataFile.includes("Book my trip"), "primary CTA comes from the dataset (rendered via DATA.screens.detail.primaryCta)");
+  assert.ok(detail.includes("DATA.screens.detail.primaryCta"), "detail renders the dataset CTA");
+  assert.ok(!detail.includes("Verified host"), "baked fallback text not used when the dataset provides content");
+});
+
+test("v14 review: screen-composition audit flags duplicate and missing components", async () => {
+  const { auditScreenComposition } = await import("../lib/pastel-agent/checks/review-v14");
+  const wireframe: any = {
+    version: "1.0.0",
+    screens: [
+      { id: "home", archetype: "app-dashboard", title: "Home", purpose: "Dashboard", nav: "topbar",
+        blocks: [
+          { block: "custom", variant: "default", component: "StreakModule" },
+          { block: "custom", variant: "default", component: "StreakModule" },
+          { block: "custom", variant: "default", component: "CoachInsight" },
+        ] },
+      { id: "detail", archetype: "list-detail", title: "Detail", purpose: "Record", nav: "topbar",
+        blocks: [{ block: "detail", variant: "pane" }] },
+    ],
+  };
+  const inventory: any = {
+    version: "1.0.0",
+    components: [
+      { name: "StreakModule", purpose: "Streak", basedOn: "StatCard", usedBy: ["home"] },
+      { name: "CoachInsight", purpose: "Insight", basedOn: "Card", usedBy: ["home"] },
+      { name: "RecordRow", purpose: "Row", basedOn: "ScheduleList", usedBy: ["detail"] },
+    ],
+  };
+  const issues = auditScreenComposition(wireframe, inventory);
+  assert.ok(issues.some((i) => i.description.includes("Duplicate component \"StreakModule\"") && i.severity === "high"), "duplicate mount is flagged HIGH");
+  assert.ok(issues.some((i) => i.description.includes("RecordRow") && i.file === "src/screens/detail.jsx"), "planned-but-unmounted component is flagged");
+});
+
+test("v14 review: geometry summary + screen context feed the vision model", async () => {
+  const { geometrySummary, screenContext } = await import("../lib/pastel-agent/agents/review-v14");
+  const clean = geometrySummary("home", { overflow: false, fonts: [], overlaps: [], blanks: [], offGrid: 0, sampled: 10, minHeightOk: true, rhythm: [], flush: [], heroScale: true });
+  assert.ok(clean.includes("clean"), "clean geometry reports clean");
+  const dirty = geometrySummary("detail", { overflow: false, fonts: [], overlaps: [], blanks: [], offGrid: 2, sampled: 10, minHeightOk: true, rhythm: ["a"], flush: ["b"], heroScale: false });
+  assert.ok(dirty.includes("issues") && dirty.includes("rhythm=1") && dirty.includes("heroScale=false"), "measured numbers reach the model");
+  const ctx = screenContext("home", {
+    version: "1.0.0",
+    screens: [{ id: "home", archetype: "app-dashboard", title: "Home", purpose: "Dashboard", nav: "topbar", blocks: [{ block: "hero", variant: "app", emphasis: true }] }],
+  }, { version: "1.0.0", components: [{ name: "StreakModule", purpose: "s", basedOn: "StatCard", usedBy: ["home"] }] });
+  assert.ok(ctx.includes("hero:app*"), "screen context lists wireframe blocks");
+  assert.ok(ctx.includes("StreakModule (StatCard)"), "screen context lists components to render");
 });

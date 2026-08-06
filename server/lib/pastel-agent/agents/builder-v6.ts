@@ -2,6 +2,7 @@ import { chatText, extractFencedBlock, MAX_TOKENS_PER_CALL, type OnUsage } from 
 import { baseComponentCode } from "../base-components/index";
 import { SANDBOX_CONTRACT } from "../contract";
 import type { ComponentUISpec, ResolvedTheme, WireframePlan } from "../schemas-v6";
+import type { VisualReference } from "../types";
 import { datasetPrompt, type MockDataset } from "../lib/content";
 
 /**
@@ -27,6 +28,7 @@ export interface BuilderInput {
   /** V11: the inspiration company's slug — its reference imagery is attached
    * to builder prompts so components match the real brand's look. */
   companySlug?: string;
+  visualReference?: VisualReference;
 }
 
 export interface BuilderOutput {
@@ -109,7 +111,7 @@ function hardcodedColorHits(code: string): string[] {
 export async function generateComponent(
   spec: ComponentUISpec,
   theme: ResolvedTheme,
-  opts?: { onUsage?: OnUsage; wireframe?: WireframePlan; data?: MockDataset; companySlug?: string },
+  opts?: { onUsage?: OnUsage; wireframe?: WireframePlan; data?: MockDataset; companySlug?: string; visualReference?: VisualReference },
 ): Promise<string> {
   const exemplar = baseComponentCode(spec.basedOn);
   if (!exemplar) {
@@ -128,8 +130,9 @@ export async function generateComponent(
       /* optional */
     }
   }
+  if (opts?.visualReference) refImages.push(...opts.visualReference.images);
   const refText = refImages.length > 0
-    ? "\n\n### COMPANY REFERENCE IMAGERY\nOne or more screenshots of the REAL company UI are attached. Match their component shapes, spacing, radii, and mood — but render THIS product's data through props. Do not copy their content or logos."
+    ? "\n\n### VISUAL REFERENCE IMAGERY\nReference screenshots are attached. Match product-target geometry, spacing, radii, and density; use company imagery only as a secondary style cue. Render THIS product's data through props and do not copy reference content or logos."
     : "";
 
   const screenContext = opts?.wireframe
@@ -244,6 +247,7 @@ export async function runBuilder(input: BuilderInput): Promise<BuilderOutput> {
       wireframe: input.wireframe,
       data: input.data,
       companySlug: input.companySlug,
+      visualReference: input.visualReference,
     });
     return { path: componentPath(spec.name), code };
   });

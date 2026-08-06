@@ -172,6 +172,47 @@ export async function companyRefImageBlocks(
   return out;
 }
 
+/** V12 product reference imagery. These references describe the intended
+ * composition for a product, independently of the selected inspiration brand.
+ * The local Figma export is optional in production, so every caller remains
+ * best-effort when the asset is not present. */
+export async function visualReferenceImageBlocks(
+  reference = "fitness-coach",
+  max = 1,
+  maxBytes = 1_500_000,
+): Promise<Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }>> {
+  const candidates = reference === "fitness-coach"
+    ? [
+        path.join(process.cwd(), "IMG_4629.jpeg"),
+        path.join(pastelAssetRoot(), "knowledge", "visual-references", "fitness-coach.jpeg"),
+      ]
+    : [path.join(pastelAssetRoot(), "knowledge", "visual-references", `${reference}.png`)];
+  const out: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = [];
+  for (const file of candidates.slice(0, max + 1)) {
+    try {
+      if (!fs.existsSync(file)) continue;
+      const buf = fs.readFileSync(file);
+      if (buf.byteLength <= 0 || buf.byteLength > maxBytes) continue;
+      const media_type = /\.jpe?g$/i.test(file) ? "image/jpeg" : "image/png";
+      out.push({ type: "image", source: { type: "base64", media_type, data: buf.toString("base64") } });
+      if (out.length >= max) break;
+    } catch {
+      // The reference is optional and must never block generation.
+    }
+  }
+  return out;
+}
+
+/** Compact textual direction paired with a product reference image. */
+export async function visualReferenceBlock(reference = "fitness-coach"): Promise<string> {
+  const p = path.join(pastelAssetRoot(), "knowledge", "visual-references", `${reference}.md`);
+  try {
+    return fs.existsSync(p) ? fs.readFileSync(p, "utf8") : "";
+  } catch {
+    return "";
+  }
+}
+
 /** The universal design law, compiled to a compact prompt block. */
 export async function megadesignBlock(): Promise<string> {
   if (megadesignCache) return megadesignCache;
@@ -331,6 +372,11 @@ export function resolveCompanyTheme(
     "--radius-xl": `${manifest.radius.xl}px`,
     "--radius-full": `${manifest.radius.full}px`,
 
+    "--control-sm": "32px",
+    "--control-md": "40px",
+    "--control-lg": "48px",
+    "--control-pad-x": "16px",
+
     "--font-display": `"${manifest.fonts.display}"`,
     "--font-body": `"${manifest.fonts.body}"`,
     ...(manifest.fonts.mono ? { "--font-mono": `"${manifest.fonts.mono}"` } : {}),
@@ -355,3 +401,126 @@ export function resolveCompanyTheme(
 }
 
 export { contrastRatio };
+
+// ── V14: theme from the design agent's tokens ────────────────────────────
+//
+// V14: the design agent produces an explicit per-run design system
+// (`DesignTokens`) BEFORE the brief — brand colors, radius scale, type scale,
+// control sizing, section rhythm, and fonts. No company manifest is copied
+// wholesale into the theme anymore; the top-scored company manifest is only a
+// HINT carried along for voice/review context (e.g. `theme.manifest.voiceAndTone`).
+
+export function themeFromDesignTokens(
+  tokens: import("../schemas-v6").DesignTokens,
+  hintManifest: CompanyManifest,
+): ResolvedTheme {
+  const c = tokens.colors;
+  const colors = {
+    primary: c.primary,
+    primaryHover: darken(c.primary, 0.08),
+    accent: c.accent,
+    accentHover: darken(c.accent, 0.08),
+    destructive: c.destructive,
+    destructiveHover: darken(c.destructive, 0.08),
+    success: c.success,
+    warning: c.warning,
+    chart: c.chart,
+  };
+
+  const cssVars: Record<string, string> = {
+    "--background": c.background,
+    "--foreground": c.foreground,
+    "--card": c.card,
+    "--card-foreground": c.cardForeground,
+    "--popover": c.popover,
+    "--popover-foreground": c.popoverForeground,
+    "--primary": c.primary,
+    "--primary-foreground": c.primaryForeground,
+    "--primary-hover": colors.primaryHover,
+    "--secondary": c.secondary,
+    "--secondary-foreground": c.secondaryForeground,
+    "--muted": c.muted,
+    "--muted-foreground": c.mutedForeground,
+    "--accent": c.accent,
+    "--accent-foreground": c.accentForeground,
+    "--accent-hover": colors.accentHover,
+    "--destructive": c.destructive,
+    "--destructive-foreground": c.destructiveForeground,
+    "--destructive-hover": colors.destructiveHover,
+    "--success": c.success,
+    "--success-subtle": c.successSubtle,
+    "--warning": c.warning,
+    "--warning-subtle": c.warningSubtle,
+    "--border": c.border,
+    "--input": c.input,
+    "--ring": c.ring,
+
+    "--radius": `${tokens.radius.md}px`,
+    "--radius-sm": `${tokens.radius.sm}px`,
+    "--radius-md": `${tokens.radius.md}px`,
+    "--radius-lg": `${tokens.radius.lg}px`,
+    "--radius-xl": `${tokens.radius.xl}px`,
+    "--radius-full": `${tokens.radius.full}px`,
+
+    "--control-sm": `${tokens.control.sm}px`,
+    "--control-md": `${tokens.control.md}px`,
+    "--control-lg": `${tokens.control.lg}px`,
+    "--control-pad-x": "16px",
+
+    "--font-display": `"${tokens.fonts.display}"`,
+    "--font-body": `"${tokens.fonts.body}"`,
+    ...(tokens.fonts.mono ? { "--font-mono": `"${tokens.fonts.mono}"` } : {}),
+
+    "--text-xs": `${tokens.typeScale.xs}px`,
+    "--text-sm": `${tokens.typeScale.sm}px`,
+    "--text-base": `${tokens.typeScale.base}px`,
+    "--text-lg": `${tokens.typeScale.lg}px`,
+    "--text-xl": `${tokens.typeScale.xl}px`,
+    "--text-2xl": `${tokens.typeScale["2xl"]}px`,
+    "--text-3xl": `${tokens.typeScale["3xl"]}px`,
+    "--text-4xl": `${tokens.typeScale["4xl"]}px`,
+
+    "--section-padding-y": `${tokens.sectionPaddingY}px`,
+    "--section-gap": `${tokens.sectionGap}px`,
+    "--content-max": "1280px",
+  };
+
+  const fontFamilies = [...new Set([tokens.fonts.display, tokens.fonts.body, tokens.fonts.mono].filter(Boolean))] as string[];
+
+  const themeTokens: ResolvedTheme["tokens"] = {
+    background: c.background,
+    foreground: c.foreground,
+    card: c.card,
+    cardForeground: c.cardForeground,
+    popover: c.popover,
+    popoverForeground: c.popoverForeground,
+    primary: c.primary,
+    primaryForeground: c.primaryForeground,
+    secondary: c.secondary,
+    secondaryForeground: c.secondaryForeground,
+    muted: c.muted,
+    mutedForeground: c.mutedForeground,
+    accent: c.accent,
+    accentForeground: c.accentForeground,
+    destructive: c.destructive,
+    destructiveForeground: c.destructiveForeground,
+    success: c.success,
+    successSubtle: c.successSubtle,
+    warning: c.warning,
+    warningSubtle: c.warningSubtle,
+    border: c.border,
+    input: c.input,
+    ring: c.ring,
+    chart: c.chart,
+  };
+
+  return {
+    manifest: hintManifest,
+    tokens: themeTokens,
+    mode: tokens.mode,
+    selection: { mode: tokens.mode, hue: hintManifest.hueBase },
+    cssVars,
+    fontFamilies,
+    colors,
+  };
+}

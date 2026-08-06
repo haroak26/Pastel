@@ -12,15 +12,24 @@ export type RunKind = "full" | "solo";
 
 export type PastelPhase =
   | "discovery"
+  | "design"
   | "brief"
+  | "data"
   | "wireframe"
   | "build"
   | "assemble"
   | "review"
   | "present";
 
-export const PHASE_ORDER: PastelPhase[] = ["discovery", "brief", "wireframe", "build", "assemble", "present", "review"];
+export const PHASE_ORDER: PastelPhase[] = ["discovery", "design", "brief", "data", "wireframe", "build", "assemble", "present", "review"];
 export type PhaseStatus = "idle" | "running" | "done" | "error";
+
+/** User-supplied visual direction, independent of company inspiration. */
+export interface VisualReference {
+  images: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }>;
+  description?: string;
+  names?: string[];
+}
 
 // ── SSE events (wire contract) ──────────────────────────────────────────
 

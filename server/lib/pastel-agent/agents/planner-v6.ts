@@ -2,6 +2,7 @@ import { chatJSON, MAX_TOKENS_PER_CALL, type OnUsage } from "../gateway";
 import { componentUISpecSchema, type ComponentUISpec, type ComponentInventory, type ResolvedTheme, type WireframePlan } from "../schemas-v6";
 import { baseComponentCode } from "../base-components/index";
 import { datasetPrompt, type MockDataset } from "../lib/content";
+import type { VisualReference } from "../types";
 
 /**
  * V6/V7 Planner agent — per-component UI spec. Runs in PARALLEL across the
@@ -18,6 +19,7 @@ export interface PlannerInput {
   theme: ResolvedTheme;
   wireframe?: WireframePlan;
   data?: MockDataset;
+  visualReference?: VisualReference;
   onUsage?: OnUsage;
   /** V11: the inspiration company's slug — its reference imagery shapes the
    * designIntent so the spec asks for the brand's actual component style. */
@@ -88,6 +90,11 @@ export async function runPlanner(input: PlannerInput): Promise<PlannerOutput> {
     } catch {
       /* reference imagery is optional */
     }
+  }
+
+  if (input.visualReference) {
+    refImages.push(...input.visualReference.images);
+    refText += "\n\n### USER PRODUCT REFERENCE\nAdapt component geometry, density, spacing, and surface treatment to the attached product reference. Keep the component's content and behavior faithful to the product brief.";
   }
 
   const textPart = `COMPONENT: ${input.item.name} — ${input.item.purpose}\nBased on base component: ${input.item.basedOn}\nUsed by screens: ${input.item.usedBy.join(", ")}\n${propsLine}\n\n${screensBlock}\n\n${dataBlock}\n\nCOMPANY DESIGN GUIDANCE:\n${guidance || "Follow the company rules (below)."}\n\nCOMPANY RULES:\n${input.theme.manifest.rules.map((r) => `- ${r}`).join("\n")}\n\nCOMPANY SIGNATURE MOVES (reference for the designIntent):\n${input.theme.manifest.signatureMoves.map((s) => `- ${s}`).join("\n")}\n${refText}\n\nEmit the component UI spec as JSON matching:\n{\n  "name", "purpose", "basedOn", "usedBy": [screen ids],\n  "props": [{ "name", "type", "default"? }],\n  "variants": [{ "name", "purpose" }],\n  "states": string[],\n  "designIntent"?, "notes"?\n}`;

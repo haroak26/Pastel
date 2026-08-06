@@ -22,12 +22,14 @@ interface AgentRunCardProps {
 
 const RUNNING_TITLES: Record<AgentPhase, string> = {
   discovery: "Discovery — picking your inspiration",
-  brief: "Brief — building the product brief",
+  design: "Design System — creating brand tokens",
+  brief: "Brief — selecting references & building the brief",
+  data: "Content & Data — writing metrics, items, and reviews",
   wireframe: "Wireframe — producing page wireframes",
   build: "Components — planning and building in parallel",
   assemble: "Assembly — composing screens & verifying",
   present: "Presenting — your screens are live",
-  review: "Quality Review — gate + visual review",
+  review: "Visual Review — spacing, components, and flow",
 };
 
 export function AgentRunCard({

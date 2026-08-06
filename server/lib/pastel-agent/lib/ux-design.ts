@@ -1,22 +1,24 @@
 import type { WireframePlan, WireframeScreen, BlockInstance, ComponentInventory, UxDesignPlan, UxScreenDesign, ProductBrief } from "../schemas-v6";
 
 /**
- * V9 UX design engine — the deterministic half of the UX component.
+ * V14 UX design engine — the deterministic half of the UX component.
  *
- * V9 ships EXACTLY TWO screens for every product:
- *   1. "home"    — the product's main browse/catalog screen (toolbar + grid +
- *                  one dominant moment).
- *   2. "detail"  — the info page for a single item (photo gallery + summary
- *                  card + the primary action).
+ * V14 (de-Airbnb fix): the canonical model is PRODUCT-LED, not marketplace-
+ * led. Exactly two screens still ship, but their structure derives from the
+ * brief's screen purposes:
+ *   1. "home"    — the product's primary workflow (dashboard, feed,
+ *                  workspace, coaching, or catalog — chosen per product).
+ *   2. "detail"  — the focused secondary workflow for one item, record,
+ *                  task, or content object.
+ * Search toolbars, product grids, photo galleries, booking panes, and guest
+ * reviews are ONLY enforced when the product genuinely is a browse/market-
+ * place product. A coaching app or dashboard never inherits an Airbnb-style
+ * catalog + listing template.
  *
  * This module is the ground truth for that model: it normalizes brief screen
  * purposes to the canonical pair, enforces per-archetype block allowlists and
- * canonical ordering (so no random elements land where they don't belong),
- * assigns visual surfaces (band/card/rows/tiles/toolbar/gallery) and card
- * budgets (fixing both outline-card overuse AND missing cards), and derives
- * the default `UxDesignPlan` the composer consumes. The model UX agent
- * (`agents/ux-v6.ts`) may refine it; every refinement is validated against
- * these rules before the composer sees it.
+ * canonical ordering, assigns visual surfaces and card budgets, and derives
+ * the default `UxDesignPlan` the composer consumes.
  */
 
 // ── Two-screen canonical model ────────────────────────────────────────────
@@ -26,17 +28,41 @@ export const CANONICAL_SCREENS = [
     id: "home",
     archetype: "catalog" as const,
     title: "Home",
-    purpose: "Browse and explore the product's main catalog — the primary screen",
+    purpose: "The product's primary workflow — the screen users spend the most time in",
     nav: "topbar" as const,
   },
   {
     id: "detail",
     archetype: "list-detail" as const,
     title: "Detail",
-    purpose: "Full info page for one item — photos, details, and the primary action",
+    purpose: "The focused secondary workflow for one item, record, task, or content object",
     nav: "topbar" as const,
   },
 ];
+
+// V14: product-led role derivation. A product only inherits marketplace
+// structure when its own screen purposes ask for it — never by default.
+const CATALOG_HOME_RE =
+  /catalog|browse|marketplace|shop|shopping|store|search|stays?|listing|rental|venue|booking/i;
+const MEDIA_DETAIL_RE =
+  /listing|gallery|photo|photograph|image|media|video|episode|stay|property|album|visual/i;
+const REVIEW_DETAIL_RE =
+  /listing|stay|property|reviews?|episode|album|book(?:ing)?|product/i;
+
+/** A home screen that genuinely browses (search + grid are legal and forced). */
+export function isCatalogHome(purpose?: string): boolean {
+  return CATALOG_HOME_RE.test(purpose ?? "");
+}
+
+/** A detail screen that is media-rich (photo/video gallery is the hero). */
+export function isMediaDetail(purpose?: string): boolean {
+  return MEDIA_DETAIL_RE.test(purpose ?? "");
+}
+
+/** A detail screen whose secondary section is social proof (reviews). */
+export function detailWantsReviews(purpose?: string): boolean {
+  return REVIEW_DETAIL_RE.test(purpose ?? "");
+}
 
 const HOMEISH =
   /^(home|landing|dashboard|overview|today|index)$|catalog|browse|explore|discover|feed|library|shop|search|stays|listings|dash|metric|overview|stat/i;
@@ -141,53 +167,63 @@ export const ROLE_CARD_BUDGET: Record<ScreenRole, number> = {
   detail: 2,
 };
 
-/** The dominant moment per role — the emphasized block. */
-export const ROLE_DOMINANT: Record<ScreenRole, string> = {
-  home: "list:cards",
-  detail: "media:gallery",
-};
+/** V14: the product-led dominant moment — a browse home emphasizes the
+ * product grid; a dashboard/feed home emphasizes its hero moment; a
+ * media-rich detail emphasizes the gallery; a focused detail emphasizes the
+ * info pane. */
+export function dominantMomentFor(role: ScreenRole, screen: { purpose?: string }): string {
+  if (role === "home") return isCatalogHome(screen.purpose) ? "list:cards" : "hero:app";
+  return isMediaDetail(screen.purpose) ? "media:gallery" : "detail:pane";
+}
 
-// ── V10 layout structures ─────────────────────────────────────────────────
+// ── V10/V14 layout structures ─────────────────────────────────────────────
 
 /** Legal layout structures per screen role. The model UX agent picks one;
- * anything else is normalized back to the role's canonical structure. */
+ * anything else is normalized back to the role's canonical structure.
+ * V14: home structures are PRODUCT-LED — dashboard/feed/workspace for
+ * non-browse products, catalog-* only when the product genuinely browses. */
 export const ROLE_STRUCTURES: Record<ScreenRole, string[]> = {
-  home: ["catalog-classic", "catalog-rail", "catalog-featured"],
+  home: ["dashboard-led", "feed-led", "workspace-led", "catalog-classic", "catalog-rail", "catalog-featured"],
   detail: ["detail-classic", "detail-asymmetric"],
-};
-
-/** Legacy structure names → canonical mapping (single-column/two-column/split
- * are pre-v10 and no longer expressed). */
-const LEGACY_STRUCTURE: Record<string, string> = {
-  "single-column": "catalog-classic",
-  two: "catalog-classic",
-  split: "catalog-classic",
 };
 
 /** Legal structure values (mirrors the uxScreenSchema enum). */
 export type UxStructure =
+  | "dashboard-led" | "feed-led" | "workspace-led"
   | "catalog-classic" | "catalog-rail" | "catalog-featured"
   | "detail-classic" | "detail-asymmetric"
   | "single-column" | "two-column" | "split";
 
-export function canonicalStructure(role: ScreenRole, structure?: string): UxStructure {
+export function canonicalStructure(role: ScreenRole, structure?: string, catalog = true): UxStructure {
   const s = structure ?? "";
   if (ROLE_STRUCTURES[role].includes(s)) return s as UxStructure;
-  return (role === "detail" ? "detail-classic" : "catalog-classic") as UxStructure;
+  if (role === "detail") return "detail-classic";
+  return catalog ? "catalog-classic" : "dashboard-led";
+}
+
+/** V14: the product-led default home structure — catalog layout only for
+ * products that browse, dashboard-led otherwise. */
+export function homeStructureFor(purpose?: string): UxStructure {
+  return canonicalStructure("home", undefined, isCatalogHome(purpose));
 }
 
 const HOME_REQUIRED = ["search", "list"];
-const DETAIL_REQUIRED = ["media", "detail", "cta", "list"];
+const DETAIL_REQUIRED_CATALOG = ["media", "detail", "cta", "list"];
+const DETAIL_REQUIRED_FOCUSED = ["detail", "cta"];
 
-function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[]): { blocks: BlockInstance[]; notes: string[] } {
+function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[], screen: { purpose?: string }): { blocks: BlockInstance[]; notes: string[] } {
   const notes: string[] = [];
   const allowed = ROLE_ALLOWED[role];
   const variants = ROLE_VARIANTS[role];
+  // V14: product-led requirements from the screen's own purpose.
+  const catalogHome = role === "home" && isCatalogHome(screen.purpose);
+  const mediaDetail = role === "detail" && isMediaDetail(screen.purpose);
+  const wantsReviews = role === "detail" && detailWantsReviews(screen.purpose);
 
   let kept = blocks.filter((b) => {
     if (!allowed.has(b.block)) return false;
     // Only the variant(s) that serve this role survive.
-    if (role === "home" && b.block === "list" && b.variant && !["cards", "featured"].includes(b.variant)) return false;
+    if (role === "home" && b.block === "list" && b.variant && !["cards", "featured", "sequence"].includes(b.variant)) return false;
     if (role === "home" && b.block === "hero" && b.variant && b.variant !== "app") return false;
     if (role === "detail" && b.block === "list" && b.variant && b.variant !== "activity") return false;
     if (role === "detail" && b.block === "detail" && b.variant && !["pane", "bottom"].includes(b.variant)) return false;
@@ -214,22 +250,33 @@ function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[]): { blocks: B
   for (const b of customs) if (!ordered.includes(b)) ordered.push(b);
   if (ordered.length !== kept.length) notes.push("reordered blocks to the canonical layout");
 
-  // Required blocks are guaranteed by construction.
+  // Required blocks are guaranteed by construction — but only the ones the
+  // product's own purpose calls for (V14: no Airbnb-shaped defaults for
+  // non-browse products).
   const present = new Set(ordered.map((b) => b.block));
   if (role === "home") {
-    if (!present.has("search")) {
-      ordered.splice(1, 0, { block: "search", variant: "dropdown" });
-      notes.push("added search toolbar to home");
-    }
-    if (!present.has("list")) {
-      ordered.push({ block: "list", variant: "cards", emphasis: true });
-      notes.push("added product grid to home");
+    // Browse products get search + grid; everything else is product-led and
+    // takes NO forced search toolbar or catalog grid (the v12 coaching
+    // dashboard is the canonical example: its primary task is starting
+    // today's plan, not browsing).
+    if (catalogHome) {
+      if (!present.has("search")) {
+        ordered.splice(1, 0, { block: "search", variant: "dropdown" });
+        notes.push("added search toolbar to home (browse product)");
+      }
+      if (!present.has("list")) {
+        ordered.push({ block: "list", variant: "cards", emphasis: true });
+        notes.push("added product grid to home (browse product)");
+      }
+    } else {
+      notes.push(`home is product-led (${(screen.purpose ?? "no purpose").slice(0, 60)}) — no forced search/grid`);
     }
   } else {
-    for (let i = DETAIL_REQUIRED.length - 1; i >= 0; i--) {
-      const name = DETAIL_REQUIRED[i];
+    const required = mediaDetail ? DETAIL_REQUIRED_CATALOG : wantsReviews ? [...DETAIL_REQUIRED_FOCUSED, "list"] : DETAIL_REQUIRED_FOCUSED;
+    for (let i = required.length - 1; i >= 0; i--) {
+      const name = required[i];
       if (!present.has(name)) {
-        ordered.splice(0, 0, { block: name, variant: ROLE_VARIANTS.detail[name], content: name === "list" ? "Guest reviews" : undefined });
+        ordered.splice(0, 0, { block: name, variant: ROLE_VARIANTS.detail[name], content: name === "list" ? undefined : undefined });
         notes.push(`added ${name} to detail`);
       }
     }
@@ -270,16 +317,17 @@ function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[]): { blocks: B
   }
 
   // Exactly ONE emphasized (dominant) block per screen.
+  const dominantKey = dominantMomentFor(role, screen);
   const emphasized = ordered.filter((b) => b.emphasis);
   if (emphasized.length === 0) {
-    const [kind, variant] = ROLE_DOMINANT[role].split(":");
+    const [kind, variant] = dominantKey.split(":");
     const target = ordered.find((b) => b.block === kind && (!variant || b.variant === variant)) ?? ordered.find((b) => b.block === kind) ?? ordered[0];
     if (target) {
       ordered[ordered.indexOf(target)] = { ...target, emphasis: true };
       notes.push(`emphasized ${target.block}:${target.variant ?? "default"} as the dominant moment`);
     }
   } else if (emphasized.length > 1) {
-    const [kind, variant] = ROLE_DOMINANT[role].split(":");
+    const [kind, variant] = dominantKey.split(":");
     const keep = emphasized.find((b) => b.block === kind && (!variant || b.variant === variant)) ?? emphasized[0];
     const drop = emphasized.filter((e) => e !== keep);
     notes.push(`de-emphasized ${drop.map((b) => b.block).join(", ")} — one dominant moment per screen`);
@@ -333,7 +381,9 @@ export function enforceUxDesign(
   if (dropped.length > 0) notes.push(`dropped ${dropped.length} non-canonical screen(s): ${dropped.map((s) => s.id).join(", ")}`);
 
   const normalize = (s: WireframeScreen, role: ScreenRole): WireframeScreen => {
-    const { blocks, notes: blockNotes } = normalizeBlocks(role, s.blocks);
+    // V14: product-led derivation runs on the MODEL's purpose (the screen
+    // purpose is canonicalized AFTER block normalization).
+    const { blocks, notes: blockNotes } = normalizeBlocks(role, s.blocks, s);
     notes.push(...blockNotes.map((n) => `${role}/${s.id}: ${n}`));
     const archetype = role === "home" ? (s.archetype === "app-dashboard" ? "app-dashboard" : "catalog") : "list-detail";
     const title = s.title ?? (role === "home" ? "Home" : "Detail");
@@ -428,11 +478,13 @@ const SURFACE_OF: Record<string, UxSectionSurface> = {
 
 function defaultUxFor(screen: WireframeScreen, role: ScreenRole): UxScreenDesign {
   const dominant = screen.blocks.find((b) => b.emphasis) ?? screen.blocks[0];
+  const catalogHome = role === "home" && isCatalogHome(screen.purpose);
+  const mediaDetail = role === "detail" && isMediaDetail(screen.purpose);
   return {
     screenId: screen.id,
     layout: {
-      structure: canonicalStructure(role),
-      dominantMoment: dominant ? `${dominant.block}:${dominant.variant ?? "default"}` : ROLE_DOMINANT[role],
+      structure: role === "home" ? homeStructureFor(screen.purpose) : canonicalStructure("detail", undefined),
+      dominantMoment: dominant ? `${dominant.block}:${dominant.variant ?? "default"}` : dominantMomentFor(role, screen),
       sections: screen.blocks.map((b) => ({
         block: b.block,
         variant: b.variant,
@@ -441,7 +493,9 @@ function defaultUxFor(screen: WireframeScreen, role: ScreenRole): UxScreenDesign
         emphasis: b.emphasis,
       })),
     },
-    notes: role === "detail" ? "gallery is the hero; the summary pane is the single card, sticky on desktop" : "toolbar + product grid is the dominant moment; stats/charts render as bands",
+    notes: role === "detail"
+      ? (mediaDetail ? "gallery is the hero; the summary pane is the single card, sticky on desktop" : "the info pane is the focus; the action band closes the screen")
+      : (catalogHome ? "toolbar + product grid is the dominant moment; stats/charts render as bands" : "the hero moment leads; no browse toolbar unless the product browses"),
   };
 }
 
@@ -459,7 +513,8 @@ export function resolveUxDesign(plan: WireframePlan, modelUx?: UxDesignPlan | nu
   const merged = defaults.map((d) => {
     const m = modelByScreen.get(d.screenId);
     if (!m) return d;
-    const byKey = new Map(d.layout.sections.map((sec) => [`${sec.block}:${sec.variant ?? "default"}`, sec]));
+    const planScreen = plan.screens.find((s) => s.id === d.screenId);
+    const role = screenRoleOf({ id: d.screenId });
     const sections = d.layout.sections.map((sec) => {
       const cand = m.layout.sections.find((c) => c.block === sec.block);
       if (!cand) return sec;
@@ -475,9 +530,14 @@ export function resolveUxDesign(plan: WireframePlan, modelUx?: UxDesignPlan | nu
     return {
       screenId: d.screenId,
       layout: {
-        // V10: the structure the model picks is validated against the role's
-        // legal set — a home screen can never claim a detail structure.
-        structure: canonicalStructure(screenRoleOf({ id: d.screenId }), m.layout.structure),
+        // V10/V14: the structure the model picks is validated against the
+        // role's legal set — a home screen can never claim a detail
+        // structure, and invalid home structures fall back to the
+        // product-led default (catalog-classic for browse, dashboard-led
+        // otherwise).
+        structure: role === "home"
+          ? canonicalStructure(role, m.layout.structure, isCatalogHome(planScreen?.purpose))
+          : canonicalStructure(role, m.layout.structure),
         dominantMoment: m.layout.dominantMoment ?? d.layout.dominantMoment,
         sections,
       },

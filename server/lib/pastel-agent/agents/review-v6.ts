@@ -1,6 +1,7 @@
 import { chatJSON, MAX_TOKENS_PER_CALL, type OnUsage } from "../gateway";
 import { reviewResultSchema, type V6ReviewResult, type ProductBrief, type ResolvedTheme, type CopyPlan, type UxDesignPlan } from "../schemas-v6";
 import { datasetPrompt, type MockDataset } from "../lib/content";
+import type { VisualReference } from "../types";
 
 /**
  * V6/V9 Review agent — the quality gate.
@@ -37,6 +38,7 @@ export interface ReviewInput {
   /** V9: the UX design plan the composer was told to render. */
   ux?: UxDesignPlan | null;
   onUsage?: OnUsage;
+  visualReference?: VisualReference;
 }
 
 export interface VisualReviewInput {
@@ -48,6 +50,7 @@ export interface VisualReviewInput {
   screenshots: string[];
   verifiedFiles?: string[];
   onUsage?: OnUsage;
+  visualReference?: VisualReference;
 }
 
 const REVIEW_SYSTEM = `You are a senior design reviewer on the Pastel review board. You judge generated UI code against a product brief, a company design language, and a universal design law.
@@ -63,7 +66,7 @@ Judge:
 - Coverage of the brief: every feature and screen purpose represented.
 - Copy quality: specific, human, on-voice. Flag AI-slop.
 - Composition quality (v8): one dominant moment per screen at hero scale; metrics and charts are large and legible; no two adjacent sections use the same surface; no blank sections; card and outline-button counts are restrained; charts are branded moments whose header/unit match the data they plot.
-- Two-screen UX contract (v9): the product is EXACTLY two screens — "home" (main browse/catalog: toolbar + product grid + ONE dominant moment) and "detail" (single-item info page: photo gallery + summary card + primary action). Flag as HIGH any off-archetype element: settings forms, pricing tables, data tables, marketing heroes/CTAs on home, or search/stats/charts on detail.
+- Two-screen UX contract (v12): the product is EXACTLY two screens, but roles are product-defined. Home must lead the primary workflow; detail must support the focused secondary workflow. Do not require a search toolbar, catalog grid, gallery, booking card, or marketplace structure unless the brief explicitly requires it.
 - Card discipline (v9): card surfaces are deliberate — the product grid on home and the ONE summary card on detail; stats/charts are bands; divided rows for reviews/details. Flag stacked outline-card modules and missing cards where a product needs them (e.g. a detail page without a summary/action card).
 - Layout law (v10): vertical rhythm — adjacent sections alternate padding steps, never two identical steps in a row and never random jumps; hierarchy is monotonic (the dominant moment is the LARGEST type on the page, ≥ text-4xl); no two adjacent sections use the same surface; every section has real content and breathing room; paired columns are equal height; type sizes come from the ladder (section headings text-2xl, body base, labels xs/sm).
 - Cross-screen integrity (v10): each screen shows ONLY its own data — the detail page is ONE item (its photos, facts, reviews); flag any catalog content (other listings, search results, metric bands) rendered on the detail page as HIGH, and any item-detail content on home.
@@ -88,8 +91,11 @@ export async function runReview(input: ReviewInput): Promise<V6ReviewResult> {
   const uxBlock = input.ux
     ? `UX DESIGN PLAN (the layout the composer was told to render):\n${JSON.stringify(input.ux, null, 2)}`
     : "";
+  const targetBlock = input.visualReference
+    ? `USER PRODUCT VISUAL TARGET: ${input.visualReference.names?.join(", ") ?? "attached reference"}. The target is authoritative for composition, hierarchy, spacing, surfaces, density, and action placement. Do not infer its domain or copy its branding.`
+    : "";
 
-  const user = `PRODUCT BRIEF:\n${JSON.stringify({ title: input.brief.title, productType: input.brief.productType, description: input.brief.description, features: input.brief.features, screenPurposes: input.brief.screenPurposes }, null, 2)}\n\n${input.companyBlock}\n\n${input.megadesign}\n\n${dataBlock}\n\n${copyBlock}\n\n${uxBlock}\n\nRELEVANCE RULE: judge whether on-screen content matches the product's domain — flag invoices, company names, currency, billing, or B2B workspace content in a non-financial/non-shopping product as high severity.\n\nVERIFIED FILES (compiled by the sandbox — judge ONLY these):\n${(input.verifiedFiles?.length ? input.verifiedFiles.join("\n") : "none")}\n\nVERIFICATION ERRORS (from the sandbox — treat as blocking, already counted):\n${input.verificationErrors.length ? input.verificationErrors.join("\n") : "none"}\n\nGENERATED FILES (verified ones in full):\n${filesBlock}\n\nEmit the review verdict as JSON: { "passed": boolean, "score": 0-100, "decision": "APPROVE"|"RETURN_TO_BUILDER", "requiredFixes": string[], "issues": [{ "target", "severity", "category", "description" }], "summary" }`;
+  const user = `PRODUCT BRIEF:\n${JSON.stringify({ title: input.brief.title, productType: input.brief.productType, description: input.brief.description, features: input.brief.features, screenPurposes: input.brief.screenPurposes }, null, 2)}\n\n${input.companyBlock}\n\n${input.megadesign}\n\n${targetBlock}\n\n${dataBlock}\n\n${copyBlock}\n\n${uxBlock}\n\nRELEVANCE RULE: judge whether on-screen content matches the product's domain — flag invoices, company names, currency, billing, or B2B workspace content in a non-financial/non-shopping product as high severity.\n\nVERIFIED FILES (compiled by the sandbox — judge ONLY these):\n${(input.verifiedFiles?.length ? input.verifiedFiles.join("\n") : "none")}\n\nVERIFICATION ERRORS (from the sandbox — treat as blocking, already counted):\n${input.verificationErrors.length ? input.verificationErrors.join("\n") : "none"}\n\nGENERATED FILES (verified ones in full):\n${filesBlock}\n\nEmit the review verdict as JSON: { "passed": boolean, "score": 0-100, "decision": "APPROVE"|"RETURN_TO_BUILDER", "requiredFixes": string[], "issues": [{ "target", "severity", "category", "description" }], "summary" }`;
 
   try {
     return await chatJSON<V6ReviewResult>(
@@ -118,11 +124,16 @@ Judge each screenshot:
 - Layout quality: alignment, whitespace, hierarchy, one dominant moment per screen, no cramped density.
 - Composition variety (v8): no two adjacent sections with the same surface; metric values and charts are hero-scale and legible; no blank or empty-looking sections; cards and outline buttons are not overused.
 - Layout law (v10): vertical rhythm alternates (adjacent sections never share one padding step); the dominant moment is the largest type on the page; sections breathe (no flush stacking); paired columns align; type follows the ladder.
-- Two-screen UX contract (v9): "home" reads as a browse/catalog screen (search toolbar + product grid + one dominant moment); "detail" reads as a single-item info page (photo gallery, a summary/action card, reviews). Flag any screen that reads as a settings page, a data table, or a marketing landing page as high severity.
+- Two-screen UX contract (v12): home reads as the product's primary workflow and detail reads as its focused secondary workflow. Flag screens that read as an unrelated template, marketplace, settings page, data table, or marketing landing page as high severity.
 - Cross-screen integrity (v10): detail shows ONE item only — flag catalog grids, other listings, or search content on the detail page as high severity.
 - Card discipline (v9): the grid and the single summary card are the only card clusters; stats/charts are bands; outline-button pairs are scaffolding.
 - Polish: does anything look broken, empty, or misaligned?
 - Copy: is the on-screen copy specific and on-voice?
+- Product reference fidelity (v12): when a Figma target is attached, judge its
+  composition as the product source of truth. Compare the dominant moment,
+  column proportions, surface hierarchy, spacing, action placement, and content
+  density. Do not reward an output for matching an inspiration company if it
+  contradicts the product target.
 
 Rules:
 - Fixes must target a screen file by name (the screenshot name) with a concrete change.
@@ -137,6 +148,13 @@ export async function runVisualReview(input: VisualReviewInput): Promise<V6Revie
   // not just prose. Best-effort: the review still runs without them.
   const refImages: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = [];
   const refNames: string[] = [];
+  let productReferenceText = "";
+
+  if (input.visualReference) {
+    refImages.push(...input.visualReference.images);
+    refNames.push(...(input.visualReference.names ?? ["user product target"]));
+    productReferenceText = input.visualReference.description ?? "The attached user reference is the product composition source of truth. Match its hierarchy, spacing, density, surfaces, responsive intent, and component relationships without copying its branding or content.";
+  }
   try {
     const { companyImageFiles, readCompanyImage } = await import("../knowledge/index");
     const { inspiration } = input.brief;
@@ -165,7 +183,7 @@ export async function runVisualReview(input: VisualReviewInput): Promise<V6Revie
 
   const textBlock = {
     type: "text" as const,
-    text: `PRODUCT BRIEF:\n${JSON.stringify({ title: input.brief.title, productType: input.brief.productType, description: input.brief.description, features: input.brief.features }, null, 2)}\n\nSCREENSHOTS: ${input.screenshotNames.join(", ")}\n\n${input.companyBlock}\n\n${input.megadesign}\n\nCOMPANY REFERENCE IMAGERY (${refNames.join(", ") || "none shipped"}): the reference image(s) show the real company's visual language — use them as the ground truth for brand fidelity (colors, type, spacing, component shapes, mood).\n\nReview the rendered screenshots above against the brief, the design language, and the reference imagery. Emit the verdict as JSON: { "passed": boolean, "score": 0-100, "decision": "APPROVE"|"RETURN_TO_BUILDER", "requiredFixes": string[], "issues": [{ "target" (a screen file), "severity", "category", "description" }], "summary" }`,
+    text: `PRODUCT BRIEF:\n${JSON.stringify({ title: input.brief.title, productType: input.brief.productType, description: input.brief.description, features: input.brief.features }, null, 2)}\n\nSCREENSHOTS: ${input.screenshotNames.join(", ")}\n\n${input.companyBlock}\n\n${input.megadesign}\n\n${productReferenceText}\n\nREFERENCE IMAGERY (${refNames.join(", ") || "none shipped"}): company imagery describes inspiration brand fidelity; a user Figma/Banani target describes the intended product composition. Product requirements and the user target outrank the inspiration brand's page archetype.\n\nReview the rendered screenshots above against the brief, the design language, and the reference imagery. When a user target is attached, explicitly judge its dominant moment, layout proportions, surface hierarchy, spacing rhythm, content density, action placement, and responsive intent. Reject any recognizable inspiration-template structure that is not supported by the brief or target. Emit the verdict as JSON: { "passed": boolean, "score": 0-100, "decision": "APPROVE"|"RETURN_TO_BUILDER", "requiredFixes": string[], "issues": [{ "target" (a screen file), "severity", "category", "description" }], "summary" }`,
   };
   try {
     return await chatJSON<V6ReviewResult>(

@@ -3,17 +3,19 @@ import { uxDesignSchema, type UxDesignPlan, type ProductBrief, type WireframePla
 import { loadCompany, compileCompanyBlock, megadesignBlock } from "../knowledge/index";
 import { resolveUxDesign, ROLE_CARD_BUDGET } from "../lib/ux-design";
 import { datasetPrompt, type MockDataset } from "../lib/content";
+import type { VisualReference } from "../types";
 
 /**
- * V9 UX design agent — the model half of the UX component.
+ * V14 UX design agent — the model half of the UX component.
  *
  * Runs AFTER the wireframe plan is deterministically enforced into the
- * canonical two-screen model (home/catalog + detail). It makes the tasteful
- * UX calls the templates parameterize:
+ * canonical two-screen model (home = primary workflow, detail = focused
+ * secondary workflow). It makes the tasteful UX calls the templates
+ * parameterize:
  *   - which moment is dominant on the home screen (hero metric band vs the
  *     product grid vs a scoreboard);
  *   - which sections pair side-by-side and which column sticks on the detail
- *     screen (gallery hero, summary card, action band);
+ *     screen (gallery hero or info pane, summary card, action band);
  *   - surface choices (band/card/rows/tiles/toolbar/gallery) within the
  *     per-screen card budget.
  *
@@ -28,6 +30,7 @@ export interface UxInput {
   inventory: ComponentInventory;
   theme: ResolvedTheme;
   data: MockDataset;
+  visualReference?: VisualReference;
   onUsage?: OnUsage;
 }
 
@@ -39,16 +42,16 @@ export interface UxOutput {
 const SYSTEM = `You are the Pastel UX designer. You turn an enforced two-screen wireframe into a precise UX design plan: one dominant moment per screen, the right visual surface for every section, and the layout structure that makes the screen feel designed rather than stacked.
 
 GROUND RULES (hard — the deterministic engine enforces them, so never break them):
-- The product is EXACTLY two screens: "home" (main browse/catalog) and "detail" (single-item info page).
-- Home: toolbar (search) + a product grid, plus ONE dominant moment (the app hero metric band, the scoreboard, or the grid itself — pick one). Stats and charts render as BANDS, never cards.
-- Detail: photo gallery is the hero; then a summary pane (the ONE card surface, sticky on desktop) and an action band. Reviews are divided rows, never cards.
-- Card budget: home ≤ ${ROLE_CARD_BUDGET.home} card surfaces (the grid is the moment); detail ≤ ${ROLE_CARD_BUDGET.detail} (the single summary card). Everything else is bands/rows/tiles/toolbar.
+- The product is EXACTLY two screens: "home" (the primary workflow) and "detail" (the focused secondary workflow).
+- Home is PRODUCT-LED (V14): a browse/marketplace home leads with its toolbar + product grid; a dashboard, feed, workspace, or coaching home leads with its hero moment — never force search/grid structure on a product that does not browse.
+- Detail is PRODUCT-LED (V14): a media-rich item leads with its gallery and ONE summary card (sticky on desktop); a record/task/exercise leads with its info pane and one primary action. Reviews render as divided rows — never cards — and only where the product has social proof.
+- Card budget: home ≤ ${ROLE_CARD_BUDGET.home} card surfaces (the grid or hero is the moment); detail ≤ ${ROLE_CARD_BUDGET.detail} (the single summary card). Everything else is bands/rows/tiles/toolbar.
 - No off-archetype elements: no search on detail, no settings forms, no pricing tables, no marketing heroes, no tables.
 - Secondary actions are quiet: one outline button at most per action row.
 
-LAYOUT STRUCTURE (V10 — pick the one that best serves the product):
-- home: "catalog-classic" (hero band → search → product grid → band chart), "catalog-rail" (search + stats in a STICKY LEFT RAIL beside the grid — data-dense catalogs), or "catalog-featured" (a curated featured strip above the grid — editorial products).
-- detail: "detail-classic" (gallery hero → two-column pane + sticky summary card → reviews) or "detail-asymmetric" (the same surfaces with the gallery running full-width and the info column offset).
+LAYOUT STRUCTURE (V10/V14 — pick the one that best serves the product):
+- home: "dashboard-led" (metrics hero → stats/chart bands → rows — the default for non-browse products), "feed-led" (activity/feed led), "workspace-led" (tool-led), "catalog-classic" (hero band → search → product grid → band chart), "catalog-rail" (search + stats in a STICKY LEFT RAIL beside the grid — data-dense catalogs), or "catalog-featured" (a curated featured strip above the grid — editorial products).
+- detail: "detail-classic" (media hero or info pane → two-column pane + sticky summary card → social proof) or "detail-asymmetric" (the same surfaces with the gallery running full-width and the info column offset).
 - The structure only REARRANGES the same blocks — never invent blocks that are not in the wireframe, and never change the surface of a block.
 
 OUTPUT as ONE JSON object:
@@ -58,7 +61,7 @@ OUTPUT as ONE JSON object:
     {
       "screenId": "home" | "detail",
       "layout": {
-        "structure": "catalog-classic" | "catalog-rail" | "catalog-featured" | "detail-classic" | "detail-asymmetric" (match the screen's role: home → catalog-*, detail → detail-*),
+        "structure": "dashboard-led" | "feed-led" | "workspace-led" | "catalog-classic" | "catalog-rail" | "catalog-featured" | "detail-classic" | "detail-asymmetric" (match the screen's role: home → dashboard/feed/workspace/catalog-*, detail → detail-*),
         "dominantMoment": "block:variant",
         "sections": [{ "block", "variant"?, "surface"?: "band"|"card"|"rows"|"tiles"|"toolbar"|"gallery", "pair"?: boolean, "sticky"?: boolean, "emphasis"?: boolean }]
       },
@@ -90,6 +93,11 @@ export async function runUx(input: UxInput): Promise<UxOutput> {
     }
   } catch {
     /* reference imagery is optional */
+  }
+
+  if (input.visualReference) {
+    refImages.push(...input.visualReference.images);
+    refText += "\n\n### USER PRODUCT TARGET\nThe attached Figma/Banani image defines the intended composition. Preserve its hierarchy, alignment, whitespace, surfaces, and density while adapting content to the brief. Do not imitate its niche or branding.";
   }
 
   const userText = `PRODUCT: ${input.brief.title} — ${input.brief.productType}\n${input.brief.description}\n\n${companyBlock}\n\n${megadesign}\n\nDOMAIN DATA (the sections fill these slots):\n${datasetPrompt(input.data)}\n\nENFORCED WIREFRAME (canonical two-screen model):\n${wireframeBlock}\n${refText}\n\nDesign the UX as JSON.`;

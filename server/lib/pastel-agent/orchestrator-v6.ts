@@ -1,33 +1,36 @@
 import fs from "node:fs";
 import path from "node:path";
 import { emitEvent, updateRun, persistFile, persistDoc, mergeManifest } from "./run-store";
-import type { PastelPhase, PhaseStatus, AgentManifest } from "./types";
+import type { PastelPhase, PhaseStatus, AgentManifest, VisualReference } from "./types";
 import type { UsageRecord } from "./gateway";
 import { ledgerFromUsage } from "./lib/ledger";
 import * as creditService from "../credit-service";
-import type { ProductBrief, WireframePlan, ComponentInventory, CopyPlan, ResolvedTheme, V6ReviewResult, UxDesignPlan } from "./schemas-v6";
-import { loadCompany, resolveCompanyTheme, compileCompanyBlock, megadesignBlock, loadCompanyDoc } from "./knowledge/index";
+import type { ProductBrief, WireframePlan, ComponentInventory, CopyPlan, ResolvedTheme, V6ReviewResult, UxDesignPlan, DesignTokens } from "./schemas-v6";
+import { loadCompany, compileCompanyBlock, megadesignBlock, loadCompanyDoc, scoreCompanies } from "./knowledge/index";
 import { compileStyles } from "./compile";
-import { mockDataset, type MockDataset } from "./lib/content";
+import type { MockDataset } from "./lib/content";
 import { composeAll } from "./compose-v6";
 import { auditFiles, type GateReport } from "./checks/audit";
 import { auditContent } from "./checks/content";
+import { auditScreenComposition } from "./checks/review-v14";
 import { auditGeometry, geometryPasses } from "./checks/geometry";
 import { buildPreviewHtml } from "./screenshots";
 
 /**
- * Pastel Agent v6 — knowledge-base pipeline.
+ * Pastel Agent v14 — knowledge-base pipeline.
  *
- * discovery → brief → wireframe → build (parallel) → assemble → present →
- * review (gates + vision).
+ * discovery → design → brief → data → wireframe → build (parallel) →
+ * assemble → present → review (gates + vision).
  *
- * The knowledge base (company design.md + megadesign.md) carries the visual
- * quality; models select, specify, and adapt; code composes, verifies, and
- * gates. Hybrid model tiers keep the parallel component work cheap while the
- * few judgment stages get a mid-tier model.
+ * V14 (final): the DESIGN agent creates the run's own token system, the
+ * DATA agent (Luna) writes ALL page content after the brief (nothing is
+ * pre-baked), and the REVIEW agent is vision-first — it looks at rendered
+ * screenshots and judges spacing, missing components, duplicates, and flow
+ * against the measured geometry and the wireframe it was told to render.
+ * Models select, specify, and adapt; code composes, verifies, and gates.
  */
 
-export type V6Phase = "discovery" | "brief" | "wireframe" | "build" | "assemble" | "review" | "present";
+export type V6Phase = "discovery" | "design" | "brief" | "data" | "wireframe" | "build" | "assemble" | "review" | "present";
 
 export interface V6RunState {
   runId: string;
@@ -38,8 +41,13 @@ export interface V6RunState {
   holdId?: string;
   holdAmount?: number;
   maxCredits: number;
+  visualReference?: VisualReference;
 
   brief: ProductBrief | null;
+  /** V14: the run's own design system (design agent, before the brief). */
+  designTokens: DesignTokens | null;
+  /** Top-scored company used as the token hint (never the law). */
+  hintCompanySlug: string | null;
   attachedCompanies: string[];
   wireframe: WireframePlan | null;
   inventory: ComponentInventory | null;
@@ -90,6 +98,7 @@ function createState(opts: {
   holdId?: string;
   holdAmount?: number;
   maxCredits: number;
+  visualReference?: VisualReference;
 }): V6RunState {
   return {
     runId: opts.runId,
@@ -100,7 +109,10 @@ function createState(opts: {
     holdId: opts.holdId,
     holdAmount: opts.holdAmount,
     maxCredits: opts.maxCredits,
+    visualReference: opts.visualReference,
     brief: null,
+    designTokens: null,
+    hintCompanySlug: null,
     attachedCompanies: [],
     wireframe: null,
     inventory: null,
@@ -187,13 +199,14 @@ export async function startAgentLoopV6(
   projectId?: string,
   holdId?: string,
   userId?: string,
-  opts?: { maxCredits?: number; holdAmount?: number },
+  opts?: { maxCredits?: number; holdAmount?: number; visualReference?: VisualReference },
 ): Promise<void> {
   const s = createState({
     runId, prompt, answers,
     projectId: projectId ?? null, userId,
     holdId, holdAmount: opts?.holdAmount,
     maxCredits: opts?.maxCredits ?? 25,
+    visualReference: opts?.visualReference,
   });
   const onUsage = usageHook(s);
 
@@ -201,10 +214,41 @@ export async function startAgentLoopV6(
     // Clarify already ran in the UI — discovery is complete at run start.
     setPhase(s, "discovery", "done", "Discovery complete — inspiration selected");
 
+    // ══ STAGE 0.5: DESIGN (V14 — the token system, BEFORE the brief) ══
+    setPhase(s, "design", "running", "Designing the token system — brand colors, radius, sizing, and fonts…");
+    const { runDesign } = await import("./agents/design-v14");
+    const scored = await scoreCompanies(prompt);
+    const hint = scored.find((x) => x.score > 0) ?? scored[0];
+    const hintManifest = hint ? await loadCompany(hint.slug) : null;
+    if (hintManifest) {
+      s.hintCompanySlug = hintManifest.slug;
+      const designOut = await runDesign({ prompt, answers, hintManifest, visualReference: s.visualReference, onUsage });
+      s.designTokens = designOut.tokens;
+      s.theme = designOut.theme;
+      emitActivity(runId, `Design tokens created (hint: ${hintManifest.name})${designOut.usedFallback ? " — deterministic fallback" : ""}`);
+      for (const note of designOut.notes) emitActivity(runId, note);
+    } else {
+      // No registered company at all (should never happen) — pick the first
+      // registered company so the run can continue with a real manifest.
+      const { listCompanySlugs } = await import("./knowledge/index");
+      const firstSlug = listCompanySlugs()[0];
+      if (!firstSlug) throw new Error("no registered companies available for the design hint");
+      const { loadCompany: loadAny } = await import("./knowledge/index");
+      const neutral = await loadAny(firstSlug);
+      const designOut = await runDesign({ prompt, answers, hintManifest: neutral, visualReference: s.visualReference, onUsage });
+      s.designTokens = designOut.tokens;
+      s.theme = designOut.theme;
+    }
+    const { css, fontFamilies } = compileStyles(s.theme);
+    s.styles = css;
+    s.fontFamilies = fontFamilies;
+    await persistJsonDoc(runId, "docs/design/DesignTokens.json", "Design Tokens", "design-tokens", s.designTokens);
+    setPhase(s, "design", "done");
+
     // ══ STAGE 1: BRIEF ══
     setPhase(s, "brief", "running", "Building the product brief and attaching design references…");
     const { runBrief } = await import("./agents/brief-v6");
-    const { brief, attachedCompanies } = await runBrief({ prompt, answers, onUsage });
+    const { brief, attachedCompanies } = await runBrief({ prompt, answers, visualReference: s.visualReference, onUsage });
     s.brief = brief;
     s.attachedCompanies = attachedCompanies;
 
@@ -222,10 +266,40 @@ export async function startAgentLoopV6(
     }
     setPhase(s, "brief", "done");
 
+    // ══ STAGE 1b: DATA (V14 — ALL page content, written after the brief) ══
+    setPhase(s, "data", "running", "Writing the product's content — metrics, items, reviews, and copy data…");
+    const { runData } = await import("./agents/data-v14");
+    const dataOut = await runData({ brief, seed: prompt + runId, onUsage });
+    s.data = dataOut.data;
+    if (dataOut.usedFallback) emitActivity(runId, "Content: deterministic domain-pack fallback used");
+    for (const note of dataOut.notes) emitActivity(runId, note);
+    await persistJsonDoc(runId, "docs/planning/DataPlan.json", "Content & Data Plan", "data-plan", {
+      domain: s.data.domain,
+      people: s.data.people,
+      metrics: s.data.metrics,
+      series: s.data.series,
+      rows: s.data.rows,
+      activity: s.data.activity,
+      detailFields: s.data.detailFields,
+      detailValues: s.data.detailValues,
+      settingsSections: s.data.settingsSections,
+      searchPlaceholder: s.data.searchPlaceholder,
+      emptyTitle: s.data.emptyTitle,
+      emptyBody: s.data.emptyBody,
+      reviews: s.data.reviews,
+      reviewHeading: s.data.reviewHeading,
+      trustItems: s.data.trustItems,
+      primaryCta: s.data.primaryCta,
+      homeCta: s.data.homeCta,
+      priceSuffix: s.data.priceSuffix,
+    });
+    emitActivity(runId, `Content written — ${s.data.rows.length} items · ${s.data.reviews.length} reviews · ${s.data.metrics.length} metrics (${s.data.domain} domain)`);
+    setPhase(s, "data", "done");
+
     // ══ STAGE 2: WIREFRAME ══
     setPhase(s, "wireframe", "running", "Producing wireframes and the component inventory…");
     const { runWireframe } = await import("./agents/wireframe-v6");
-    const wireframeOut = await runWireframe({ brief, onUsage });
+    const wireframeOut = await runWireframe({ brief, visualReference: s.visualReference, onUsage });
     s.wireframe = wireframeOut.plan;
     s.inventory = wireframeOut.inventory;
     if (wireframeOut.usedFallback.length > 0) emitActivity(runId, `Used deterministic fallback for: ${wireframeOut.usedFallback.join(", ")}`);
@@ -237,27 +311,14 @@ export async function startAgentLoopV6(
     setPhase(s, "wireframe", "done");
 
     // ══ STAGE 2b: UX DESIGN (canonical layout + model refinement) ══
-    // The theme + domain dataset are deterministic and cheap — compute them
-    // now so the UX agent can reason about real data, then the composer and
-    // the review both consume the UX design plan.
+    // V14: the theme + css are resolved by the DESIGN stage and the content
+    // dataset by the DATA stage — both before the wireframe — so the UX
+    // agent reasons about real data, and the composer and the review both
+    // consume the UX design plan.
     setPhase(s, "wireframe", "running", "Designing the UX layout — hierarchy, surfaces, and the interaction flow…");
-    const manifest = await loadCompany(brief.inspiration.primary);
-    const theme = resolveCompanyTheme(manifest, {
-      mode: brief.platform === "mobile" && manifest.name === "Spotify" ? "dark" : (answers["mode"] === "dark" ? "dark" : "light"),
-      hue: manifest.hueBase,
-    });
-    s.theme = theme;
-    const { css, fontFamilies } = compileStyles(theme);
-    s.styles = css;
-    s.fontFamilies = fontFamilies;
-
-    // Domain-aware dataset — built once, shared by planner/builder/copy/
-    // composer/UX.
-    const data = mockDataset(brief, prompt + runId);
-    s.data = data;
 
     const { runUx } = await import("./agents/ux-v6");
-    const uxOut = await runUx({ brief, wireframe: s.wireframe!, inventory: s.inventory!, theme, data, onUsage });
+    const uxOut = await runUx({ brief, wireframe: s.wireframe!, inventory: s.inventory!, theme: s.theme!, data: s.data!, visualReference: s.visualReference, onUsage });
     s.ux = uxOut.ux;
     if (uxOut.usedFallback) emitActivity(runId, "UX design: canonical layout used (model refinement unavailable)");
     for (const sc of s.ux.screens) if (sc.notes) emitActivity(runId, `UX ${sc.screenId}: ${sc.notes}`);
@@ -280,7 +341,7 @@ export async function startAgentLoopV6(
 
     const specs = await Promise.all(
       budgeted.map(async (item) => {
-        const out = await runPlanner({ item, theme, wireframe: s.wireframe!, data, onUsage, companySlug: s.brief!.inspiration.primary });
+        const out = await runPlanner({ item, theme: s.theme!, wireframe: s.wireframe!, data: s.data!, visualReference: s.visualReference, onUsage, companySlug: s.brief!.inspiration.primary });
         emitActivity(s.runId, `Planned ${item.name}`);
         return out.spec;
       }),
@@ -288,12 +349,13 @@ export async function startAgentLoopV6(
 
     const { components } = await runBuilder({
       specs,
-      theme,
+      theme: s.theme!,
       wireframe: s.wireframe!,
-      data,
+      data: s.data!,
       onUsage,
       onFile: (p) => emitActivity(s.runId, `Built ${p}`),
       companySlug: s.brief.inspiration.primary,
+      visualReference: s.visualReference,
     });
     s.generatedFiles = { ...components };
     s.generatedFiles["src/styles.css"] = s.styles;
@@ -307,11 +369,11 @@ export async function startAgentLoopV6(
     // ══ STAGE 4: ASSEMBLE (final builder — compose + copy + sandbox verify) ══
     setPhase(s, "assemble", "running", "Writing copy and assembling the screens…");
     const { runCopy } = await import("./agents/copy-v6");
-    const copy = await runCopy({ brief, wireframe: s.wireframe, theme, data, onUsage });
+    const copy = await runCopy({ brief, wireframe: s.wireframe, theme: s.theme!, data: s.data!, onUsage });
     s.copy = copy;
     await persistJsonDoc(runId, "docs/planning/CopyPlan.json", "Copy Plan", "copy-plan", copy);
 
-    const composed = composeAll({ brief, wireframe: s.wireframe, inventory: s.inventory!, copy, theme, data, ux: s.ux });
+    const composed = composeAll({ brief, wireframe: s.wireframe, inventory: s.inventory!, copy, theme: s.theme!, data: s.data!, ux: s.ux });
     s.generatedFiles = { ...s.generatedFiles, ...composed.files };
     // Materialize base primitives the screens depend on (Card, Table, Button,
     // …) that the builder did not produce — guarantees screens always compile.
@@ -377,19 +439,30 @@ export async function startAgentLoopV6(
       screens: s.generatedScreens,
       docs: [
         "docs/brief/ProductBrief.json",
+        "docs/design/DesignTokens.json",
         "docs/design/megadesign.md",
         ...s.attachedCompanies.map((c) => `docs/design/${c}.md`),
+        "docs/planning/DataPlan.json",
         "docs/planning/WireframePlan.json",
         "docs/planning/ComponentInventory.json",
         "docs/planning/UXDesign.json",
         "docs/planning/CopyPlan.json",
         "docs/review/ReviewResult.json",
       ],
-      brandKit: null,
-      styleSeed: null,
+      brandKit: s.designTokens
+        ? {
+            colors: Object.fromEntries(Object.entries(s.designTokens.colors).filter(([k]) => k !== "chart")) as Record<string, string>,
+            fonts: { ...s.designTokens.fonts },
+            sizes: { sectionPaddingY: String(s.designTokens.sectionPaddingY), sectionGap: String(s.designTokens.sectionGap) },
+            radius: Object.fromEntries(Object.entries(s.designTokens.radius).map(([k, v]) => [k, `${v}px`])) as Record<string, string>,
+          }
+        : null,
+      styleSeed: s.designTokens ? JSON.stringify(s.designTokens.rationale ?? s.designTokens.mode) : null,
       phases: {
         discovery: "done",
+        design: "done",
         brief: "done",
+        data: "done",
         wireframe: "done",
         review: s.reviewResult?.passed ? "done" : "error",
         build: "done",
@@ -528,6 +601,12 @@ async function runGate(s: V6RunState): Promise<void> {
     issues.push(...auditContent(s.data, s.generatedFiles));
   }
 
+  // V14: screen-composition audit — duplicate components on a screen,
+  // components planned for a screen that no custom block mounts.
+  if (s.wireframe && s.inventory) {
+    issues.push(...auditScreenComposition(s.wireframe, s.inventory));
+  }
+
   if (s.sandboxErrors.length > 0) {
     for (const e of s.sandboxErrors) {
       const target = e.file && s.generatedFiles[e.file] ? e.file : s.generatedScreens[0] ?? "project";
@@ -570,7 +649,7 @@ async function runGate(s: V6RunState): Promise<void> {
 }
 
 async function runModelReview(s: V6RunState, onUsage: (rec: UsageRecord) => void): Promise<void> {
-  const { runReview, runVisualReview, mergeReviewResults } = await import("./agents/review-v6");
+  const { runReview, runVisualReview, mergeReviewResults } = await import("./agents/review-v14");
   const companyBlock = await compileCompanyBlock(s.brief!.inspiration.primary);
   const megadesign = await megadesignBlock();
 
@@ -599,6 +678,10 @@ async function runModelReview(s: V6RunState, onUsage: (rec: UsageRecord) => void
       copy: s.copy,
       data: s.data,
       ux: s.ux,
+      wireframe: s.wireframe,
+      inventory: s.inventory,
+      geometryReports: s.geometryReports,
+      visualReference: s.visualReference,
       onUsage,
     });
   }
@@ -614,6 +697,10 @@ async function runModelReview(s: V6RunState, onUsage: (rec: UsageRecord) => void
         screenshotNames: s.screenshotNames,
         screenshots: s.screenshots,
         verifiedFiles: s.generatedScreens,
+        wireframe: s.wireframe,
+        inventory: s.inventory,
+        geometryReports: s.geometryReports,
+        visualReference: s.visualReference,
         onUsage,
       });
       if (visualResult) emitActivity(s.runId, `Visual review: ${visualResult.score}/100 — ${visualResult.decision}`);

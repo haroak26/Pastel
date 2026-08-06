@@ -1,5 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
+export type VisualReferenceInput = { name: string; mimeType: "image/png" | "image/jpeg" | "image/webp"; data: string };
+
 const CLARIFY_KEY = "pastel.agent.clarify.v6";
 
 function saveClarifyState(data: Record<string, unknown>) {
@@ -18,14 +20,23 @@ function clearClarifyState() {
   try { sessionStorage.removeItem(CLARIFY_KEY); } catch {}
 }
 
-/** V6 pipeline phases — the agent panel timeline. */
-export type AgentPhase = "discovery" | "brief" | "wireframe" | "build" | "assemble" | "present" | "review";
+function loadVisualReference(): VisualReferenceInput[] {
+  try {
+    const raw = sessionStorage.getItem("pastel-visual-reference");
+    return raw ? JSON.parse(raw) as VisualReferenceInput[] : [];
+  } catch { return []; }
+}
 
-export const PHASE_ORDER: AgentPhase[] = ["discovery", "brief", "wireframe", "build", "assemble", "present", "review"];
+/** V14 pipeline phases — the agent panel timeline. */
+export type AgentPhase = "discovery" | "design" | "brief" | "data" | "wireframe" | "build" | "assemble" | "present" | "review";
+
+export const PHASE_ORDER: AgentPhase[] = ["discovery", "design", "brief", "data", "wireframe", "build", "assemble", "present", "review"];
 
 export const PHASE_LABELS: Record<AgentPhase, string> = {
   discovery: "Discovery",
+  design: "Design System",
   brief: "Brief",
+  data: "Content & Data",
   wireframe: "Wireframe",
   build: "Components",
   assemble: "Assembly",
@@ -35,12 +46,14 @@ export const PHASE_LABELS: Record<AgentPhase, string> = {
 
 export const PHASE_DESCRIPTIONS: Record<AgentPhase, string> = {
   discovery: "Picking your inspiration and answering a few questions",
-  brief: "Building the product brief and attaching the design references",
+  design: "Creating the design tokens — brand colors, radius, sizing, and fonts",
+  brief: "Selecting the reference companies and building the product brief",
+  data: "Writing all the page content — metrics, items, reviews, and CTAs",
   wireframe: "Producing page wireframes and the component inventory",
   build: "Planning and building every component in parallel",
   assemble: "Composing the screens and verifying them in the sandbox",
   present: "Presenting your rendered screens — they're live now",
-  review: "Quality gate + visual review against the brief and design docs",
+  review: "Visual review of the renders + quality gate against the brief",
 };
 
 export interface PhaseState {
@@ -130,7 +143,9 @@ interface PastelEvent {
 
 const IDLE_PHASES: Record<AgentPhase, PhaseState> = {
   discovery: { status: "idle" },
+  design: { status: "idle" },
   brief: { status: "idle" },
+  data: { status: "idle" },
   wireframe: { status: "idle" },
   build: { status: "idle" },
   assemble: { status: "idle" },
@@ -150,6 +165,7 @@ export function usePastelAgent(projectId: string | null) {
   const [suggestedCompanies, setSuggestedCompanies] = useState<SuggestedCompany[]>(loadClarifyState("suggestedCompanies") ?? []);
   const [inspiration, setInspiration] = useState<string>(loadClarifyState("inspiration") ?? "");
   const [secondaryInspiration, setSecondaryInspiration] = useState<string[]>(loadClarifyState("secondaryInspiration") ?? []);
+  const [visualReferenceImages, setVisualReferenceImages] = useState<VisualReferenceInput[]>(loadVisualReference);
 
   // ── Knowledge base catalog (gallery) ──
   const [catalog, setCatalog] = useState<CompanyCatalogItem[]>([]);
@@ -475,6 +491,7 @@ export function usePastelAgent(projectId: string | null) {
           prompt,
           answers: Object.keys(enriched).length > 0 ? enriched : undefined,
           projectId: projectId ?? undefined,
+          referenceImages: visualReferenceImages.length > 0 ? visualReferenceImages : undefined,
         }),
       });
       if (!res.ok) {
@@ -482,6 +499,7 @@ export function usePastelAgent(projectId: string | null) {
         throw new Error(err.message || "Request failed");
       }
       const data = await res.json();
+      try { sessionStorage.removeItem("pastel-visual-reference"); } catch {}
       setRunId(data.runId);
       pushActivity("Agent started");
       attachToStream(data.runId);
@@ -489,7 +507,7 @@ export function usePastelAgent(projectId: string | null) {
       setStatus("error");
       setError(err.message || "Generation failed");
     }
-  }, [projectId, attachToStream, pushActivity, inspiration, secondaryInspiration]);
+  }, [projectId, attachToStream, pushActivity, inspiration, secondaryInspiration, visualReferenceImages]);
 
   const submitAnswers = useCallback(() => {
     if (!pendingPrompt) return;
@@ -524,6 +542,7 @@ export function usePastelAgent(projectId: string | null) {
     setSuggestedCompanies([]);
     setInspiration("");
     setSecondaryInspiration([]);
+    setVisualReferenceImages([]);
   }, []);
 
   const isGenerating = status === "running";
@@ -543,6 +562,7 @@ export function usePastelAgent(projectId: string | null) {
     clarify,
     setAnswer,
     chooseInspiration,
+    setVisualReferenceImages,
     submitAnswers,
     skipClarify,
     // run

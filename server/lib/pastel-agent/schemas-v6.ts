@@ -71,6 +71,175 @@ export interface ResolvedTheme {
   };
 }
 
+// ── Design tokens (V14 design agent — before the brief) ─────────────────
+//
+// V14: every run's design system is an explicit artifact produced by the
+// design agent BEFORE the brief: brand colors, radius scale, type scale,
+// control sizing, section rhythm, and fonts. Nothing about the design is
+// hardcoded to a company — the company manifests become *hints* (prompt
+// scoring) and reference imagery, never the default theme.
+
+const hexColorSchema = z
+  .string()
+  .regex(/^#[0-9a-fA-F]{6}$/, "colors must be 6-digit hex (#RRGGBB)");
+
+export const designTokensSchema = z.object({
+  version: z.literal("1.0.0"),
+  mode: z.enum(["light", "dark"]),
+  colors: z.object({
+    background: hexColorSchema,
+    foreground: hexColorSchema,
+    card: hexColorSchema,
+    cardForeground: hexColorSchema,
+    popover: hexColorSchema,
+    popoverForeground: hexColorSchema,
+    primary: hexColorSchema,
+    primaryForeground: hexColorSchema,
+    secondary: hexColorSchema,
+    secondaryForeground: hexColorSchema,
+    muted: hexColorSchema,
+    mutedForeground: hexColorSchema,
+    accent: hexColorSchema,
+    accentForeground: hexColorSchema,
+    destructive: hexColorSchema,
+    destructiveForeground: hexColorSchema,
+    success: hexColorSchema,
+    successSubtle: hexColorSchema,
+    warning: hexColorSchema,
+    warningSubtle: hexColorSchema,
+    border: hexColorSchema,
+    input: hexColorSchema,
+    ring: hexColorSchema,
+    chart: z.array(hexColorSchema).min(3).max(6),
+  }),
+  radius: z.object({
+    sm: z.number().int().min(0).max(24),
+    md: z.number().int().min(0).max(32),
+    lg: z.number().int().min(0).max(48),
+    xl: z.number().int().min(0).max(64),
+    full: z.literal(9999),
+  }),
+  typeScale: z.object({
+    xs: z.number().min(10).max(14),
+    sm: z.number().min(12).max(16),
+    base: z.number().min(14).max(18),
+    lg: z.number().min(16).max(22),
+    xl: z.number().min(18).max(26),
+    "2xl": z.number().min(20).max(34),
+    "3xl": z.number().min(24).max(42),
+    "4xl": z.number().min(28).max(52),
+  }),
+  /** Control-height scale in px — the interactive element ladder (8px grid). */
+  control: z.object({
+    sm: z.number().int().min(28).max(40),
+    md: z.number().int().min(36).max(48),
+    lg: z.number().int().min(44).max(60),
+  }),
+  sectionPaddingY: z.number().int().min(32).max(96),
+  sectionGap: z.number().int().min(16).max(64),
+  fonts: z.object({
+    display: z.string().min(1).max(64),
+    body: z.string().min(1).max(64),
+    mono: z.string().min(1).max(64).optional(),
+  }),
+  rationale: z.string().max(240).optional(),
+});
+
+export type DesignTokens = z.infer<typeof designTokensSchema>;
+
+/** WCAG-AA pair requirements the design agent's colors must satisfy
+ * deterministically after the model call (body text ≥4.5:1). */
+export const DESIGN_TOKEN_CONTRAST_PAIRS: Array<{ label: string; fg: Exclude<keyof DesignTokens["colors"], "chart">; bg: Exclude<keyof DesignTokens["colors"], "chart">; min: number }> = [
+  { label: "foreground/background", fg: "foreground", bg: "background", min: 4.5 },
+  { label: "muted/background", fg: "mutedForeground", bg: "background", min: 4.5 },
+  { label: "primary/primary-foreground", fg: "primaryForeground", bg: "primary", min: 4.5 },
+  { label: "primary/background", fg: "primary", bg: "background", min: 4.5 },
+  { label: "accent/accent-foreground", fg: "accentForeground", bg: "accent", min: 4.5 },
+  { label: "success/success-subtle", fg: "success", bg: "successSubtle", min: 4.5 },
+  { label: "warning/warning-subtle", fg: "warning", bg: "warningSubtle", min: 4.5 },
+];
+
+// ── Data plan (V14 design-data agent — after the brief) ──────────────────
+//
+// V14: ALL page content is generated per run by the data agent (mid-tier
+// Luna) — people, metrics, series, rows, activity, detail fields, settings,
+// search/empty states, social proof (reviews + heading), trust items, and
+// CTAs. Nothing about the page's content is pre-baked anymore; the domain
+// packs in `lib/domains.ts` are the deterministic FALLBACK only.
+
+export const dataPersonSchema = z.object({
+  name: z.string().trim().min(1).max(48),
+  role: z.string().trim().min(1).max(40),
+  email: z.string().trim().min(3).max(64),
+  initials: z.string().max(4).optional(),
+  hue: z.number().int().min(0).max(359).optional(),
+});
+
+export const dataMetricSchema = z.object({
+  label: z.string().trim().min(1).max(32),
+  unit: z.string().trim().max(12),
+  value: z.string().trim().min(1).max(16),
+  delta: z.number(),
+  positive: z.boolean(),
+  note: z.string().trim().min(1).max(60),
+  spark: z.array(z.number()).min(4).max(20),
+});
+
+export const dataSeriesSchema = z.object({
+  label: z.string().trim().min(1).max(40),
+  unit: z.string().trim().max(12),
+  points: z.array(z.object({ x: z.string().min(1).max(8), y: z.number() })).min(4).max(16),
+});
+
+export const dataRowSchema = z.object({
+  id: z.string().trim().min(1).max(24),
+  name: z.string().trim().min(1).max(48),
+  detail: z.string().trim().min(1).max(80),
+  amount: z.string().trim().min(1).max(24),
+  status: z.string().trim().min(1).max(24),
+  date: z.string().trim().min(1).max(24),
+  owner: z.string().trim().max(48).optional(),
+  fields: z.array(z.string()).max(8).optional(),
+  dates: z.string().max(32).optional(),
+  guests: z.string().max(24).optional(),
+});
+
+export const dataReviewSchema = z.object({
+  name: z.string().trim().min(1).max(48),
+  rating: z.number().min(1).max(5),
+  text: z.string().trim().min(8).max(200),
+});
+
+export const dataPlanSchema = z.object({
+  version: z.literal("1.0.0"),
+  people: z.array(dataPersonSchema).min(6).max(12),
+  metrics: z.array(dataMetricSchema).length(4),
+  series: z.array(dataSeriesSchema).min(2).max(5),
+  rows: z.array(dataRowSchema).min(6).max(12),
+  activity: z.array(z.string().trim().min(4)).min(4).max(12),
+  detailFields: z.array(z.string().trim().min(1)).min(4).max(8),
+  detailValues: z.array(z.string().trim().min(1)).min(4).max(8),
+  settingsSections: z.array(z.object({
+    title: z.string().trim().min(1).max(40),
+    items: z.array(z.object({
+      label: z.string().trim().min(1).max(48),
+      value: z.string().trim().min(1).max(32),
+      control: z.enum(["toggle", "select", "text"]),
+    })).min(2).max(6),
+  })).min(2).max(3),
+  searchPlaceholder: z.string().trim().min(1).max(48),
+  emptyTitle: z.string().trim().min(1).max(48),
+  emptyBody: z.string().trim().min(1).max(120),
+  reviews: z.array(dataReviewSchema).min(4).max(8),
+  reviewHeading: z.string().trim().min(1).max(60),
+  trustItems: z.array(z.string().trim().min(1).max(48)).min(3).max(5),
+  primaryCta: z.string().trim().min(1).max(24),
+  homeCta: z.string().trim().min(1).max(24),
+  priceSuffix: z.string().trim().max(12).optional(),
+});
+
+export type DataPlan = z.infer<typeof dataPlanSchema>;
+
 // ── Clarify ──────────────────────────────────────────────────────────────
 
 export const clarifyOptionSchema = z.object({
@@ -191,10 +360,11 @@ export const uxSectionSchema = z.object({
 export const uxScreenSchema = z.object({
   screenId: z.string(),
   layout: z.object({
-    /** V10 layout structure per screen role:
-     * home: "catalog-classic" | "catalog-rail" | "catalog-featured"
+    /** V10/V14 layout structure per screen role:
+     * home: "dashboard-led" | "feed-led" | "workspace-led" |
+     * "catalog-classic" | "catalog-rail" | "catalog-featured"
      * detail: "detail-classic" (legacy values stay valid). */
-    structure: z.enum(["catalog-classic", "catalog-rail", "catalog-featured", "detail-classic", "detail-asymmetric", "single-column", "two-column", "split"]),
+    structure: z.enum(["dashboard-led", "feed-led", "workspace-led", "catalog-classic", "catalog-rail", "catalog-featured", "detail-classic", "detail-asymmetric", "single-column", "two-column", "split"]),
     /** The one dominant moment — "block:variant" ("list:cards", "media:gallery"). */
     dominantMoment: z.string().optional(),
     sections: z.array(uxSectionSchema).min(1).max(10),

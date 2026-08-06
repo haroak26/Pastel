@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
-import type { PastelEvent, AgentManifest, BrandKit } from "../lib/pastel-agent/types";
+import type { PastelEvent, AgentManifest, BrandKit, VisualReference } from "../lib/pastel-agent/types";
 import { getRunState, getLatestRunForProject, subscribeToRun, getRunLiveStatus } from "../lib/pastel-agent/run-store";
 import type { User, PlanTier } from "@shared/schema";
 import { requireAuth } from "./helpers";
@@ -17,7 +17,27 @@ const generateSchema = z.object({
   prompt: z.string().trim().min(1).max(4000),
   answers: z.record(z.string()).optional(),
   projectId: z.string().uuid().optional(),
+  referenceImages: z.array(z.object({
+    name: z.string().trim().min(1).max(160),
+    mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
+    data: z.string().min(100).max(2_100_000),
+  })).max(3).optional(),
 });
+
+function visualReferenceFromRequest(images: Array<{ name: string; mimeType: string; data: string }> | undefined): VisualReference | undefined {
+  if (!images?.length) return undefined;
+  return {
+    names: images.map((image) => image.name),
+    images: images.map((image) => ({
+      type: "image" as const,
+      source: {
+        type: "base64" as const,
+        media_type: image.mimeType,
+        data: image.data.replace(/^data:image\/(?:png|jpeg|webp);base64,/, ""),
+      },
+    })),
+  };
+}
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -130,6 +150,8 @@ export function registerPastelAgentRoutes(app: Express) {
         answers: parsed.data.answers ?? {},
       });
 
+      const visualReference = visualReferenceFromRequest(parsed.data.referenceImages);
+
       let holdId: string | undefined;
       try {
         holdId = await creditService.createHold(user.id, estCredits, run.id);
@@ -140,6 +162,7 @@ export function registerPastelAgentRoutes(app: Express) {
       startAgentLoop(run.id, parsed.data.prompt, parsed.data.answers ?? {}, parsed.data.projectId, holdId, user.id, {
         maxCredits: Math.max(estCredits * 2, 10),
         holdAmount: estCredits,
+        visualReference,
       }).catch(
         (err) => console.error("[pastel-agent] loop crashed:", err instanceof Error ? err.message : err),
       );
@@ -347,15 +370,17 @@ async function getPlanTier(userId: string): Promise<PlanTier> {
 }
 
 /**
- * V9 cost estimate.
+ * V14 cost estimate.
  *
  * Call graph (hybrid tiers):
+ *   design (mid)    × 1
  *   brief (mid)     × 1
+ *   data (mid)      × 1
  *   wireframe (mid) × 1
  *   ux design (mid) × 1
  *   planner (cheap) × ~6 components (parallel)
  *   builder (cheap) × ~6 components (parallel)
- *   copy (cheap)    × 1
+ *   copy (mid)      × 1
  *   review (mid)    × 1
  *   visualReview (mid, +image tokens) × 1
  *   repair (cheap)  × bounded (≤2 rounds × a few files)
@@ -363,7 +388,9 @@ async function getPlanTier(userId: string): Promise<PlanTier> {
 function estimateRunCredits(prompt: string): number {
   const components = 6;
 
+  const designCost = calcCost(MODELS.design, prompt.length + 5000, 3000);
   const briefCost = calcCost(MODELS.brief, prompt.length + 5000, 2500);
+  const dataCost = calcCost(MODELS.data, prompt.length + 4000, 4000);
   const wireframeCost = calcCost(MODELS.wireframe, prompt.length + 6000, 6000);
   const uxCost = calcCost(MODELS.wireframe, prompt.length + 4000, 4000);
   const plannerCost = calcCost(MODELS.planner, 3000, 1500);
@@ -377,7 +404,7 @@ function estimateRunCredits(prompt: string): number {
   // added once instead of ×components). 4 repair calls = 2 bounded rounds × ~2
   // targeted files.
   const subtotal = [
-    briefCost, wireframeCost, uxCost,
+    designCost, briefCost, dataCost, wireframeCost, uxCost,
     copyCost, reviewCost,
   ].reduce((s, c) => s + c.costDollars, 0)
     + (plannerCost.costDollars + builderCost.costDollars) * components
