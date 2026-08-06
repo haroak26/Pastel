@@ -10,11 +10,13 @@ import { CanvasPromptInput } from "@/components/CanvasPromptInput";
 import { CanvasDropdown } from "@/components/CanvasDropdown";
 import { usePastelAgent } from "@/hooks/use-pastel-agent";
 import { AgentRunCard } from "@/components/agent/AgentRunCard";
+import { CompanyGallery } from "@/components/agent/CompanyGallery";
 import { ScreenPreview } from "@/components/agent/ScreenPreview";
 import { ScreenPanel } from "@/components/agent/ScreenPanel";
 import { DocsPanel } from "@/components/agent/DocsPanel";
 import { DocReader } from "@/components/agent/DocReader";
 import { FilesPanel } from "@/components/agent/FilesPanel";
+import { formatScreenLabel } from "@/lib/utils";
 
 const ALL_FONTS = [
   "Inter",
@@ -114,12 +116,15 @@ export default function CanvasPage() {
 
   const agent = usePastelAgent(agentProjectId);
   const {
+    catalog,
     phases,
     status,
     isGenerating,
     error,
     phaseOrder,
     phaseLabels,
+    phaseDescriptions,
+    skills,
     docs,
     files,
     screens: agentScreens,
@@ -134,12 +139,22 @@ export default function CanvasPage() {
     awaitingAnswers,
     pendingPrompt,
     isClarifying,
+    suggestedCompanies,
+    inspiration,
+    secondaryInspiration,
     clarify,
     setAnswer,
+    chooseInspiration,
     submitAnswers,
     skipClarify,
     reset,
   } = agent;
+
+  // Clarify flow: pick an inspiration company first, then the question wizard.
+  const [clarifyStage, setClarifyStage] = useState<"gallery" | "questions">("gallery");
+  useEffect(() => {
+    if (awaitingAnswers) setClarifyStage("gallery");
+  }, [awaitingAnswers]);
 
   const hasSession = status !== "idle" || awaitingAnswers;
 
@@ -154,18 +169,18 @@ export default function CanvasPage() {
   );
 
   const displayScreens = useMemo(() => {
-    if (status === "done" && agentScreens.length > 0) {
+    if ((status === "done" || phases.present.status !== "idle") && agentScreens.length > 0) {
       return agentScreens.map((name) => ({ name, ready: true, failed: failedScreens.includes(name) }));
     }
     if (hasSession && specScreens.length > 0) {
       return specScreens.map((name) => ({
         name,
-        ready: status === "done" && agentScreens.includes(name),
+        ready: (status === "done" || phases.present.status !== "idle") && agentScreens.includes(name),
         failed: failedScreens.includes(name),
       }));
     }
     return [];
-  }, [status, agentScreens, specScreens, failedScreens, hasSession]);
+  }, [status, agentScreens, specScreens, failedScreens, hasSession, phases.present.status]);
 
   const componentFiles = useMemo(
     () => Object.keys(files).filter((p) => /^src\/components\/[^/]+\.jsx$/.test(p)),
@@ -235,12 +250,12 @@ export default function CanvasPage() {
     }
   }, [brandKit]);
 
-  // Auto-select the first screen when the run completes
+  // Auto-select the first screen when it's presented (before review completes)
   useEffect(() => {
-    if (status === "done" && agentScreens.length > 0 && !selectedScreen) {
+    if ((status === "done" || phases.present.status !== "idle") && agentScreens.length > 0 && !selectedScreen) {
       setSelectedScreen(agentScreens[0]);
     }
-  }, [status, agentScreens, selectedScreen]);
+  }, [status, agentScreens, selectedScreen, phases.present.status]);
 
   useEffect(() => {
     if (showSearch) searchRef.current?.focus();
@@ -464,7 +479,7 @@ export default function CanvasPage() {
                         ) : (
                           <Loader2 size={12} className="shrink-0 animate-spin text-fg-faint" />
                         )}
-                        <span className="text-[11px] truncate">{s.name}</span>
+                        <span className="text-[11px] truncate">{formatScreenLabel(s.name)}</span>
                         {s.failed && <span className="ml-auto text-[9px] text-warning font-medium">warn</span>}
                       </motion.button>
                     ))}
@@ -984,8 +999,8 @@ export default function CanvasPage() {
                 </div>
               )}
 
-              {/* Verified screen preview */}
-              {!activeDoc && previewMode === "preview" && status === "done" && selectedScreen && runId && (
+              {/* Verified screen preview — live once the agent presents the UI */}
+              {!activeDoc && previewMode === "preview" && (status === "done" || phases.present.status !== "idle") && selectedScreen && runId && (
                 <div className="absolute inset-0 flex flex-col items-center p-6 overflow-y-auto">
                   <div className="w-full max-w-[1400px]">
                     <ScreenPanel screenName={selectedScreen || ""}>
@@ -999,26 +1014,34 @@ export default function CanvasPage() {
               )}
 
               {/* Working state */}
-              {!activeDoc && previewMode === "preview" && isGenerating && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="flex flex-col items-center text-center max-w-xs">
-                  <div className="w-16 h-16 rounded-2xl bg-brand/10 flex items-center justify-center mb-4">
-                    <Sparkles size={24} strokeWidth={1.5} className="text-brand" />
-                  </div>
-                  <h2 className="text-[15px] font-semibold text-foreground mb-1">
-                     {phases.brief.status === "running" && "Reading your brief…"}
-                     {phases.plan.status === "running" && "Designing every detail…"}
-                     {phases.review.status === "running" && "Reviewing the design…"}
-                     {phases.build.status === "running" && "Coding the app…"}
-                    {phases.verify.status === "running" && "Verifying in the sandbox…"}
-                    {phases.present.status === "running" && "Finishing up…"}
-                    {!phases.brief.status.match(/running|done/) && "Starting the agent…"}
-                  </h2>
-                  <p className="text-[12px] text-fg-muted leading-relaxed">
-                    {docs.length > 0
-                      ? `${docs.length} document${docs.length === 1 ? "" : "s"} written · ${Object.keys(files).length} files built`
-                      : "The agent is working. Everything is saved as it happens — you can safely leave this page."}
-                  </p>
+              {!activeDoc && previewMode === "preview" && isGenerating && phases.present.status === "idle" && (
+                <div className="absolute inset-0 flex items-center justify-center overflow-auto">
+                  <div className="flex flex-col items-center text-center max-w-md">
+                    <div className="w-16 h-16 rounded-2xl bg-brand/10 flex items-center justify-center mb-4">
+                      <Sparkles size={24} strokeWidth={1.5} className="text-brand" />
+                    </div>
+                    <h2 className="text-[15px] font-semibold text-foreground mb-1">
+                       {phases.brief.status === "running" && "Building the product brief…"}
+                       {phases.wireframe.status === "running" && "Producing the wireframes…"}
+                       {phases.build.status === "running" && "Planning & building components…"}
+                       {phases.assemble.status === "running" && "Assembling the screens…"}
+                       {!phases.brief.status.match(/running|done/) && "Starting the agent…"}
+                    </h2>
+                    <p className="text-[12px] text-fg-muted leading-relaxed">
+                      {docs.length > 0
+                        ? `${docs.length} document${docs.length === 1 ? "" : "s"} written · ${Object.keys(files).length} files built`
+                        : "The agent is working. Everything is saved as it happens — you can safely leave this page."}
+                    </p>
+                    {phases.build.status === "running" && componentFiles.length > 0 && (
+                      <div className="mt-4 w-full max-w-sm flex flex-wrap items-center justify-center gap-1.5">
+                        {componentFiles.slice(-16).map((p) => (
+                          <span key={p} className="inline-flex items-center gap-1 text-[10px] text-brand bg-brand/5 border border-brand/20 px-2 py-1 rounded-full">
+                            <span className="w-1 h-1 rounded-full bg-brand animate-pulse" />
+                            {p.replace(/^src\/components\//, "").replace(/\.jsx$/, "")}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                   </div>
                 </div>
               )}
@@ -1030,8 +1053,14 @@ export default function CanvasPage() {
                     <div className="w-16 h-16 rounded-2xl bg-brand/10 flex items-center justify-center mb-4">
                       <Sparkles size={24} strokeWidth={1.5} className="text-brand" />
                     </div>
-                    <h2 className="text-[15px] font-semibold text-foreground mb-1">A few questions</h2>
-                    <p className="text-[12px] text-fg-muted leading-relaxed">Answer in the prompt box below — or skip to go straight to generation.</p>
+                    <h2 className="text-[15px] font-semibold text-foreground mb-1">
+                      {clarifyStage === "gallery" ? "Pick your inspiration" : "A few questions"}
+                    </h2>
+                    <p className="text-[12px] text-fg-muted leading-relaxed">
+                      {clarifyStage === "gallery"
+                        ? "Choose the app your product should feel like — the brief is written around it."
+                        : "Answer in the panel below — or skip to go straight to generation."}
+                    </p>
                   </div>
                 </div>
               )}
@@ -1109,6 +1138,8 @@ export default function CanvasPage() {
                         phases={phases}
                         phaseOrder={phaseOrder}
                         phaseLabels={phaseLabels}
+                        phaseDescriptions={phaseDescriptions}
+                        skills={skills}
                         activity={activity}
                         prompt={originalPrompt || pendingPrompt}
                         error={error}
@@ -1122,20 +1153,42 @@ export default function CanvasPage() {
                     <AnimatePresence mode="wait">
                       {awaitingAnswers && questions && questions.length > 0 ? (
                         <motion.div
-                          key="clarify"
+                          key={clarifyStage}
                           initial={{ opacity: 0, y: 12 }}
                           animate={{ opacity: 1, y: 0 }}
                           exit={{ opacity: 0, y: 12 }}
                           transition={{ duration: 0.35, ease: [0.22, 1, 0.36, 1] }}
                         >
-                          <CanvasPromptInput
-                            questions={questions}
-                            answers={answers}
-                            onAnswerChange={setAnswer}
-                            onSubmit={submitAnswers}
-                            onSkip={skipClarify}
-                            isLoading={isGenerating || isClarifying}
-                          />
+                          {clarifyStage === "gallery" ? (
+                            <CompanyGallery
+                              catalog={catalog}
+                              suggested={suggestedCompanies}
+                              inspiration={inspiration}
+                              secondary={secondaryInspiration}
+                              onPick={chooseInspiration}
+                              onGenerate={() => {
+                                setClarifyStage("questions");
+                              }}
+                              loading={isGenerating || isClarifying}
+                            />
+                          ) : (
+                            <div className="relative">
+                              <button
+                                onClick={() => setClarifyStage("gallery")}
+                                className="absolute -top-8 left-1 flex items-center gap-1 text-[11px] font-medium text-fg-muted hover:text-foreground bg-transparent border-none cursor-pointer transition-colors"
+                              >
+                                ← Change inspiration
+                              </button>
+                              <CanvasPromptInput
+                                questions={questions}
+                                answers={answers}
+                                onAnswerChange={setAnswer}
+                                onSubmit={submitAnswers}
+                                onSkip={skipClarify}
+                                isLoading={isGenerating || isClarifying}
+                              />
+                            </div>
+                          )}
                         </motion.div>
                       ) : (
                         <motion.div

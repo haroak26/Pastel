@@ -1,4 +1,4 @@
-import type { Express, Request, Response, NextFunction } from "express";
+import type { Express, Request, Response } from "express";
 import { z } from "zod";
 import type { PastelEvent, AgentManifest, BrandKit } from "../lib/pastel-agent/types";
 import { getRunState, getLatestRunForProject, subscribeToRun, getRunLiveStatus } from "../lib/pastel-agent/run-store";
@@ -8,7 +8,6 @@ import { storage } from "../storage";
 import * as creditService from "../lib/credit-service";
 import { calcCost, CREDIT_PER_DOLLAR } from "../lib/pricing";
 import { MODELS, MAX_TOKENS_PER_CALL } from "../lib/pastel-agent/gateway";
-import { intakeSystemPrompt } from "../lib/pastel-agent/prompts/intake";
 
 const clarifySchema = z.object({
   prompt: z.string().trim().min(1).max(4000),
@@ -20,16 +19,49 @@ const generateSchema = z.object({
   projectId: z.string().uuid().optional(),
 });
 
-const addScreensSchema = z.object({
-  prompt: z.string().trim().min(1).max(2000),
-});
-
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 }
 
 export function registerPastelAgentRoutes(app: Express) {
-  // ── Clarify (intake + ambiguity engine) ──────────────────────────────
+  // ── Knowledge base catalog (company gallery for the clarify step) ─────
+  app.get("/api/pastel-agent/knowledge", requireAuth, async (_req: Request, res: Response) => {
+    try {
+      const { listCatalog } = await import("../lib/pastel-agent/knowledge/index");
+      const catalog = await listCatalog();
+      return res.json({ companies: catalog });
+    } catch (err: any) {
+      console.error("[pastel-agent] knowledge error:", err?.message || err);
+      return res.status(500).json({ message: err?.message || "Internal error" });
+    }
+  });
+
+  // ── Company reference imagery (V10) — preview.png / references/*.png ────
+  app.get("/api/pastel-agent/knowledge/:slug/image/:file", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const { readCompanyImage, companyImageFiles } = await import("../lib/pastel-agent/knowledge/index");
+      const slug = String(req.params.slug ?? "");
+      const file = String(req.params.file ?? "");
+      const available = companyImageFiles(slug);
+      if (!available.includes(file)) {
+        return res.status(404).json({ message: "Image not found" });
+      }
+      const buf = readCompanyImage(slug, file);
+      if (!buf) return res.status(404).json({ message: "Image not found" });
+      const mime = file.endsWith(".png") ? "image/png"
+        : file.endsWith(".webp") ? "image/webp"
+        : file.endsWith(".jpg") || file.endsWith(".jpeg") ? "image/jpeg"
+        : "application/octet-stream";
+      res.set("Content-Type", mime);
+      res.set("Cache-Control", "public, max-age=3600");
+      return res.send(buf);
+    } catch (err: any) {
+      console.error("[pastel-agent] company image error:", err?.message || err);
+      return res.status(500).json({ message: err?.message || "Internal error" });
+    }
+  });
+
+  // ── Clarify (intake + ambiguity engine + inspiration suggestions) ─────
   app.post("/api/pastel-agent/clarify", requireAuth, async (req: Request, res: Response) => {
     try {
       const user = req.user as User;
@@ -39,16 +71,16 @@ export function registerPastelAgentRoutes(app: Express) {
       }
 
       const planTier = await getPlanTier(user.id);
-      const estimatedPrompt = intakeSystemPromptLength() + parsed.data.prompt.length;
-      const estimatedOutput = MAX_TOKENS_PER_CALL.intake * 4;
-      const estCost = calcCost(MODELS.intake, estimatedPrompt, estimatedOutput);
+      const estimatedPrompt = 6000 + parsed.data.prompt.length;
+      const estimatedOutput = MAX_TOKENS_PER_CALL.clarify * 4;
+      const estCost = calcCost(MODELS.clarify, estimatedPrompt, estimatedOutput);
       const allowance = await creditService.checkAllowance(user.id, planTier, estCost.credits);
       if (!allowance.allowed) {
         return res.status(402).json({ message: allowance.reason, balance: allowance.balance, monthlyUsed: allowance.monthlyUsed, monthlyAllowance: allowance.monthlyAllowance });
       }
 
-      const { runClarify } = await import("../lib/pastel-agent/engine");
-      const result = await runClarify(parsed.data.prompt, user.id);
+      const { runClarify } = await import("../lib/pastel-agent/agents/clarify-v6");
+      const { result } = await runClarify({ prompt: parsed.data.prompt });
       return res.json(result);
     } catch (err: any) {
       const message = err?.message || String(err);
@@ -62,8 +94,7 @@ export function registerPastelAgentRoutes(app: Express) {
   app.get("/api/pastel-agent/estimate", requireAuth, async (req: Request, res: Response) => {
     try {
       const prompt = String(req.query.prompt ?? "").slice(0, 4000);
-      const screens = Math.max(1, Math.min(6, Number(req.query.screens) || 4));
-      const estimatedCredits = estimateRunCredits(prompt, { screens });
+      const estimatedCredits = estimateRunCredits(prompt);
       const user = req.user as User;
       const balance = await creditService.getBalance(user.id);
       return res.json({ estimatedCredits, balance: balance.balance, minRequired: 5 });
@@ -89,7 +120,6 @@ export function registerPastelAgentRoutes(app: Express) {
         return res.status(402).json({ message: allowance.reason, balance: allowance.balance, monthlyUsed: allowance.monthlyUsed, monthlyAllowance: allowance.monthlyAllowance });
       }
 
-      // Create run first so we can link the hold to it
       const { createRun } = await import("../lib/pastel-agent/run-store");
       const { startAgentLoop } = await import("../lib/pastel-agent/engine");
 
@@ -109,6 +139,7 @@ export function registerPastelAgentRoutes(app: Express) {
 
       startAgentLoop(run.id, parsed.data.prompt, parsed.data.answers ?? {}, parsed.data.projectId, holdId, user.id, {
         maxCredits: Math.max(estCredits * 2, 10),
+        holdAmount: estCredits,
       }).catch(
         (err) => console.error("[pastel-agent] loop crashed:", err instanceof Error ? err.message : err),
       );
@@ -116,53 +147,6 @@ export function registerPastelAgentRoutes(app: Express) {
       return res.status(201).json({ runId: run.id, status: "running", holdId });
     } catch (err: any) {
       console.error("[pastel-agent] generate error:", err?.message || err);
-      return res.status(500).json({ message: err?.message || "Internal error" });
-    }
-  });
-
-  // ── Add screen(s) to an established project (delta run) ───────────────
-  app.post("/api/pastel-agent/projects/:projectId/screens", requireAuth, async (req: Request, res: Response) => {
-    try {
-      const user = req.user as User;
-      const projectId = String(req.params.projectId);
-      const parsed = addScreensSchema.safeParse(req.body);
-      if (!parsed.success) {
-        return res.status(400).json({ message: "Invalid request", errors: parsed.error.issues });
-      }
-
-      const planTier = await getPlanTier(user.id);
-      const estCredits = estimateRunCredits(parsed.data.prompt, { screens: 2 });
-      const allowance = await creditService.checkAllowance(user.id, planTier, estCredits);
-      if (!allowance.allowed) {
-        return res.status(402).json({ message: allowance.reason, balance: allowance.balance, monthlyUsed: allowance.monthlyUsed, monthlyAllowance: allowance.monthlyAllowance });
-      }
-
-      const { createRun } = await import("../lib/pastel-agent/run-store");
-      const { startScreenDeltaLoop } = await import("../lib/pastel-agent/engine");
-
-      const run = await createRun({
-        projectId,
-        userId: user.id,
-        prompt: parsed.data.prompt,
-        answers: {},
-      });
-
-      let holdId: string | undefined;
-      try {
-        holdId = await creditService.createHold(user.id, estCredits, run.id);
-      } catch (err) {
-        console.error("[pastel-agent] hold creation failed — delta run will not be chargeable:", err instanceof Error ? err.message : err);
-      }
-
-      startScreenDeltaLoop(run.id, projectId, parsed.data.prompt, holdId, user.id, {
-        maxCredits: Math.max(estCredits * 2, 10),
-      }).catch(
-        (err) => console.error("[pastel-agent] delta loop crashed:", err instanceof Error ? err.message : err),
-      );
-
-      return res.status(201).json({ runId: run.id, status: "running", holdId });
-    } catch (err: any) {
-      console.error("[pastel-agent] add-screens error:", err?.message || err);
       return res.status(500).json({ message: err?.message || "Internal error" });
     }
   });
@@ -363,50 +347,42 @@ async function getPlanTier(userId: string): Promise<PlanTier> {
 }
 
 /**
- * 17-stage cost model — matches the actual stage call graph:
- *   reasoner: clarify(1) creativeBrief(2) spec(3) brandStrategy(4) brandKit(5)
- *             screenPlan(8) layout(9) componentSystem(10) compose(12)
- *             designGate(review) visualQA(16)
- *   light:    ia(6) flows(7) patternRank(11) interactions(13)
- *   implementer: components + screens + bounded repairs (14/15/17)
- *   embeddings: pattern retrieval query (11) — sub-cent, folded into margin.
- *   styles.css, derivation, lint, and anti-slop checks are deterministic (free).
+ * V9 cost estimate.
+ *
+ * Call graph (hybrid tiers):
+ *   brief (mid)     × 1
+ *   wireframe (mid) × 1
+ *   ux design (mid) × 1
+ *   planner (cheap) × ~6 components (parallel)
+ *   builder (cheap) × ~6 components (parallel)
+ *   copy (cheap)    × 1
+ *   review (mid)    × 1
+ *   visualReview (mid, +image tokens) × 1
+ *   repair (cheap)  × bounded (≤2 rounds × a few files)
  */
-function estimateRunCredits(prompt: string, opts?: { screens?: number }): number {
-  const S = Math.max(1, Math.min(6, opts?.screens ?? 4));
-  const C = 8; // components (hard-capped at 12, ~8 typical)
-  const avgCharsPerToken = 4;
-  const sum = (costs: Array<{ costDollars: number }>) => costs.reduce((s, c) => s + c.costDollars, 0);
+function estimateRunCredits(prompt: string): number {
+  const components = 6;
 
-  const reasonerCosts = [
-    calcCost(MODELS.intake, prompt.length + 3500, 2500),                                  // 1 clarification (0 when cached)
-    calcCost(MODELS.creativeBrief, prompt.length + 4000, 2000),                           // 2 creative brief
-    calcCost(MODELS.spec, prompt.length + 8000, 6000),                                    // 3 product spec
-    calcCost(MODELS.brandStrategy, 7000, 1200),                                           // 4 brand strategy
-    calcCost(MODELS.designSystem, 16000, 8000),                                           // 5 brand kit
-    calcCost(MODELS.ia, 6000, 1500),                                                      // 6 information architecture (light)
-    calcCost(MODELS.flows, 5000, 1200),                                                   // 7 user flows (light)
-    calcCost(MODELS.screenPlan, 8000, 3000),                                              // 8 screen planning
-    calcCost(MODELS.layout, 7000, 1800),                                                  // 9 layout planning
-    calcCost(MODELS.componentSystem, 12000, 6000),                                        // 10 component system (≤12 contracts)
-    calcCost(MODELS.patternRank, 6000, 600),                                              // 11 pattern rerank (light)
-    calcCost(MODELS.compose, 14000, 9000),                                                // 12 screen composition
-    calcCost(MODELS.interactions, 7000, 1600),                                            // 13 interaction planning (light)
-    calcCost(MODELS.designGate, 16000, 3000),                                             // review gate
-    calcCost(MODELS.designGate, 6000, 4000),                                              // expected targeted gate repair
-    calcCost(MODELS.visualQA, 20000, 4000),                                               // 16 visual design review (budget-reserved)
-  ];
+  const briefCost = calcCost(MODELS.brief, prompt.length + 5000, 2500);
+  const wireframeCost = calcCost(MODELS.wireframe, prompt.length + 6000, 6000);
+  const uxCost = calcCost(MODELS.wireframe, prompt.length + 4000, 4000);
+  const plannerCost = calcCost(MODELS.planner, 3000, 1500);
+  const builderCost = calcCost(MODELS.builder, 4000, 3500);
+  const copyCost = calcCost(MODELS.copy, prompt.length + 3000, 2000);
+  const reviewCost = calcCost(MODELS.review, prompt.length + 6000, 2500);
+  const visualCost = calcCost(MODELS.visualReview, prompt.length + 4000, 2500);
+  const repairCost = calcCost(MODELS.repair, 5000, 3000);
 
-  const implementerCosts = [
-    calcCost(MODELS.component, 5000 * C, 4500 * avgCharsPerToken * C),                    // 14 components
-    calcCost(MODELS.screen, 8000 * S, 7500 * avgCharsPerToken * S),                       // 14 screens
-    calcCost(MODELS.patch, 6000 * 4, 5000 * 4),                                           // 15/17 bounded artifact repairs
-  ];
+  // Planner + builder run PER component (that was the underestimate: they were
+  // added once instead of ×components). 4 repair calls = 2 bounded rounds × ~2
+  // targeted files.
+  const subtotal = [
+    briefCost, wireframeCost, uxCost,
+    copyCost, reviewCost,
+  ].reduce((s, c) => s + c.costDollars, 0)
+    + (plannerCost.costDollars + builderCost.costDollars) * components
+    + repairCost.costDollars * 4;
 
-  const totalDollars = sum(reasonerCosts) + sum(implementerCosts) + 0.01;
-  return Math.max(5, Math.ceil(totalDollars * CREDIT_PER_DOLLAR * 100) / 100);
-}
-
-function intakeSystemPromptLength(): number {
-  return intakeSystemPrompt().length;
+  const totalDollars = (subtotal + visualCost.costDollars * 0.5) * 1.15 + 0.002;
+  return Math.max(3, Math.ceil(totalDollars * CREDIT_PER_DOLLAR * 100) / 100);
 }

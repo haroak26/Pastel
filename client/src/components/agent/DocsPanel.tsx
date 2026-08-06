@@ -11,10 +11,9 @@ interface DocsPanelProps {
 
 const GROUPS: Array<{ id: string; label: string; match: (d: DocItem) => boolean }> = [
   { id: "brief", label: "Brief", match: (d) => d.kind === "brief" },
-  { id: "system", label: "Design System", match: (d) => d.kind === "system" },
-  { id: "components", label: "Components", match: (d) => d.kind === "component-spec" },
-  { id: "screens", label: "Screen Specs", match: (d) => d.kind === "screen-spec" },
-  { id: "visual", label: "Visual QA", match: (d) => d.kind === "visual-review" },
+  { id: "references", label: "Design References", match: (d) => d.kind === "megadesign" || d.kind === "company-design" },
+  { id: "planning", label: "Planning", match: (d) => d.kind === "wireframe-plan" || d.kind === "component-inventory" || d.kind === "copy-plan" },
+  { id: "review", label: "Review", match: (d) => d.kind === "gate-report" || d.kind === "review-result" },
 ];
 
 /** Sidebar panel listing every markdown document the agent produced, live. */
@@ -42,8 +41,7 @@ export function DocsPanel({ docs, isRunning, activeDocPath, onOpenDoc }: DocsPan
             {isRunning
               ? "The agent is writing the brief — docs will appear here as they're created."
               : "No documents yet. Run the agent to generate design docs."}
-          </p>
-        </div>
+          </p>        </div>
       )}
 
       {grouped.map((group) => (

@@ -121,6 +121,22 @@ test("sandbox: projects with no screens fail cleanly", async () => {
   assert.ok(result.errors.some((e) => /No screen files/.test(e.message)));
 });
 
+test("sandbox: infinite self-recursion is caught as a runtime error", async () => {
+  const { verifyProject } = await import("../lib/pastel-agent/sandbox");
+  const files = {
+    ...GOOD_FILES,
+    "src/screens/Home.jsx": `export default function Home() {
+  return <Home />;
+}`,
+  };
+  const result = await verifyProject(files);
+  assert.equal(result.ok, false);
+  assert.ok(
+    result.errors.some((e) => /call stack|maximum|recurs/i.test(e.message)),
+    `should report the recursion: ${JSON.stringify(result.errors)}`,
+  );
+});
+
 test("sandbox: screens using useState interactivity verify fine", async () => {
   const { verifyProject } = await import("../lib/pastel-agent/sandbox");
   const files = {

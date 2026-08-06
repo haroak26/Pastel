@@ -1,9 +1,5 @@
-export { runClarify } from "./stages/clarify";
-export { startAgentLoop, startScreenDeltaLoop } from "./orchestrator";
-export { selectStyleSeed, selectStyleSeedByName, selectStyleSeedDeterministic, seedPermissions } from "./style-seeds";
+export { startAgentLoop } from "./engine";
 export { verifyProject, verifyScreens, IncrementalScreenVerifier } from "./sandbox";
-export { loadProjectState } from "./state";
-export { listRegistry } from "./registry";
 export {
   createRun,
   emitEvent,
@@ -11,3 +7,4 @@ export {
   getRunState,
   getLatestRunForProject,
 } from "./run-store";
+export { listCatalog, scoreCompanies } from "./knowledge/index";

@@ -1,0 +1,185 @@
+import type { ResolvedTheme } from "./schemas-v6";
+
+/**
+ * Deterministic stylesheet compiler — Pastel v5.
+ *
+ * Emits the complete stylesheet from a resolved theme: tokens, semantic
+ * utility classes (bg-card, text-muted-foreground, border-border…), radius
+ * and type-scale overrides, focus rings, and layout helpers. The generated
+ * components reference these classes; every pixel is token-driven.
+ * Zero model tokens, zero variance.
+ */
+
+export interface CompiledStyles {
+  css: string;
+  fontFamilies: string[];
+}
+
+export function compileStyles(theme: ResolvedTheme): CompiledStyles {
+  const vars = Object.entries(theme.cssVars)
+    .map(([k, v]) => `  ${k}: ${v};`)
+    .join("\n");
+
+  const chartVars = theme.colors.chart
+    .map((c, i) => `  --chart-${i + 1}: ${c};`)
+    .join("\n");
+
+  // V11: the interactive-control scale (8px rhythm: 32/40/48). Base
+  // components and builder output size buttons/inputs/selects from these
+  // tokens — never ad hoc h-9/h-11 utilities.
+  const controlVars = [
+    "  --control-sm: 32px;",
+    "  --control-md: 40px;",
+    "  --control-lg: 48px;",
+    "  --control-pad-x: 16px;",
+  ].join("\n");
+
+  const css = [
+    ":root {",
+    vars,
+    chartVars,
+    controlVars,
+    "}",
+    "",
+    "/* ── Base ── */",
+    "* { box-sizing: border-box; }",
+    "html { scroll-behavior: smooth; }",
+    "body {",
+    "  margin: 0;",
+    "  font-family: var(--font-body);",
+    "  font-size: var(--text-base);",
+    "  line-height: 1.5;",
+    "  color: var(--foreground);",
+    "  background: var(--background);",
+    "  -webkit-font-smoothing: antialiased;",
+    "  text-rendering: optimizeLegibility;",
+    "}",
+    "::selection { background: var(--accent); color: var(--accent-foreground); }",
+    "a { color: var(--primary); text-decoration: none; }",
+    "a:hover { text-decoration: underline; text-underline-offset: 2px; }",
+    "button { cursor: pointer; font-family: inherit; }",
+    "",
+    "/* ── Focus (keyboard visible, mouse invisible) ── */",
+    ":focus { outline: none; }",
+    ":focus-visible {",
+    "  outline: 2px solid var(--ring);",
+    "  outline-offset: 2px;",
+    "  border-radius: 4px;",
+    "}",
+    "",
+    "/* ── Motion ── */",
+    "button, a, input, select, textarea, [role='button'] {",
+    "  transition: color 150ms ease, background-color 150ms ease, border-color 150ms ease, box-shadow 150ms ease, transform 150ms ease;",
+    "}",
+    "",
+    "/* ── Scrollbar ── */",
+    "* { scrollbar-width: thin; scrollbar-color: var(--input) transparent; }",
+    "*::-webkit-scrollbar { width: 10px; height: 10px; }",
+    "*::-webkit-scrollbar-thumb { background: var(--input); border-radius: 8px; }",
+    "*::-webkit-scrollbar-track { background: transparent; }",
+    "",
+    "/* ── Semantic surface utilities (shadcn-style, token-driven) ── */",
+    ".bg-background { background-color: var(--background); }",
+    ".bg-card { background-color: var(--card); }",
+    ".bg-popover { background-color: var(--popover); }",
+    ".bg-primary { background-color: var(--primary); }",
+    ".bg-secondary { background-color: var(--secondary); }",
+    ".bg-muted { background-color: var(--muted); }",
+    ".bg-accent { background-color: var(--accent); }",
+    ".bg-destructive { background-color: var(--destructive); }",
+    ".bg-success { background-color: var(--success); }",
+    ".bg-success-subtle { background-color: var(--success-subtle); }",
+    ".bg-warning { background-color: var(--warning); }",
+    ".bg-warning-subtle { background-color: var(--warning-subtle); }",
+    ".bg-transparent { background-color: transparent; }",
+    "",
+    ".text-foreground { color: var(--foreground); }",
+    ".text-card-foreground { color: var(--card-foreground); }",
+    ".text-popover-foreground { color: var(--popover-foreground); }",
+    ".text-primary { color: var(--primary); }",
+    ".text-primary-foreground { color: var(--primary-foreground); }",
+    ".text-secondary-foreground { color: var(--secondary-foreground); }",
+    ".text-muted-foreground { color: var(--muted-foreground); }",
+    ".text-accent-foreground { color: var(--accent-foreground); }",
+    ".text-destructive { color: var(--destructive); }",
+    ".text-success { color: var(--success); }",
+    ".text-warning { color: var(--warning); }",
+    "",
+    ".border-border { border-color: var(--border); }",
+    ".border-input { border-color: var(--input); }",
+    ".border-destructive { border-color: var(--destructive); }",
+    ".border-primary { border-color: var(--primary); }",
+    ".divide-border > :not([hidden]) ~ :not([hidden]) { border-color: var(--border); }",
+    "",
+    "/* ── Hover variants (explicit — CDN can't alpha-blend CSS vars) ── */",
+    ".hover\\:bg-primary:hover { background-color: var(--primary-hover); }",
+    ".hover\\:bg-primary\\/90:hover { background-color: var(--primary-hover); }",
+    ".hover\\:bg-accent\\/90:hover { background-color: var(--accent-hover); }",
+    ".hover\\:bg-destructive\\/90:hover { background-color: var(--destructive-hover); }",
+    ".hover\\:bg-secondary\\/80:hover { background-color: var(--secondary); }",
+    ".hover\\:bg-muted\\/50:hover { background-color: var(--muted); }",
+    ".hover\\:bg-muted\\/80:hover { background-color: var(--muted); }",
+    ".hover\\:text-primary:hover { color: var(--primary); }",
+    ".hover\\:text-muted-foreground:hover { color: var(--muted-foreground); }",
+    ".hover\\:text-accent-foreground:hover { color: var(--accent-foreground); }",
+    ".hover\\:border-primary:hover { border-color: var(--primary); }",
+    "",
+    "/* ── Rings (color only — width from Tailwind's ring-* utilities) ── */",
+    ".ring-ring { --tw-ring-color: var(--ring); }",
+    ".focus-visible\\:ring-ring:focus-visible { --tw-ring-color: var(--ring); }",
+    ".ring-offset-background { --tw-ring-offset-color: var(--background); }",
+    "",
+    "/* ── Type scale overrides (body-prefixed to beat CDN specificity) ── */",
+    "body .text-xs { font-size: var(--text-xs); }",
+    "body .text-sm { font-size: var(--text-sm); }",
+    "body .text-base { font-size: var(--text-base); }",
+    "body .text-lg { font-size: var(--text-lg); }",
+    "body .text-xl { font-size: var(--text-xl); }",
+    "body .text-2xl { font-size: var(--text-2xl); }",
+    "body .text-3xl { font-size: var(--text-3xl); }",
+    "body .text-4xl { font-size: var(--text-4xl); }",
+    "body .text-5xl { font-size: var(--text-4xl); }",
+    "",
+    "/* ── Radius overrides (theme-tunable rounding) ── */",
+    "body .rounded-sm { border-radius: var(--radius-sm); }",
+    "body .rounded-md { border-radius: var(--radius-md); }",
+    "body .rounded-lg { border-radius: var(--radius-lg); }",
+    "body .rounded-xl { border-radius: var(--radius-xl); }",
+    "body .rounded-full { border-radius: var(--radius-full); }",
+    "body .rounded { border-radius: var(--radius-sm); }",
+    "body .rounded-[var(--radius)] { border-radius: var(--radius-md); }",
+    "",
+    "/* ── Visually hidden (a11y) ── */",
+    ".sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }",
+    "",
+    "/* ── Layout helpers ── */",
+    ".pastel-frame {",
+    "  max-width: var(--content-max);",
+    "  margin-inline: auto;",
+    // V11: every gutter is on the 8px rhythm (16/24/32/48) — the old 20px
+    // floor sat off-grid at mobile and fed geometry off-grid false positives.
+    "  padding-inline: clamp(16px, 4vw, 48px);",
+    "}",
+    ".pastel-prose { max-width: 65ch; }",
+    ".pastel-tabular { font-variant-numeric: tabular-nums; }",
+    "",
+    "/* ── Chart gridlines ── */",
+    ".chart-grid line { stroke: var(--border); stroke-opacity: 0.7; }",
+    ".chart-axis text { font-size: var(--text-xs); fill: var(--muted-foreground); }",
+    "",
+    "/* ── Tables ── */",
+    "table { border-collapse: collapse; width: 100%; }",
+    "th { text-align: left; font-weight: 500; }",
+    "td, th { vertical-align: middle; }",
+    "",
+    "/* ── Display type helper ── */",
+    ".pastel-display { font-family: var(--font-display); }",
+    "",
+    "/* ── Backdrop transparency fallbacks (no alpha-blend needed) ── */",
+    ".bg-background\\/95 { background-color: var(--background); }",
+    ".bg-background\\/80 { background-color: var(--background); }",
+    "",
+  ].join("\n");
+
+  return { css, fontFamilies: theme.fontFamilies };
+}

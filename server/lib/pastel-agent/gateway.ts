@@ -1,156 +1,66 @@
-import { MergeGateway, type TagInput, type ThinkingConfig } from "merge-gateway-sdk";
+import { MergeGateway, type ThinkingConfig } from "merge-gateway-sdk";
 
 /**
- * Multi-model gateway for the Pastel Agent 2 (17-stage) pipeline.
+ * Pastel Agent v6 — hybrid model gateway.
  *
- * Routing is by capability, not by pipeline stage:
- *   - Reasoner roles (Terra): intake, creativeBrief, spec, brandStrategy,
- *     designSystem, screenPlan, layout, componentSystem, compose, architecture,
- *     designGate, visualQA — planning, strategy, composition, verification.
- *   - Light roles (PASTEL_MODEL_LIGHT, defaults to ministral-14b-2512 — fast,
- *     cheap, and proven reliable on this gateway for structured JSON): ia,
- *     flows, interactions, patternRank. (gpt-oss-20b returns empty responses
- *     via this gateway — do not route roles to it.)
- *   - Implementer roles (Luna): component, screen, patch — deterministic
- *     React generation, component creation, targeted repair.
+ * V6 strategy: TWO models only. A CHEAP model (claude-haiku-4-5) carries the
+ * bulk parallel work — clarify, per-component planner, per-component builder,
+ * copy, assembly, and repair. A MID model (gpt-5.4-mini) handles the few
+ * judgment stages — brief, wireframe, and review (incl. visual review on
+ * rendered screenshots).
  *
- * Override any via env: PASTEL_MODEL_INTAKE, PASTEL_MODEL_COMPONENT, …
+ * The knowledge base (company design.md + megadesign.md) carries the visual
+ * quality; models select and adapt within it. Override any role via env:
+ * PASTEL_MODEL_{ROLE}.
  */
+
+export const CHEAP_DEFAULT = "anthropic/claude-haiku-4-5";
+export const MID_DEFAULT = "openai/gpt-5.6-luna";
+
 export const MODELS = {
-  // Stage 1 — clarification / intake
-  intake: process.env.PASTEL_MODEL_INTAKE || "openai/gpt-5.6-terra",
-  // Stage 2 — creative brief
-  creativeBrief: process.env.PASTEL_MODEL_CREATIVE_BRIEF || "openai/gpt-5.6-terra",
-  // Stage 3 — product specification
-  spec: process.env.PASTEL_MODEL_SPEC || "openai/gpt-5.6-terra",
-  // Stage 4 — brand strategy
-  brandStrategy: process.env.PASTEL_MODEL_BRAND_STRATEGY || "openai/gpt-5.6-terra",
-  // Stage 5 — brand kit (design system) generation
-  designSystem: process.env.PASTEL_MODEL_DESIGN_SYSTEM || "openai/gpt-5.6-terra",
-  // Stage 6 — information architecture (light)
-  ia: process.env.PASTEL_MODEL_IA || process.env.PASTEL_MODEL_LIGHT || "mistralai/ministral-14b-2512",
-  // Stage 7 — user flow planning (light)
-  flows: process.env.PASTEL_MODEL_FLOWS || process.env.PASTEL_MODEL_LIGHT || "mistralai/ministral-14b-2512",
-  // Stage 8 — screen planning
-  screenPlan: process.env.PASTEL_MODEL_SCREEN_PLAN || "openai/gpt-5.6-terra",
-  // Stage 9 — layout planning
-  layout: process.env.PASTEL_MODEL_LAYOUT || "openai/gpt-5.6-terra",
-  // Stage 10 — component system planning
-  componentSystem: process.env.PASTEL_MODEL_COMPONENT_SYSTEM || "openai/gpt-5.6-terra",
-  // Stage 11 — pattern retrieval reranker (light)
-  patternRank: process.env.PASTEL_MODEL_PATTERN_RANK || process.env.PASTEL_MODEL_LIGHT || "mistralai/ministral-14b-2512",
-  // Stage 12 — screen composition
-  compose: process.env.PASTEL_MODEL_COMPOSE || "openai/gpt-5.6-terra",
-  // Stage 13 — interaction planning (light)
-  interactions: process.env.PASTEL_MODEL_INTERACTIONS || process.env.PASTEL_MODEL_LIGHT || "mistralai/ministral-14b-2512",
-  // Delta planning (screen additions onto established projects)
-  architecture: process.env.PASTEL_MODEL_ARCHITECTURE || "openai/gpt-5.6-terra",
-  // Review phase — composition design gate
-  designGate: process.env.PASTEL_MODEL_DESIGN_GATE || "openai/gpt-5.6-terra",
-  // Stage 16 — visual design review (multimodal)
-  visualQA: process.env.PASTEL_MODEL_VISUAL_QA || "openai/gpt-5.6-terra",
-  // Stage 14 — code generation (implementer)
-  component: process.env.PASTEL_MODEL_COMPONENT || "openai/gpt-5.6-luna",
-  screen: process.env.PASTEL_MODEL_SCREEN || "openai/gpt-5.6-luna",
-  // Stages 15/17 — surgical repair (implementer)
-  patch: process.env.PASTEL_MODEL_PATCH || "openai/gpt-5.6-luna",
+  clarify:      process.env.PASTEL_MODEL_CLARIFY      || CHEAP_DEFAULT,
+  brief:        process.env.PASTEL_MODEL_BRIEF        || MID_DEFAULT,
+  wireframe:    process.env.PASTEL_MODEL_WIREFRAME    || MID_DEFAULT,
+  planner:      process.env.PASTEL_MODEL_PLANNER      || CHEAP_DEFAULT,
+  builder:      process.env.PASTEL_MODEL_BUILDER      || CHEAP_DEFAULT,
+  copy:         process.env.PASTEL_MODEL_COPY         || CHEAP_DEFAULT,
+  assemble:     process.env.PASTEL_MODEL_ASSEMBLE     || CHEAP_DEFAULT,
+  review:       process.env.PASTEL_MODEL_REVIEW       || MID_DEFAULT,
+  visualReview: process.env.PASTEL_MODEL_VISUAL_REVIEW || MID_DEFAULT,
+  repair:       process.env.PASTEL_MODEL_REPAIR       || CHEAP_DEFAULT,
 } as const;
 
 export type ModelRole = keyof typeof MODELS;
 
-export const PASTEL_GATEWAY_TAG_KEY = "betatesterid";
-
-const TAG_ENV_BY_ROLE: Record<ModelRole, string> = {
-  intake: "PASTEL_MERGE_GATEWAY_TAG_INTAKE",
-  creativeBrief: "PASTEL_MERGE_GATEWAY_TAG_CREATIVE_BRIEF",
-  spec: "PASTEL_MERGE_GATEWAY_TAG_SPEC",
-  brandStrategy: "PASTEL_MERGE_GATEWAY_TAG_BRAND_STRATEGY",
-  designSystem: "PASTEL_MERGE_GATEWAY_TAG_DESIGN_SYSTEM",
-  ia: "PASTEL_MERGE_GATEWAY_TAG_IA",
-  flows: "PASTEL_MERGE_GATEWAY_TAG_FLOWS",
-  screenPlan: "PASTEL_MERGE_GATEWAY_TAG_SCREEN_PLAN",
-  layout: "PASTEL_MERGE_GATEWAY_TAG_LAYOUT",
-  componentSystem: "PASTEL_MERGE_GATEWAY_TAG_COMPONENT_SYSTEM",
-  patternRank: "PASTEL_MERGE_GATEWAY_TAG_PATTERN_RANK",
-  compose: "PASTEL_MERGE_GATEWAY_TAG_COMPOSE",
-  interactions: "PASTEL_MERGE_GATEWAY_TAG_INTERACTIONS",
-  architecture: "PASTEL_MERGE_GATEWAY_TAG_ARCHITECTURE",
-  designGate: "PASTEL_MERGE_GATEWAY_TAG_DESIGN_GATE",
-  visualQA: "PASTEL_MERGE_GATEWAY_TAG_VISUAL_QA",
-  component: "PASTEL_MERGE_GATEWAY_TAG_COMPONENT",
-  screen: "PASTEL_MERGE_GATEWAY_TAG_SCREEN",
-  patch: "PASTEL_MERGE_GATEWAY_TAG_PATCH",
-};
-
-// Gateway-registered tag values (betagroupa) — new roles map onto the
-// established registered value set. Override per role via the env vars above.
-// If an org's tag config drifts, chat() retries once without tags.
-const DEFAULT_TAG_VALUE_BY_ROLE: Record<ModelRole, string> = {
-  intake: "clarify",
-  creativeBrief: "brief",
-  spec: "brief",
-  brandStrategy: "plan",
-  designSystem: "plan",
-  ia: "plan",
-  flows: "plan",
-  screenPlan: "plan",
-  layout: "plan",
-  componentSystem: "componentPlan",
-  patternRank: "planFallback",
-  compose: "componentPlan",
-  interactions: "plan",
-  architecture: "componentPlan",
-  designGate: "planFallback",
-  visualQA: "planFallback",
-  component: "code",
-  screen: "code",
-  patch: "fixSimple",
-};
-
-export function getPastelGatewayTags(
-  role: ModelRole,
-  env: NodeJS.ProcessEnv = process.env,
-): TagInput[] {
-  const key = env.PASTEL_MERGE_GATEWAY_TAG_KEY || env.MERGE_GATEWAY_TAG_KEY || PASTEL_GATEWAY_TAG_KEY;
-  const value = env[TAG_ENV_BY_ROLE[role]] || env.PASTEL_MERGE_GATEWAY_TAG_VALUE || env.MERGE_GATEWAY_TAG_VALUE || DEFAULT_TAG_VALUE_BY_ROLE[role];
-  return [{ key, value }];
-}
-
-// Budgets are right-sized to measured emission — oversized budgets cost
-// latency on every call (models fill headroom with reasoning).
 export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
-  intake: Number(process.env.PASTEL_MAX_TOKENS_INTAKE) || 2500,
-  creativeBrief: Number(process.env.PASTEL_MAX_TOKENS_CREATIVE_BRIEF) || 2500,
-  spec: Number(process.env.PASTEL_MAX_TOKENS_SPEC) || 6000,
-  brandStrategy: Number(process.env.PASTEL_MAX_TOKENS_BRAND_STRATEGY) || 1600,
-  designSystem: Number(process.env.PASTEL_MAX_TOKENS_DESIGN_SYSTEM) || 9000,
-  ia: Number(process.env.PASTEL_MAX_TOKENS_IA) || 2000,
-  flows: Number(process.env.PASTEL_MAX_TOKENS_FLOWS) || 1600,
-  screenPlan: Number(process.env.PASTEL_MAX_TOKENS_SCREEN_PLAN) || 3500,
-  layout: Number(process.env.PASTEL_MAX_TOKENS_LAYOUT) || 2500,
-  componentSystem: Number(process.env.PASTEL_MAX_TOKENS_COMPONENT_SYSTEM) || 8000,
-  patternRank: Number(process.env.PASTEL_MAX_TOKENS_PATTERN_RANK) || 900,
-  compose: Number(process.env.PASTEL_MAX_TOKENS_COMPOSE) || 10000,
-  interactions: Number(process.env.PASTEL_MAX_TOKENS_INTERACTIONS) || 2000,
-  architecture: Number(process.env.PASTEL_MAX_TOKENS_ARCHITECTURE) || 10000,
-  designGate: Number(process.env.PASTEL_MAX_TOKENS_DESIGN_GATE) || 4000,
-  visualQA: Number(process.env.PASTEL_MAX_TOKENS_VISUAL_QA) || 6000,
-  component: Number(process.env.PASTEL_MAX_TOKENS_COMPONENT) || 5000,
-  screen: Number(process.env.PASTEL_MAX_TOKENS_SCREEN) || 8000,
-  patch: Number(process.env.PASTEL_MAX_TOKENS_PATCH) || 5000,
+  clarify:      Number(process.env.PASTEL_MAX_TOKENS_CLARIFY)      || 2500,
+  brief:        Number(process.env.PASTEL_MAX_TOKENS_BRIEF)        || 4000,
+  wireframe:    Number(process.env.PASTEL_MAX_TOKENS_WIREFRAME)    || 9000,
+  planner:      Number(process.env.PASTEL_MAX_TOKENS_PLANNER)      || 4000,
+  builder:      Number(process.env.PASTEL_MAX_TOKENS_BUILDER)      || 6500,
+  copy:         Number(process.env.PASTEL_MAX_TOKENS_COPY)         || 3000,
+  assemble:     Number(process.env.PASTEL_MAX_TOKENS_ASSEMBLE)     || 5000,
+  review:       Number(process.env.PASTEL_MAX_TOKENS_REVIEW)       || 4000,
+  visualReview: Number(process.env.PASTEL_MAX_TOKENS_VISUAL_REVIEW) || 4000,
+  repair:       Number(process.env.PASTEL_MAX_TOKENS_REPAIR)       || 5000,
 } as const;
 
-// Reasoning models count chain-of-thought against max_tokens. When the budget
-// is exhausted during reasoning the model emits empty/truncated text at
-// finish_reason "max_tokens". Allow exactly one escalated retry as a safety
-// net — stage-level budgets are sized so this should be rare.
 const TRUNCATION_SCALE = 2.5;
 const MAX_TRUNCATION_RETRIES = 1;
-const MAX_ESCALATED_TOKENS = 24000;
+
+/** Per-role ceiling for truncation escalation. */
+const ESCALATION_CAP: Partial<Record<ModelRole, number>> = {
+  wireframe: 16000,
+};
+
+function escalationCap(role: ModelRole): number {
+  const env = Number(process.env.PASTEL_MAX_ESCALATED_TOKENS);
+  if (Number.isFinite(env) && env > 0) return env;
+  return ESCALATION_CAP[role] ?? 12000;
+}
+
 const DEFAULT_THINKING_BUDGET = 2000;
 
-// Gateway variants report truncation with different finish reasons. The
-// OpenAI Responses API also exposes a top-level incomplete_details field.
 const TRUNCATED_FINISH_REASONS = new Set(["max_tokens", "length", "incomplete"]);
 
 export function isTruncated(response: ChatResponse): boolean {
@@ -160,38 +70,51 @@ export function isTruncated(response: ChatResponse): boolean {
   return !!(response.incomplete_details as { reason?: string } | undefined)?.reason;
 }
 
-/** Thinking budget for reasoning models. PASTEL_THINKING_BUDGET=off disables reasoning. */
 function thinkingConfig(role?: ModelRole): ThinkingConfig | Record<string, unknown> | undefined {
   const raw = process.env.PASTEL_THINKING_BUDGET;
   if (raw === "off") return { type: "disabled" };
-  // Light roles run small structured transforms on a mini model — reasoning
-  // config is skipped from the start (saves a whole retry round-trip).
   if (role && LIGHT_ROLES.has(role) && raw === undefined) return undefined;
   const budget = Number(raw);
   if (Number.isFinite(budget) && budget > 0) return { type: "enabled", budget_tokens: Math.floor(budget) };
   return { type: "enabled", budget_tokens: DEFAULT_THINKING_BUDGET };
 }
 
-export const LIGHT_ROLES: ReadonlySet<ModelRole> = new Set<ModelRole>(["ia", "flows", "patternRank", "interactions"]);
+/** Roles that don't support reasoning/thinking config — Luna models.
+ * Thinking config is skipped entirely for these, avoiding a wasted retry round-trip.
+ * v6 defaults ALL roles to thinking-off (cheap + fast); set PASTEL_THINKING_BUDGET
+ * to a number to enable it. */
+export const LIGHT_ROLES: ReadonlySet<ModelRole> = new Set<ModelRole>([
+  "clarify", "brief", "wireframe", "planner", "builder", "copy", "assemble", "review", "visualReview", "repair",
+]);
 
 let cachedClient: MergeGateway | null = null;
 
+const GATEWAY_TIMEOUT_MS = Number(process.env.PASTEL_GATEWAY_TIMEOUT_MS) || 300000;
+
 function getClient(): MergeGateway {
   if (cachedClient) return cachedClient;
-
   const apiKey = process.env.MERGE_GATEWAY_API_KEY;
   if (!apiKey) {
     throw new Error(
       "AI service not configured. Set MERGE_GATEWAY_API_KEY in your environment variables.",
     );
   }
-
   cachedClient = new MergeGateway({
     apiKey,
     baseUrl: "https://api-gateway.merge.dev/v1",
-    timeout: 180000,
+    timeout: GATEWAY_TIMEOUT_MS,
   });
   return cachedClient;
+}
+
+/** Minimal client shape needed for tests/stubs. */
+export interface MergeGatewayLike {
+  responses: { create: (params: Record<string, unknown>) => Promise<unknown> };
+}
+
+/** Test seam: swap the gateway client with a stub. Pass null to reset. */
+export function __setTestClient(client: MergeGatewayLike | MergeGateway | null): void {
+  cachedClient = client as MergeGateway | null;
 }
 
 export interface ChatMessage {
@@ -203,11 +126,46 @@ function contentLength(content: ChatMessage["content"]): number {
   return typeof content === "string" ? content.length : JSON.stringify(content).length;
 }
 
+function countImageBlocks(messages: ChatMessage[]): number {
+  let n = 0;
+  for (const m of messages) {
+    if (Array.isArray(m.content)) {
+      for (const block of m.content) {
+        if (block && typeof block === "object" && (block as { type?: string }).type === "image") n++;
+      }
+    }
+  }
+  return n;
+}
+
+export interface ChatUsage {
+  inputTokens: number;
+  outputTokens: number;
+  costUsd?: number;
+}
+
+export interface UsageRecord {
+  role: ModelRole;
+  modelId: string;
+  inputChars: number;
+  outputChars: number;
+  /** Real token counts from the API when available (else 0). */
+  inputTokens: number;
+  outputTokens: number;
+  /** Number of image blocks sent — priced as image tokens, never text chars. */
+  imageBlocks: number;
+  costUsd?: number;
+}
+
+export type OnUsage = (rec: UsageRecord) => void;
+
 export interface ChatCallOptions {
   model: ModelRole;
   temperature?: number;
   maxTokens?: number;
   responseFormat?: "json_object" | "text";
+  /** Called once per successful API call with real usage numbers. */
+  onUsage?: OnUsage;
 }
 
 type JsonValidator<T> = (value: unknown) => T;
@@ -217,77 +175,9 @@ export interface ChatResult {
   model: string;
   inputChars: number;
   outputChars: number;
+  usage?: ChatUsage;
 }
 
-export async function chat(
-  messages: ChatMessage[],
-  opts: ChatCallOptions,
-): Promise<ChatResult> {
-  const client = getClient();
-  const model = MODELS[opts.model];
-
-  const inputChars = messages.reduce((s, m) => s + contentLength(m.content), 0);
-
-  let budget = opts.maxTokens ?? 2000;
-  let content = "";
-  let response: ChatResponse;
-  let withThinking = true;
-  let skipTags = false;
-
-  for (let attempt = 0; ; attempt++) {
-    try {
-      response = await client.responses.create({
-        model,
-        input: messages.map((m) => ({ type: "message" as const, ...m })),
-        tags: skipTags ? undefined : getPastelGatewayTags(opts.model),
-        temperature: opts.temperature ?? 0.5,
-        max_tokens: budget,
-        thinking: withThinking ? thinkingConfig(opts.model) : undefined,
-        response_format:
-          opts.responseFormat === "json_object"
-            ? { type: "json_object" }
-            : undefined,
-      });
-    } catch (err) {
-      // If the org's tag registry rejects our tag for this role, retry once
-      // without tags — generating the artifact matters more than its cost tag.
-      if (!skipTags && /unknown tags/i.test(err instanceof Error ? err.message : String(err))) {
-        skipTags = true;
-        continue;
-      }
-      // Some gateways reject the thinking config for non-reasoning models.
-      // Retry once without it before surfacing the error.
-      if (withThinking) {
-        withThinking = false;
-        continue;
-      }
-      throw err;
-    }
-
-    content = extractTextContent(response);
-
-    const truncated = isTruncated(response);
-
-    if (truncated && attempt < MAX_TRUNCATION_RETRIES) {
-      const nextBudget = Math.min(MAX_ESCALATED_TOKENS, Math.ceil(budget * TRUNCATION_SCALE));
-      if (nextBudget > budget) {
-        budget = nextBudget;
-        continue;
-      }
-    }
-    break;
-  }
-
-  if (!content.trim()) {
-    // Dump response structure for debugging
-    const structure = JSON.stringify(response).slice(0, 500);
-    console.error(`[pastel-agent] Empty response from ${model}. Response structure: ${structure}`);
-    throw new Error(`Empty response from model ${model}`);
-  }
-  return { content, model, inputChars, outputChars: content.length };
-}
-
-/** Minimal shape of a gateway response needed by this module. */
 interface ChatResponse {
   output?: Array<{
     finish_reason?: "stop" | "max_tokens" | "length" | "incomplete" | "tool_use" | "content_filter";
@@ -295,11 +185,150 @@ interface ChatResponse {
   }>;
   output_text?: unknown;
   incomplete_details?: { reason?: string };
+  usage?: { input_tokens?: number; output_tokens?: number; total_tokens?: number };
+  routing?: { cost_usd?: number };
+  model?: string;
 }
 
-/** Extract all visible text blocks from a gateway response. */
+function hasThinkingContent(response: ChatResponse): boolean {
+  for (const output of response.output ?? []) {
+    const blocks = Array.isArray(output.content) ? output.content : [output.content];
+    for (const block of blocks) {
+      if (block && typeof block === "object" && (block as { type?: string }).type === "thinking") return true;
+    }
+  }
+  return false;
+}
+
+function extractUsage(response: ChatResponse): ChatUsage | undefined {
+  const u = response.usage;
+  if (u && typeof u.input_tokens === "number" && typeof u.output_tokens === "number") {
+    const costUsd = response.routing?.cost_usd;
+    return { inputTokens: u.input_tokens, outputTokens: u.output_tokens, ...(typeof costUsd === "number" ? { costUsd } : {}) };
+  }
+  return undefined;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Transient gateway/upstream faults worth one bounded retry: rate limits,
+ * 5xx, network resets, timeouts. Content problems (validation, auth, bad
+ * request) are never retried here.
+ */
+export function isTransientError(message: string): boolean {
+  return /429|\b5\d{2}\b|rate.?limit|overloaded|request timed?\s*out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|fetch failed|socket hang up|temporarily unavailable|service unavailable|bad gateway|gateway timeout/i.test(message);
+}
+
+const MAX_TOTAL_ATTEMPTS = 3;
+const RETRY_DELAYS_MS = [800, 2000];
+
+export async function chat(
+  messages: ChatMessage[],
+  opts: ChatCallOptions,
+): Promise<ChatResult> {
+  const client = getClient();
+  const model = MODELS[opts.model];
+  const inputChars = messages.reduce((s, m) => s + contentLength(m.content), 0);
+  const imageBlocks = countImageBlocks(messages);
+
+  let budget = opts.maxTokens ?? 2000;
+  let content = "";
+  let response: ChatResponse | undefined;
+  let withThinking = true;
+  let attempts = 0;
+
+  for (let escalations = 0; ; ) {
+    try {
+      response = (await client.responses.create({
+        model,
+        input: messages.map((m) => ({ type: "message" as const, ...m })),
+        temperature: opts.temperature ?? 0.5,
+        max_tokens: budget,
+        thinking: withThinking ? thinkingConfig(opts.model) : undefined,
+        response_format:
+          opts.responseFormat === "json_object"
+            ? { type: "json_object" }
+            : undefined,
+      })) as ChatResponse;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      // Thinking config unsupported by this model — drop it and retry once for free.
+      if (withThinking && /thinking.*(?:budget|token|limit)|no vendor.*(?:reasoning|capabilities)/i.test(msg)) {
+        withThinking = false;
+        continue;
+      }
+      attempts++;
+      if (attempts < MAX_TOTAL_ATTEMPTS && isTransientError(msg)) {
+        console.warn(`[pastel-agent] transient error from ${model} (attempt ${attempts}): ${msg} — retrying`);
+        await sleep(RETRY_DELAYS_MS[Math.min(attempts - 1, RETRY_DELAYS_MS.length - 1)]);
+        continue;
+      }
+      throw err;
+    }
+
+    content = extractTextContent(response);
+    const truncated = isTruncated(response);
+
+    // When a model burns its entire output budget producing thinking blocks
+    // (common with M3), there is zero text to extract.  Disable thinking
+    // and retry — this costs no escalation budget because no usable output
+    // was produced.
+    if (!content.trim() && withThinking && hasThinkingContent(response)) {
+      console.warn(`[pastel-agent] ${model} returned only thinking content — retrying with thinking disabled`);
+      withThinking = false;
+      continue;
+    }
+
+    if (truncated && escalations < MAX_TRUNCATION_RETRIES) {
+      // Only escalate when the response actually burned the budget (>=90% of
+      // output tokens). Avoids paying a full second call for models that
+      // stopped early but reported a truncated finish reason.
+      const usage = extractUsage(response);
+      const budgetExhausted = usage ? usage.outputTokens >= budget * 0.9 : true;
+      if (budgetExhausted) {
+        const nextBudget = Math.min(escalationCap(opts.model), Math.ceil(budget * TRUNCATION_SCALE));
+        if (nextBudget > budget) {
+          console.warn(`[pastel-agent] truncated response from ${model} — escalating output budget ${budget} → ${nextBudget}`);
+          budget = nextBudget;
+          escalations++;
+          continue;
+        }
+      }
+    }
+    break;
+  }
+
+  if (!content.trim()) {
+    const structure = JSON.stringify(response).slice(0, 500);
+    console.error(`[pastel-agent] Empty response from ${model}. Response structure: ${structure}`);
+    throw new Error(`Empty response from model ${model}`);
+  }
+
+  const usage = extractUsage(response!);
+  if (opts.onUsage) {
+    try {
+      opts.onUsage({
+        role: opts.model,
+        modelId: model,
+        inputChars,
+        outputChars: content.length,
+        inputTokens: usage?.inputTokens ?? 0,
+        outputTokens: usage?.outputTokens ?? 0,
+        imageBlocks,
+        ...(usage?.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
+      });
+    } catch {
+      // usage tracking must never break a call
+    }
+  }
+
+  return { content, model, inputChars, outputChars: content.length, ...(usage ? { usage } : {}) };
+}
+
 function extractTextContent(response: ChatResponse): string {
-  // Try primary extraction path: output[0].content text blocks
   const firstContent = response.output?.[0]?.content;
   let content = Array.isArray(firstContent)
     ? firstContent
@@ -308,7 +337,6 @@ function extractTextContent(response: ChatResponse): string {
         .join("")
     : "";
 
-  // Fallback: scan all output items for text content
   if (!content.trim() && Array.isArray(response.output)) {
     for (const output of response.output) {
       const blocks = Array.isArray(output.content) ? output.content : [output.content];
@@ -320,7 +348,6 @@ function extractTextContent(response: ChatResponse): string {
     }
   }
 
-  // Last resort: try output_text or raw response stringification
   if (!content.trim() && typeof response.output_text === "string") {
     content = response.output_text;
   }
@@ -330,7 +357,6 @@ function extractTextContent(response: ChatResponse): string {
 
 type ParseResult<T> = { value: T } | { error: Error; kind: "parse" | "validate" };
 
-/** Parse (with repair) and validate a JSON payload, reporting the failure kind. */
 export function parseAndValidate<T>(raw: string, validate?: JsonValidator<T>): ParseResult<T> {
   let jsonStr = raw.trim();
 
@@ -359,63 +385,63 @@ export function parseAndValidate<T>(raw: string, validate?: JsonValidator<T>): P
   return { error: new Error(jsonStr.slice(0, 300)), kind: "parse" };
 }
 
-/**
- * Call a model expecting a JSON object response.
- *
- * Validation-first policy: exactly one attempt, parse-repair (free), zod
- * validation, then ONE corrective retry with the validation error appended.
- * No blind retries — a stage that still fails degrades deterministically.
- */
 export async function chatJSON<T>(
   messages: ChatMessage[],
-  opts: Omit<ChatCallOptions, "responseFormat"> & { validate?: JsonValidator<T> },
+  opts: Omit<ChatCallOptions, "responseFormat"> & {
+    validate?: JsonValidator<T>;
+    /** Receives the raw model output when every attempt has failed — lets callers salvage. */
+    onRawFailure?: (content: string) => void;
+  },
 ): Promise<T> {
   const chatOpts: ChatCallOptions = { ...opts, responseFormat: "json_object" };
 
-  const attempt = async (messageSet: ChatMessage[]): Promise<ParseResult<T>> => {
+  const attempt = async (messageSet: ChatMessage[]): Promise<{ result: ParseResult<T>; content: string }> => {
     const { content } = await chat(messageSet, chatOpts);
-    return parseAndValidate(content, opts.validate);
+    return { result: parseAndValidate(content, opts.validate), content };
   };
 
   const first = await attempt(messages);
-  if ("value" in first) return first.value;
+  if ("value" in first.result) return first.result.value;
 
-  // Validation failures get one corrective retry with the error appended.
-  if (first.kind === "validate") {
-    const correctiveMessages: ChatMessage[] = [
-      ...messages,
-      {
-        role: "user",
-        content: `Your previous response was valid JSON but failed this validation:
-${first.error.message}
+  // Corrective retry for BOTH parse and validation failures. The model's
+  // broken output is included as an assistant turn so it can see exactly
+  // what it must repair.
+  const kind = first.result.kind;
+  const errMsg = first.result.error.message;
+  const correctiveMessages: ChatMessage[] = [
+    ...messages,
+    { role: "assistant", content: first.content },
+    {
+      role: "user",
+      content: kind === "validate"
+        ? `Your previous response was valid JSON but failed this validation:\n${errMsg}\n\nFix the JSON so it satisfies the expected schema exactly — include every required item and field. Output ONLY the corrected JSON. No markdown, no code fences, no explanations.`
+        : `Your previous response could not be parsed as JSON. Output the SAME content as a single valid JSON document — no markdown, no code fences, no prose before or after the JSON.`,
+    },
+  ];
 
-Fix the JSON so it satisfies the expected schema exactly — include every required item and field. Output ONLY the corrected JSON. No markdown, no code fences, no explanations.`,
-      },
-    ];
-    let second: ParseResult<T> | null = null;
-    try {
-      second = await attempt(correctiveMessages);
-    } catch (err) {
-      console.warn(`[pastel-agent] corrective retry failed for model ${chatOpts.model}:`, err instanceof Error ? err.message : err);
-    }
-    if (second && "value" in second) return second.value;
-    if (second && second.kind === "validate") {
-      console.error(`[pastel-agent] JSON validation failed. Model: ${chatOpts.model}. Validation error: ${second.error.message}`);
-      throw new Error(`AI returned JSON that failed validation. Model: ${chatOpts.model}. Validation error: ${second.error.message}`);
-    }
+  let second: { result: ParseResult<T>; content: string } | null = null;
+  try {
+    second = await attempt(correctiveMessages);
+  } catch (err) {
+    console.warn(`[pastel-agent] corrective retry failed for model ${chatOpts.model}:`, err instanceof Error ? err.message : err);
   }
+  if (second && "value" in second.result) return second.result.value;
 
-  if (first.kind === "validate") {
-    console.error(`[pastel-agent] JSON validation failed. Model: ${chatOpts.model}. Validation error: ${first.error.message}`);
-    throw new Error(`AI returned JSON that failed validation. Model: ${chatOpts.model}. Validation error: ${first.error.message}`);
+  const finalResult = second && "error" in second.result ? second.result : first.result;
+  try {
+    opts.onRawFailure?.(second?.content ?? first.content);
+  } catch {
+    // salvage hook must never break the flow
   }
-
-  const preview = first.error.message;
+  if (finalResult.kind === "validate") {
+    console.error(`[pastel-agent] JSON validation failed. Model: ${chatOpts.model}. Validation error: ${finalResult.error.message}`);
+    throw new Error(`AI returned JSON that failed validation. Model: ${chatOpts.model}. Validation error: ${finalResult.error.message}`);
+  }
+  const preview = finalResult.error.message;
   console.error(`[pastel-agent] JSON parse failed. Model: ${chatOpts.model}. First 300 chars: ${preview}`);
   throw new Error(`AI returned non-JSON response. Model: ${chatOpts.model}. First 300 chars: ${preview}`);
 }
 
-/** Call a model expecting a plain-text (markdown) response. */
 export async function chatText(
   messages: ChatMessage[],
   opts: Omit<ChatCallOptions, "responseFormat">,
@@ -424,25 +450,16 @@ export async function chatText(
   return content.trim();
 }
 
-/**
- * Extract a fenced code block (e.g. ```json ... ```) from a markdown document.
- * Returns null when the block is absent or unparseable.
- */
 export function extractFencedBlock(doc: string, lang: string): string | null {
   const re = new RegExp("```" + lang + "\\s*\\n([\\s\\S]*?)\\n```", "i");
   const match = doc.match(re);
   return match ? match[1].trim() : null;
 }
 
-/** Attempt to repair truncated or malformed JSON strings. */
-function repairJSON(raw: string): string {
+export function repairJSON(raw: string): string {
   let s = raw.trim();
-
-  // Strip BOM
   s = s.replace(/^﻿/, "");
-
   s = s.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, "").trim();
-
   if (!s) return raw;
 
   const firstBrace = s.indexOf("{");
@@ -453,25 +470,16 @@ function repairJSON(raw: string): string {
       : firstBracket === -1
         ? firstBrace
         : Math.min(firstBrace, firstBracket);
-
   if (jsonStart === -1) return raw;
   s = s.slice(jsonStart);
 
-  // Fix single-quoted strings (single quotes are illegal JSON)
-  // This handles common AI mistake: {'key': 'value'}
   s = s.replace(/'([^'\\]*(?:\\.[^'\\]*)*)'/g, (_match, inner) => {
     return `"${inner.replace(/"/g, '\\"')}"`;
   });
-
-  // Fix unquoted keys at the start of lines/after commas: { key: ... }
   s = s.replace(/([{,]\s*)([a-zA-Z_$][a-zA-Z0-9_$]*)\s*:/g, '$1"$2":');
-
-  // Fix NaN and Infinity
   s = s.replace(/:\s*NaN\b/g, ": null");
   s = s.replace(/:\s*Infinity\b/g, ": null");
   s = s.replace(/:\s*-Infinity\b/g, ": null");
-
-  // Fix trailing commas before closing brackets/braces
   s = s.replace(/,\s*([}\]])/g, "$1");
 
   let depth = 0;
@@ -482,52 +490,27 @@ function repairJSON(raw: string): string {
 
   for (let i = 0; i < s.length; i++) {
     const ch = s[i];
-
-    if (escapeNext) {
-      escapeNext = false;
-      continue;
-    }
-
+    if (escapeNext) { escapeNext = false; continue; }
     if (inString) {
-      if (ch === "\\") {
-        escapeNext = true;
-      } else if (ch === '"') {
-        inString = false;
-      }
+      if (ch === "\\") { escapeNext = true; }
+      else if (ch === '"') { inString = false; }
       continue;
     }
-
-    if (ch === '"') {
-      inString = true;
-      continue;
-    }
-
-    if (ch === "{" || ch === "[") {
-      depth++;
-      stack.push(ch);
-    } else if (ch === "}" || ch === "]") {
+    if (ch === '"') { inString = true; continue; }
+    if (ch === "{" || ch === "[") { depth++; stack.push(ch); }
+    else if (ch === "}" || ch === "]") {
       depth--;
       stack.pop();
-      if (depth === 0) {
-        lastBalancedEnd = i;
-      }
+      if (depth === 0) { lastBalancedEnd = i; }
     }
   }
 
   if (lastBalancedEnd === -1) {
     s = s.replace(/,\s*$/, "");
-
-    // Output was cut off mid-string: close the open string literal so the
-    // remaining delimiters can balance. A trailing backslash would escape the
-    // closing quote, so drop it first.
     if (inString) {
       if (escapeNext) s = s.slice(0, -1);
       s += '"';
     }
-
-    // Close still-open delimiters in reverse stack order so the nesting stays
-    // valid. Closing all braces before all brackets would emit `[}]` when the
-    // truncation happens inside a nested array.
     const closer: Record<string, string> = { "{": "}", "[": "]" };
     for (let i = stack.length - 1; i >= 0; i--) {
       s += closer[stack[i]];
@@ -536,10 +519,7 @@ function repairJSON(raw: string): string {
   }
 
   let extracted = s.slice(0, lastBalancedEnd + 1);
-
-  // Final pass: remove any trailing content after the balanced JSON
   extracted = extracted.replace(/,\s*([}\]])/g, "$1");
   extracted = extracted.replace(/,\s*$/, "");
-
   return extracted;
 }

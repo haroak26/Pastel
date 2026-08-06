@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, RotateCcw } from "lucide-react";
+import { formatScreenLabel } from "@/lib/utils";
 
 interface ScreenPreviewProps {
   runId: string;
@@ -56,11 +57,14 @@ export function ScreenPreview({ runId, screen }: ScreenPreviewProps) {
   const src = `/api/pastel-agent/runs/${runId}/preview/${encodeURIComponent(screen)}?n=${nonce}`;
 
   return (
-    <div className="relative w-full bg-white" style={{ minHeight: contentHeight || 400 }}>
+    <div
+      className="relative w-full bg-[#f5f5f4]"
+      style={{ minHeight: contentHeight || 400 }}
+    >
       {!loaded && !runtimeError && (
         <div className="absolute inset-0 z-10 bg-white">
           <div className="absolute inset-0 animate-pulse bg-[linear-gradient(180deg,#fafafa_0%,#f4f4f4_100%)]" />
-          <div className="absolute top-6 left-6 right-6 flex items-center justify-between">
+          <div className="absolute top-6 left-1/2 right-6 -translate-x-1/2 flex max-w-[1280px] items-center justify-between">
             <div className="h-4 w-28 rounded bg-black/[0.06] animate-pulse" />
             <div className="flex gap-2">
               <div className="h-4 w-14 rounded bg-black/[0.05] animate-pulse" />
@@ -68,9 +72,9 @@ export function ScreenPreview({ runId, screen }: ScreenPreviewProps) {
               <div className="h-4 w-14 rounded bg-black/[0.05] animate-pulse" />
             </div>
           </div>
-          <div className="absolute top-28 left-6 h-9 w-[420px] max-w-[60%] rounded bg-black/[0.06] animate-pulse" />
-          <div className="absolute top-44 left-6 h-3 w-[300px] max-w-[50%] rounded bg-black/[0.04] animate-pulse" />
-          <div className="absolute top-[52px] left-6 mt-40 h-8 w-24 rounded-[10px] bg-black/[0.07] animate-pulse" />
+          <div className="absolute top-28 left-1/2 -translate-x-1/2 h-9 w-[420px] max-w-[60%] rounded bg-black/[0.06] animate-pulse" />
+          <div className="absolute top-44 left-1/2 -translate-x-1/2 h-3 w-[300px] max-w-[50%] rounded bg-black/[0.04] animate-pulse" />
+          <div className="absolute top-[52px] left-1/2 -translate-x-1/2 mt-40 h-8 w-24 rounded-[10px] bg-black/[0.07] animate-pulse" />
         </div>
       )}
 
@@ -81,7 +85,7 @@ export function ScreenPreview({ runId, screen }: ScreenPreviewProps) {
               <AlertTriangle size={22} strokeWidth={1.5} className="text-danger" />
             </div>
             <h3 className="text-[14px] font-semibold text-foreground mb-1">
-              {screen} hit a runtime issue
+              {formatScreenLabel(screen)} hit a runtime issue
             </h3>
             <p className="text-[12px] text-fg-muted leading-relaxed mb-1">
               This screen was verified at build time but failed while rendering just now.
@@ -100,18 +104,20 @@ export function ScreenPreview({ runId, screen }: ScreenPreviewProps) {
         </div>
       )}
 
-      <iframe
-        ref={iframeRef}
-        key={`${runId}:${screen}:${nonce}`}
-        src={src}
-        onLoad={() => {
-          setTimeout(() => setLoaded((v) => v || true), 2500);
-        }}
-        className="w-full border-0"
-        style={{ height: contentHeight || 400, minHeight: 400 }}
-        title={`${screen} preview`}
-        sandbox="allow-scripts"
-      />
+      <div className="mx-auto w-full max-w-[1280px]">
+        <iframe
+          ref={iframeRef}
+          key={`${runId}:${screen}:${nonce}`}
+          src={src}
+          onLoad={() => {
+            setTimeout(() => setLoaded((v) => v || true), 2500);
+          }}
+          className="block w-full border-0"
+          style={{ height: contentHeight || 400, minHeight: 400 }}
+          title={`${formatScreenLabel(screen)} preview`}
+          sandbox="allow-scripts"
+        />
+      </div>
     </div>
   );
 }

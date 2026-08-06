@@ -1,7 +1,17 @@
+export { startAgentLoopV6 } from "./orchestrator-v6";
+
 /**
- * Back-compat shim — the public engine entry points now delegate to the
- * stage orchestrator. Kept as a module so existing dynamic imports in the
- * route layer continue to resolve.
+ * v6 pipeline entry point.
  */
-export { runClarify } from "./stages/clarify";
-export { startAgentLoop, startScreenDeltaLoop } from "./orchestrator";
+export async function startAgentLoop(
+  runId: string,
+  prompt: string,
+  answers: Record<string, string>,
+  projectId?: string,
+  holdId?: string,
+  userId?: string,
+  opts?: { maxCredits?: number; holdAmount?: number },
+): Promise<void> {
+  const { startAgentLoopV6: loop } = await import("./orchestrator-v6");
+  await loop(runId, prompt, answers, projectId, holdId, userId, opts);
+}

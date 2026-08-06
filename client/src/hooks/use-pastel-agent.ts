@@ -1,6 +1,6 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
-const CLARIFY_KEY = "pastel.agent.clarify.v2";
+const CLARIFY_KEY = "pastel.agent.clarify.v6";
 
 function saveClarifyState(data: Record<string, unknown>) {
   try { sessionStorage.setItem(CLARIFY_KEY, JSON.stringify(data)); } catch {}
@@ -18,17 +18,29 @@ function clearClarifyState() {
   try { sessionStorage.removeItem(CLARIFY_KEY); } catch {}
 }
 
-export type AgentPhase = "brief" | "plan" | "review" | "build" | "verify" | "present";
+/** V6 pipeline phases — the agent panel timeline. */
+export type AgentPhase = "discovery" | "brief" | "wireframe" | "build" | "assemble" | "present" | "review";
 
-export const PHASE_ORDER: AgentPhase[] = ["brief", "plan", "review", "build", "verify", "present"];
+export const PHASE_ORDER: AgentPhase[] = ["discovery", "brief", "wireframe", "build", "assemble", "present", "review"];
 
 export const PHASE_LABELS: Record<AgentPhase, string> = {
-  brief: "Build brief",
-  plan: "Design specs",
-  review: "Design review",
-  build: "Coding",
-  verify: "Sandbox verify",
+  discovery: "Discovery",
+  brief: "Brief",
+  wireframe: "Wireframe",
+  build: "Components",
+  assemble: "Assembly",
   present: "Present",
+  review: "Review",
+};
+
+export const PHASE_DESCRIPTIONS: Record<AgentPhase, string> = {
+  discovery: "Picking your inspiration and answering a few questions",
+  brief: "Building the product brief and attaching the design references",
+  wireframe: "Producing page wireframes and the component inventory",
+  build: "Planning and building every component in parallel",
+  assemble: "Composing the screens and verifying them in the sandbox",
+  present: "Presenting your rendered screens — they're live now",
+  review: "Quality gate + visual review against the brief and design docs",
 };
 
 export interface PhaseState {
@@ -64,20 +76,50 @@ export interface ClarifyQuestion {
   placeholder?: string;
 }
 
+/** Company design reference from the knowledge base (gallery card). */
+export interface CompanyCatalogItem {
+  slug: string;
+  name: string;
+  description: string;
+  tags: string[];
+  swatches: string[];
+  /** V10: auth'd preview image URL (when the company ships one). */
+  imageUrl?: string;
+}
+
+export interface SuggestedCompany {
+  slug: string;
+  name: string;
+  score: number;
+  reason?: string;
+}
+
 export interface ActivityItem {
   id: number;
   message: string;
   ts: number;
+  isSkill?: boolean;
+}
+
+export interface SkillState {
+  loaded: string[];
+  loading: string | null;
+  totalPacks: number;
 }
 
 interface PastelEvent {
-  type: "phase" | "title" | "doc" | "file" | "activity" | "done" | "error";
+  type: "phase" | "agent" | "title" | "doc" | "file" | "activity" | "qaroute" | "screens" | "done" | "error";
   phase?: AgentPhase;
   status?: "running" | "done" | "error";
   message?: string;
   doc?: DocItem;
   file?: FileItem;
   title?: string;
+  screens?: string[];
+  agent?: string;
+  agentStatus?: "pending" | "started" | "completed" | "failed" | "retrying" | "skipped";
+  attempt?: number;
+  qaRoute?: { target: string; targetAgent: string; reason: string };
   result?: {
     screens?: string[];
     docs?: string[];
@@ -87,12 +129,13 @@ interface PastelEvent {
 }
 
 const IDLE_PHASES: Record<AgentPhase, PhaseState> = {
+  discovery: { status: "idle" },
   brief: { status: "idle" },
-  plan: { status: "idle" },
-  review: { status: "idle" },
+  wireframe: { status: "idle" },
   build: { status: "idle" },
-  verify: { status: "idle" },
+  assemble: { status: "idle" },
   present: { status: "idle" },
+  review: { status: "idle" },
 };
 
 let activityCounter = 0;
@@ -104,6 +147,25 @@ export function usePastelAgent(projectId: string | null) {
   const [awaitingAnswers, setAwaitingAnswers] = useState(loadClarifyState("awaitingAnswers") ?? false);
   const [pendingPrompt, setPendingPrompt] = useState(loadClarifyState("pendingPrompt") ?? "");
   const [isClarifying, setIsClarifying] = useState(false);
+  const [suggestedCompanies, setSuggestedCompanies] = useState<SuggestedCompany[]>(loadClarifyState("suggestedCompanies") ?? []);
+  const [inspiration, setInspiration] = useState<string>(loadClarifyState("inspiration") ?? "");
+  const [secondaryInspiration, setSecondaryInspiration] = useState<string[]>(loadClarifyState("secondaryInspiration") ?? []);
+
+  // ── Knowledge base catalog (gallery) ──
+  const [catalog, setCatalog] = useState<CompanyCatalogItem[]>([]);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/pastel-agent/knowledge", { credentials: "include" });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data.companies)) setCatalog(data.companies);
+      } catch {}
+    })();
+    return () => { cancelled = true; };
+  }, []);
 
   // ── Run state (server-persisted, restored on mount) ──
   const [runId, setRunId] = useState<string | null>(null);
@@ -119,12 +181,28 @@ export function usePastelAgent(projectId: string | null) {
   const [error, setError] = useState<string | null>(null);
   const [isRestoring, setIsRestoring] = useState(!!projectId);
   const [originalPrompt, setOriginalPrompt] = useState<string>("");
+  const [skills, setSkills] = useState<SkillState>({ loaded: [], loading: null, totalPacks: 0 });
 
   const abortRef = useRef<AbortController | null>(null);
   const restoredRef = useRef(false);
 
   const pushActivity = useCallback((message: string) => {
-    setActivity((prev) => [...prev.slice(-199), { id: ++activityCounter, message, ts: Date.now() }]);
+    const isSkill = message.startsWith("Reading ") && message.endsWith(" skill ✓");
+    const isSkillStart = message.startsWith("Reading ") && message.includes(" skill...");
+    const isSkillsLoaded = message.startsWith("Skills loaded:");
+
+    setActivity((prev) => [...prev.slice(-199), { id: ++activityCounter, message, ts: Date.now(), isSkill: isSkill || isSkillStart }]);
+
+    if (isSkill) {
+      const skillName = message.replace("Reading ", "").replace(" skill ✓", "").trim();
+      setSkills((s) => ({ ...s, loaded: [...s.loaded, skillName], loading: null }));
+    } else if (isSkillStart) {
+      const skillName = message.replace("Reading ", "").replace(" skill...", "").trim();
+      setSkills((s) => ({ ...s, loading: skillName }));
+    } else if (isSkillsLoaded) {
+      const match = message.match(/Skills loaded: (\d+) packs loaded/);
+      setSkills((s) => ({ ...s, totalPacks: match ? parseInt(match[1]) : s.totalPacks }));
+    }
   }, []);
 
   // ── SSE attach ──
@@ -174,10 +252,7 @@ export function usePastelAgent(projectId: string | null) {
     switch (event.type) {
       case "phase":
         if (event.phase && event.status) {
-          setPhases((prev) => ({
-            ...prev,
-            [event.phase!]: { status: event.status! },
-          }));
+          setPhases((prev) => ({ ...prev, [event.phase!]: { status: event.status! } }));
           if (event.status === "running") setStatus("running");
         }
         break;
@@ -204,6 +279,19 @@ export function usePastelAgent(projectId: string | null) {
         break;
       case "activity":
         if (event.message) pushActivity(event.message);
+        break;
+      case "agent":
+        if (event.agent && event.agentStatus === "retrying") {
+          pushActivity(`${event.agent} retrying (attempt ${event.attempt ?? 2})`);
+        }
+        break;
+      case "qaroute":
+        if (event.qaRoute) {
+          pushActivity(`QA routed: ${event.qaRoute.targetAgent} takes ${event.qaRoute.target}`);
+        }
+        break;
+      case "screens":
+        if (event.screens) setScreens(event.screens);
         break;
       case "done":
         setStatus("done");
@@ -256,7 +344,6 @@ export function usePastelAgent(projectId: string | null) {
 
         if (data.run.status === "running" || data.liveStatus === "running") {
           setStatus("running");
-          // Hydrate phase statuses from the manifest
           setPhases((prev) => {
             const next = { ...prev };
             for (const p of PHASE_ORDER) {
@@ -269,14 +356,11 @@ export function usePastelAgent(projectId: string | null) {
           attachToStream(data.run.id);
         } else if (data.run.status === "done") {
           setStatus("done");
-          setPhases({
-            brief: { status: "done" },
-            plan: { status: "done" },
-            review: { status: manifest.phases?.review === "error" ? "error" : "done" },
-            build: { status: "done" },
-            verify: { status: manifest.phases?.verify === "error" ? "error" : "done" },
-            present: { status: "done" },
-          });
+          const next = { ...IDLE_PHASES };
+          for (const p of PHASE_ORDER) {
+            next[p] = { status: manifest.phases?.[p] === "error" ? "error" : "done" };
+          }
+          setPhases(next);
         } else if (data.run.status === "error") {
           setStatus("error");
         }
@@ -294,6 +378,7 @@ export function usePastelAgent(projectId: string | null) {
     setError(null);
     setQuestions(null);
     setAnswers({});
+    setSuggestedCompanies([]);
     setAwaitingAnswers(true);
     setPendingPrompt(prompt);
     setIsClarifying(true);
@@ -314,15 +399,17 @@ export function usePastelAgent(projectId: string | null) {
       }
       const data = JSON.parse(text);
       const qs = Array.isArray(data.questions) ? data.questions : [];
+      const suggestions = Array.isArray(data.suggestedCompanies) ? data.suggestedCompanies : [];
+      setSuggestedCompanies(suggestions);
+
       if (qs.length === 0) {
-        // Model decided the prompt is detailed enough — go straight to run.
         setAwaitingAnswers(false);
         setIsClarifying(false);
         start(prompt, {});
         return;
       }
       setQuestions(qs);
-      saveClarifyState({ questions: qs, answers: {}, awaitingAnswers: true, pendingPrompt: prompt });
+      saveClarifyState({ questions: qs, answers: {}, awaitingAnswers: true, pendingPrompt: prompt, suggestedCompanies: suggestions, inspiration: "", secondaryInspiration: [] });
     } catch (err: any) {
       setError(err.message || "Failed to generate questions");
       setStatus("error");
@@ -336,10 +423,23 @@ export function usePastelAgent(projectId: string | null) {
   const setAnswer = useCallback((id: string, value: string) => {
     setAnswers((prev) => {
       const next = { ...prev, [id]: value };
-      saveClarifyState({ questions, answers: next, awaitingAnswers: true, pendingPrompt });
+      saveClarifyState({ questions, answers: next, awaitingAnswers: true, pendingPrompt, suggestedCompanies, inspiration, secondaryInspiration });
       return next;
     });
-  }, [questions, pendingPrompt]);
+  }, [questions, pendingPrompt, suggestedCompanies, inspiration, secondaryInspiration]);
+
+  const chooseInspiration = useCallback((slug: string, secondary = false) => {
+    if (!secondary) {
+      setInspiration(slug);
+      saveClarifyState({ questions, answers, awaitingAnswers: true, pendingPrompt, suggestedCompanies, inspiration: slug, secondaryInspiration });
+    } else {
+      setSecondaryInspiration((prev) => {
+        const next = prev.includes(slug) ? prev.filter((s) => s !== slug) : [...prev, slug];
+        saveClarifyState({ questions, answers, awaitingAnswers: true, pendingPrompt, suggestedCompanies, inspiration, secondaryInspiration: next });
+        return next;
+      });
+    }
+  }, [questions, answers, pendingPrompt, suggestedCompanies, inspiration, secondaryInspiration]);
 
   // ── Start a run ──
   const start = useCallback(async (prompt: string, answerMap: Record<string, string>) => {
@@ -356,10 +456,15 @@ export function usePastelAgent(projectId: string | null) {
     setActivity([]);
     setFailedScreens([]);
     setError(null);
+    setSkills({ loaded: [], loading: null, totalPacks: 0 });
     setQuestions(null);
     setAnswers({});
     setAwaitingAnswers(false);
     setOriginalPrompt(prompt);
+
+    const enriched = { ...answerMap };
+    if (inspiration) enriched["inspiration"] = inspiration;
+    if (secondaryInspiration.length > 0) enriched["inspirationSecondary"] = secondaryInspiration.join(",");
 
     try {
       const res = await fetch("/api/pastel-agent/generate", {
@@ -368,7 +473,7 @@ export function usePastelAgent(projectId: string | null) {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt,
-          answers: Object.keys(answerMap).length > 0 ? answerMap : undefined,
+          answers: Object.keys(enriched).length > 0 ? enriched : undefined,
           projectId: projectId ?? undefined,
         }),
       });
@@ -384,7 +489,7 @@ export function usePastelAgent(projectId: string | null) {
       setStatus("error");
       setError(err.message || "Generation failed");
     }
-  }, [projectId, attachToStream, pushActivity]);
+  }, [projectId, attachToStream, pushActivity, inspiration, secondaryInspiration]);
 
   const submitAnswers = useCallback(() => {
     if (!pendingPrompt) return;
@@ -410,25 +515,34 @@ export function usePastelAgent(projectId: string | null) {
     setActivity([]);
     setFailedScreens([]);
     setError(null);
+    setSkills({ loaded: [], loading: null, totalPacks: 0 });
     setQuestions(null);
     setAnswers({});
     setAwaitingAnswers(false);
     setPendingPrompt("");
     setOriginalPrompt("");
+    setSuggestedCompanies([]);
+    setInspiration("");
+    setSecondaryInspiration([]);
   }, []);
 
   const isGenerating = status === "running";
   const activePhase = PHASE_ORDER.find((p) => phases[p].status === "running") ?? null;
 
   return {
-    // clarify
+    // clarify + knowledge
+    catalog,
     questions,
     answers,
     awaitingAnswers,
     pendingPrompt,
     isClarifying,
+    suggestedCompanies,
+    inspiration,
+    secondaryInspiration,
     clarify,
     setAnswer,
+    chooseInspiration,
     submitAnswers,
     skipClarify,
     // run
@@ -439,6 +553,8 @@ export function usePastelAgent(projectId: string | null) {
     activePhase,
     phaseOrder: PHASE_ORDER,
     phaseLabels: PHASE_LABELS,
+    phaseDescriptions: PHASE_DESCRIPTIONS,
+    skills,
     docs,
     files,
     screens,

@@ -1,0 +1,619 @@
+# Redesign Pastel Agent 2 Framework
+
+## Objective
+
+Redesign the entire Pastel Agent 2 framework into a deterministic, production-grade AI product design system.
+
+The goal is **not** to add more agents or complexity. The goal is to create an AI design team that behaves like a senior product designer supported by an engineering team.
+
+The framework must prioritise:
+
+* Design quality
+* Consistency
+* Predictability
+* Speed
+* Cost efficiency
+* Maintainability
+* Scalability
+
+The architecture should feel like a professional product design workflow rather than a chain of prompts.
+
+---
+
+# Core Principles
+
+These principles override all previous behaviour.
+
+## 1. Planning First
+
+Never generate UI before the design has been planned.
+
+The system must separate:
+
+* thinking
+* planning
+* implementation
+
+UI generation is forbidden until planning is complete.
+
+---
+
+## 2. Deterministic Outputs
+
+Every stage produces structured JSON.
+
+No free-form markdown between agents.
+
+No essays.
+
+No unnecessary explanations.
+
+Every output must have:
+
+* fixed schema
+* validation
+* versioning
+
+---
+
+## 3. Single Responsibility
+
+Every stage owns exactly one responsibility.
+
+No stage should perform work belonging to another stage.
+
+---
+
+## 4. Human Design Thinking
+
+The framework should mirror how experienced product designers work.
+
+Think before drawing.
+
+Create systems before screens.
+
+Create components before pages.
+
+Create pages before prototypes.
+
+---
+
+# Runtime Architecture
+
+There are only six stages.
+
+No additional stages unless absolutely required.
+
+---
+
+# Stage 1 — Discovery
+
+Model:
+MiniMax M3
+
+Responsibilities
+
+* Understand user request
+* Ask only essential clarification questions
+* Extract requirements
+* Produce Product Brief
+* Select knowledge packs
+* Build Context Manifest
+
+Outputs
+
+ProductBrief.json
+
+ContextManifest.json
+
+The Context Manifest should contain references only.
+
+Example
+
+overall.json
+
+mobile.json
+
+finance.json
+
+dashboard.json
+
+No knowledge content is embedded.
+
+---
+
+# Stage 2 — Context Builder
+
+Backend responsibility.
+
+Not an AI agent.
+
+Responsibilities
+
+Resolve Context Manifest.
+
+Load runtime JSON knowledge.
+
+Merge into Optimised Design Context.
+
+The models should never receive unnecessary files.
+
+---
+
+# Stage 3 — Design Planner
+
+Model:
+Claude Opus 5
+
+This is the only planning model.
+
+It never writes code.
+
+It never generates UI.
+
+It only creates architecture.
+
+Inputs
+
+Product Brief
+
+Optimised Design Context
+
+Outputs
+
+## DesignIntent.json
+
+Contains
+
+* personality
+* emotion
+* visual density
+* design language
+* interaction philosophy
+* accessibility philosophy
+* avoid patterns
+
+---
+
+## DesignSystem.json
+
+Contains
+
+* colour tokens
+* typography
+* spacing
+* radius
+* elevation
+* motion
+* iconography
+
+---
+
+## Navigation.json
+
+Contains
+
+* sitemap
+* flows
+* journeys
+* navigation graph
+
+---
+
+## ComponentPlan.json
+
+Contains
+
+* primitives
+* components
+* variants
+* states
+* hierarchy
+* responsive behaviour
+
+---
+
+## ScreenPlan.json
+
+Contains
+
+Each screen:
+
+* purpose
+* layout
+* sections
+* required components
+* interactions
+* priorities
+
+No implementation.
+
+---
+
+# Stage 4 — Build Engine
+
+Model
+
+MiniMax M3
+
+Inputs
+
+Product Brief
+
+Optimised Design Context
+
+All planning JSON
+
+Responsibilities
+
+Generate
+
+Components
+
+Pages
+
+Responsive layouts
+
+Interactions
+
+Accessibility
+
+State handling
+
+Builder is forbidden from inventing design decisions.
+
+Builder implements the plan exactly.
+
+---
+
+# Stage 5 — Sandbox
+
+Model
+
+MiniMax M3
+
+Responsibilities
+
+Assemble project
+
+Generate preview
+
+Generate screenshots
+
+Generate navigation
+
+Generate loading states
+
+Generate error states
+
+Generate empty states
+
+Produce runnable application.
+
+---
+
+# Stage 6 — Review Board
+
+Model
+
+MiniMax M3
+
+Three independent reviewers.
+
+Reviewer A
+
+Functional QA
+
+Checks
+
+* interactions
+* navigation
+* responsive behaviour
+* accessibility
+* missing states
+* broken UI
+
+Reviewer B
+
+Visual QA
+
+Compares screenshots against Screen Plan.
+
+Checks
+
+* alignment
+* spacing
+* hierarchy
+* typography
+* token usage
+* consistency
+
+Reviewer C
+
+AI Slop Engine
+
+This is no longer a generic reviewer.
+
+It is an adversarial design critic.
+
+Its purpose is to reject mediocre interfaces.
+
+---
+
+# AI Slop Engine v2
+
+The Slop Engine must analyse the rendered screenshots together with:
+
+* Product Brief
+* Design Intent
+* Design System
+* Component Plan
+* Screen Plan
+
+It should not simply judge screenshots in isolation.
+
+It must score the design using weighted categories.
+
+## 1. Originality
+
+Does the UI avoid common AI-generated layouts?
+
+Detect
+
+* repeated dashboard cards
+* cookie-cutter SaaS layouts
+* template hero sections
+* repetitive sections
+* AI clichés
+
+---
+
+## 2. Design Intent Fidelity
+
+Does the UI express the intended personality?
+
+Example
+
+Professional
+
+Luxury
+
+Minimal
+
+Playful
+
+Developer-first
+
+Enterprise
+
+Government
+
+The screenshot should match the intended design language.
+
+---
+
+## 3. Visual Hierarchy
+
+Evaluate
+
+* scanning order
+* focal points
+* typography
+* spacing
+* emphasis
+* balance
+
+---
+
+## 4. Component Consistency
+
+Detect
+
+* inconsistent radii
+* inconsistent spacing
+* inconsistent elevation
+* inconsistent interaction behaviour
+* inconsistent typography
+
+---
+
+## 5. Visual Rhythm
+
+Evaluate
+
+* whitespace
+* density
+* grouping
+* repetition
+* breathing room
+* visual flow
+
+---
+
+## 6. UX Quality
+
+Evaluate
+
+* clarity
+* navigation
+* interaction cost
+* friction
+* discoverability
+* progressive disclosure
+* empty states
+* error prevention
+
+---
+
+## 7. Accessibility
+
+Evaluate
+
+* contrast
+* touch targets
+* keyboard flow
+* readability
+* semantic structure
+
+---
+
+## 8. Production Readiness
+
+Detect
+
+* duplicated components
+* unnecessary variation
+* design token violations
+* hardcoded styling
+* inconsistent responsiveness
+
+---
+
+## 9. Brand Personality
+
+Would the product be memorable?
+
+Or could it be mistaken for another generic AI-generated SaaS?
+
+---
+
+## 10. Human Design Test
+
+Ask
+
+"If this appeared on Dribbble or Behance, would experienced product designers believe it was intentionally designed?"
+
+If not, explain why.
+
+---
+
+## 11. Comparative Analysis
+
+Compare against recognised qualities of excellent product design (without copying any specific product).
+
+Evaluate:
+
+* clarity
+* restraint
+* consistency
+* information hierarchy
+* usability
+* visual identity
+
+Do not imitate any individual company's visual style. Assess whether the work reaches a comparable level of design quality.
+
+---
+
+# Scoring
+
+Return
+
+Overall Score
+
+Originality
+
+Hierarchy
+
+Consistency
+
+Accessibility
+
+Personality
+
+UX
+
+Production Readiness
+
+Visual Rhythm
+
+Design Intent Fidelity
+
+Confidence
+
+Final Decision
+
+PASS
+
+PASS WITH MINOR FIXES
+
+REBUILD
+
+RETURN TO DESIGN PLANNER
+
+Every failed score must include actionable reasons linked back to the relevant planning artifact.
+
+---
+
+# Final Approval
+
+Model
+
+Claude Opus 5
+
+Inputs
+
+Final screenshots
+
+Review Board report
+
+Responsibilities
+
+Approve
+
+Return to Builder
+
+Return to Planner
+
+No implementation.
+
+No code.
+
+---
+
+# Knowledge System
+
+Markdown remains the authoring format.
+
+Humans edit
+
+overall.md
+
+finance.md
+
+mobile.md
+
+etc.
+
+The runtime automatically compiles Markdown into optimised JSON.
+
+Models never receive markdown.
+
+Models receive compiled runtime JSON.
+
+---
+
+# Design Principles
+
+Always
+
+Design systems before components.
+
+Components before screens.
+
+Screens before implementation.
+
+Implementation before review.
+
+Review before delivery.
+
+Never bypass planning.
+
+Never bypass review.
+
+Never allow Builder to redesign.
+
+Never allow Planner to implement.
+
+Every stage must remain deterministic, structured, modular and independently testable.
+
+The resulting framework should feel like a professional AI product design organisation, not a collection of prompts.

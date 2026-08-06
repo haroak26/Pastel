@@ -1,43 +1,48 @@
 import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Loader2, ShieldCheck, AlertTriangle } from "lucide-react";
-import type { ActivityItem, AgentPhase, PhaseState } from "@/hooks/use-pastel-agent";
+import type { ActivityItem, AgentPhase, PhaseState, SkillState } from "@/hooks/use-pastel-agent";
+import { formatScreenLabel } from "@/lib/utils";
 
 interface AgentRunCardProps {
   status: "idle" | "running" | "done" | "error";
   phases: Record<AgentPhase, PhaseState>;
   phaseOrder: AgentPhase[];
   phaseLabels: Record<AgentPhase, string>;
+  phaseDescriptions?: Record<AgentPhase, string>;
   activity: ActivityItem[];
   prompt: string;
   error: string | null;
   screensCount: number;
   docsCount: number;
   failedScreens: string[];
+  skills?: SkillState;
   onReset: () => void;
 }
 
 const RUNNING_TITLES: Record<AgentPhase, string> = {
-  brief: "Writing the build brief…",
-  plan: "Designing every detail…",
-  review: "Reviewing the design…",
-  build: "Coding the app…",
-  verify: "Verifying in the sandbox…",
-  present: "Presenting…",
+  discovery: "Discovery — picking your inspiration",
+  brief: "Brief — building the product brief",
+  wireframe: "Wireframe — producing page wireframes",
+  build: "Components — planning and building in parallel",
+  assemble: "Assembly — composing screens & verifying",
+  present: "Presenting — your screens are live",
+  review: "Quality Review — gate + visual review",
 };
 
-/** The agent status card shown above the prompt — phase timeline + live activity. */
 export function AgentRunCard({
   status,
   phases,
   phaseOrder,
   phaseLabels,
+  phaseDescriptions,
   activity,
   prompt,
   error,
   screensCount,
   docsCount,
   failedScreens,
+  skills,
   onReset,
 }: AgentRunCardProps) {
   const feedRef = useRef<HTMLDivElement>(null);
@@ -48,13 +53,13 @@ export function AgentRunCard({
   }, [activity.length]);
 
   const activePhase = phaseOrder.find((p) => phases[p]?.status === "running") ?? null;
-  const verifyFailed = phases.verify?.status === "error";
+  const assembleFailed = phases.assemble?.status === "error" || phases.review?.status === "error";
 
   const headline =
     status === "running"
       ? RUNNING_TITLES[activePhase ?? "brief"]
       : status === "done"
-        ? "Design ready"
+        ? "Design approved"
         : status === "error"
           ? "The run hit a problem"
           : "";
@@ -64,11 +69,13 @@ export function AgentRunCard({
       ? [
           screensCount > 0 ? `${screensCount} screen${screensCount === 1 ? "" : "s"}` : null,
           docsCount > 0 ? `${docsCount} doc${docsCount === 1 ? "" : "s"}` : null,
-          verifyFailed ? "verified with warnings" : "sandbox verified",
+          assembleFailed ? "needs fixes" : "sandbox verified",
         ]
           .filter(Boolean)
           .join(" · ")
       : null;
+
+  const skillsLoaded = skills && skills.loaded.length > 0;
 
   return (
     <div className="rounded-t-[20px] rounded-b-none border border-border bg-background shadow-[0_4px_16px_rgba(0,0,0,0.06)] border-b-0 mb-[-48px]">
@@ -79,10 +86,10 @@ export function AgentRunCard({
             {status === "running" && (
               <Loader2 size={13} className="animate-spin text-brand shrink-0" />
             )}
-            {status === "done" && !verifyFailed && (
+            {status === "done" && !assembleFailed && (
               <ShieldCheck size={13} strokeWidth={2} className="text-success shrink-0" />
             )}
-            {status === "done" && verifyFailed && (
+            {status === "done" && assembleFailed && (
               <AlertTriangle size={13} strokeWidth={2} className="text-warning shrink-0" />
             )}
             {status === "error" && (
@@ -144,6 +151,27 @@ export function AgentRunCard({
           })}
         </div>
 
+        {/* Active phase description */}
+        {activePhase && phaseDescriptions?.[activePhase] && status === "running" && (
+          <p className="text-[10px] text-fg-muted italic">{phaseDescriptions[activePhase]}</p>
+        )}
+
+        {/* Skills loaded indicator */}
+        {skillsLoaded && (
+          <div className="flex items-center gap-1.5 flex-wrap">
+            <span className="text-[10px] text-fg-faint font-medium">Skills:</span>
+            {skills!.loaded.slice(0, 6).map((skill) => (
+              <span key={skill} className="inline-flex items-center gap-0.5 text-[10px] text-success bg-success/5 px-1.5 py-0.5 rounded">
+                <Check size={8} strokeWidth={2.5} />
+                {skill}
+              </span>
+            ))}
+            {skills!.loaded.length > 6 && (
+              <span className="text-[10px] text-fg-faint">+{skills!.loaded.length - 6} more</span>
+            )}
+          </div>
+        )}
+
         {/* Live activity feed */}
         {activity.length > 0 && status !== "idle" && (
           <div ref={feedRef} className="max-h-[86px] overflow-y-auto space-y-1 pr-1">
@@ -156,8 +184,14 @@ export function AgentRunCard({
                   transition={{ duration: 0.25 }}
                   className="flex items-start gap-1.5"
                 >
-                  <span className="mt-[5px] w-1 h-1 rounded-full bg-brand/50 shrink-0" />
-                  <span className="text-[11px] text-fg-muted leading-snug">{item.message}</span>
+                  {item.isSkill ? (
+                    <Check size={10} strokeWidth={2.5} className="mt-[3px] text-success shrink-0" />
+                  ) : (
+                    <span className="mt-[5px] w-1 h-1 rounded-full bg-brand/50 shrink-0" />
+                  )}
+                  <span className={`text-[11px] leading-snug ${item.isSkill ? "text-success/80" : "text-fg-muted"}`}>
+                    {item.message}
+                  </span>
                 </motion.div>
               ))}
             </AnimatePresence>
@@ -166,7 +200,7 @@ export function AgentRunCard({
 
         {failedScreens.length > 0 && status === "done" && (
           <p className="text-[11px] text-warning font-medium">
-            Couldn't verify: {failedScreens.join(", ")} — try Reset and generate again.
+            Couldn't verify: {failedScreens.map(formatScreenLabel).join(", ")} — try Reset and generate again.
           </p>
         )}
 

@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from "react";
 import { Code2, Download, Share2, CopyPlus, RefreshCw, Plus } from "lucide-react";
 import { ComputerIcon, SmartPhone01Icon } from "hugeicons-react";
+import { formatScreenLabel } from "@/lib/utils";
 
 interface ScreenPanelProps {
   screenName: string;
@@ -122,7 +123,7 @@ export function ScreenPanel({
               isActive ? "text-brand" : "text-fg-muted"
             }`}
           >
-            {screenName}
+            {formatScreenLabel(screenName)}
           </span>
         )}
         <div className="flex items-center gap-1">

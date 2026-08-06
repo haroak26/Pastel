@@ -49,6 +49,22 @@ function resolvePackage(id: string): string {
   return require.resolve(id);
 }
 
+/**
+ * Bare package imports allowed from virtual files. Resolved to real
+ * node_modules paths in browser bundles; marked external in node bundles.
+ * Generated projects depend on react + lucide-react only — every other
+ * import is forbidden by the build contract.
+ */
+const SANDBOX_DEP_PATTERNS: Array<RegExp> = [
+  /^react(\/jsx-runtime)?$/,
+  /^react-dom(\/client|\/server)?$/,
+  /^lucide-react$/,
+];
+
+function isSandboxDep(id: string): boolean {
+  return SANDBOX_DEP_PATTERNS.some((re) => re.test(id));
+}
+
 /** Strip markdown fences / stray prose a model may have wrapped code in. */
 export function sanitizeFileContent(raw: string): string {
   let s = raw.trim();
@@ -82,7 +98,13 @@ function virtualFsPlugin(
     name: "pastel-virtual-fs",
     setup(build) {
       if (opts.bundleReact) {
-        // React packages → real node_modules paths (browser bundle)
+        // Allowlisted packages → real node_modules paths (browser bundle)
+        build.onResolve({ filter: /.*/, namespace: "pastel" }, (args) => {
+          if (isSandboxDep(args.path)) {
+            return { path: resolvePackage(args.path) };
+          }
+          return undefined;
+        });
         build.onResolve({ filter: /^react(\/jsx-runtime)?$/ }, (args) => ({
           path: resolvePackage(args.path),
         }));
@@ -104,9 +126,9 @@ function virtualFsPlugin(
         if (!isEntry && !importerIsVirtual) {
           return undefined; // default node resolution
         }
-        // Bare react imports from virtual files: when react is external
-        // (node smoke bundle), defer to esbuild's external handling.
-        if (!opts.bundleReact && /^react(-dom)?(\/.*)?$/.test(args.path)) {
+        // Bare dep imports from virtual files: browser bundle resolves them
+        // above; when deps are external (node smoke bundle), defer.
+        if (!opts.bundleReact && (isSandboxDep(args.path) || /^react(-dom)?(\/.*)?$/.test(args.path))) {
           return undefined;
         }
         let resolved: string;
@@ -233,7 +255,7 @@ async function bundleScreenNode(
     target: "node18",
     minify: false,
     logLevel: "silent",
-    external: ["react", "react-dom", "react/jsx-runtime", "react-dom/server"],
+    external: ["react", "react-dom", "react/jsx-runtime", "react-dom/server", "lucide-react"],
     plugins: [virtualFsPlugin(filesWithEntry, { bundleReact: false })],
   });
 }
