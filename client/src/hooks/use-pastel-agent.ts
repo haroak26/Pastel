@@ -1,7 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from "react";
 
-export type VisualReferenceInput = { name: string; mimeType: "image/png" | "image/jpeg" | "image/webp"; data: string };
-
 const CLARIFY_KEY = "pastel.agent.clarify.v6";
 
 function saveClarifyState(data: Record<string, unknown>) {
@@ -18,13 +16,6 @@ function loadClarifyState<T>(key: string): T | undefined {
 
 function clearClarifyState() {
   try { sessionStorage.removeItem(CLARIFY_KEY); } catch {}
-}
-
-function loadVisualReference(): VisualReferenceInput[] {
-  try {
-    const raw = sessionStorage.getItem("pastel-visual-reference");
-    return raw ? JSON.parse(raw) as VisualReferenceInput[] : [];
-  } catch { return []; }
 }
 
 /** V14 pipeline phases — the agent panel timeline. */
@@ -165,7 +156,6 @@ export function usePastelAgent(projectId: string | null) {
   const [suggestedCompanies, setSuggestedCompanies] = useState<SuggestedCompany[]>(loadClarifyState("suggestedCompanies") ?? []);
   const [inspiration, setInspiration] = useState<string>(loadClarifyState("inspiration") ?? "");
   const [secondaryInspiration, setSecondaryInspiration] = useState<string[]>(loadClarifyState("secondaryInspiration") ?? []);
-  const [visualReferenceImages, setVisualReferenceImages] = useState<VisualReferenceInput[]>(loadVisualReference);
 
   // ── Knowledge base catalog (gallery) ──
   const [catalog, setCatalog] = useState<CompanyCatalogItem[]>([]);
@@ -491,7 +481,6 @@ export function usePastelAgent(projectId: string | null) {
           prompt,
           answers: Object.keys(enriched).length > 0 ? enriched : undefined,
           projectId: projectId ?? undefined,
-          referenceImages: visualReferenceImages.length > 0 ? visualReferenceImages : undefined,
         }),
       });
       if (!res.ok) {
@@ -499,7 +488,6 @@ export function usePastelAgent(projectId: string | null) {
         throw new Error(err.message || "Request failed");
       }
       const data = await res.json();
-      try { sessionStorage.removeItem("pastel-visual-reference"); } catch {}
       setRunId(data.runId);
       pushActivity("Agent started");
       attachToStream(data.runId);
@@ -507,7 +495,7 @@ export function usePastelAgent(projectId: string | null) {
       setStatus("error");
       setError(err.message || "Generation failed");
     }
-  }, [projectId, attachToStream, pushActivity, inspiration, secondaryInspiration, visualReferenceImages]);
+  }, [projectId, attachToStream, pushActivity, inspiration, secondaryInspiration]);
 
   const submitAnswers = useCallback(() => {
     if (!pendingPrompt) return;
@@ -542,7 +530,6 @@ export function usePastelAgent(projectId: string | null) {
     setSuggestedCompanies([]);
     setInspiration("");
     setSecondaryInspiration([]);
-    setVisualReferenceImages([]);
   }, []);
 
   const isGenerating = status === "running";
@@ -562,7 +549,6 @@ export function usePastelAgent(projectId: string | null) {
     clarify,
     setAnswer,
     chooseInspiration,
-    setVisualReferenceImages,
     submitAnswers,
     skipClarify,
     // run

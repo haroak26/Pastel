@@ -1,10 +1,17 @@
-# MEGADESIGN — Universal Product Design Law (V10)
+# MEGADESIGN — Universal Product Design Law (V15)
 
 > This document is the global design law for every product the Pastel Agent
 > builds. It applies to ALL companies and ALL screens, on top of the
 > selected company's `design.md`. If a company file conflicts with this
 > document, THIS document wins. Every agent receives these rules; every
 > review pass checks against them.
+>
+> V15: the law is PRINCIPLES, not a single layout shape. Universal rules
+> cover accessibility, tokens, rhythm, anti-slop, and data isolation. The
+> product's VISUAL SHAPE comes from its brief mode + the run's design
+> system — never from one hardcoded marketplace pattern. A fitness app, a
+> developer tool, and a travel marketplace must NOT read as the same
+> template.
 
 ## 1. Accessibility (non-negotiable)
 
@@ -78,9 +85,32 @@ ignores rhythm reads as a template; a screen that follows it reads as designed.
   the detail screen are the only card clusters. Never wrap a list in cards when divided rows exist.
 - **rows** — `divide-y border-t` divided lists for reviews, activity, details. No card surface.
 - **tiles** — image/icon tiles in a mosaic or strip. No text cards.
-- **toolbar** — search + one Select + one button. Only on screens whose purpose genuinely
-  browses; never chip groups.
+- **toolbar** — search + one Select + one button. Only on a screen whose product genuinely
+  browses (brief mode `browse`/`transact`, or a home purpose that clearly browses); never chip
+  groups. The toolbar's filter fields come from the product's OWN dimensions — a shop filters by
+  price/category, a template catalog by category, never "Where?/Check-in/Guests" unless the
+  product books stays.
 - **gallery** — a photo mosaic of ONE item's images (only for media-rich detail items).
+
+## 4c. Mode law (V15 — the shape of every product)
+
+The product's LAYOUT SHAPE comes from its brief `mode`, never from a keyword domain pack. The
+domain pack only supplies CONTENT vocabulary (units, statuses, items, reviews):
+
+- **browse** — home: search hero + product grid; detail: item facts (+ gallery only when the
+  item is photo/media-rich, + reviews as divided rows).
+- **transact** — the ONLY mode where a price/dates/guests booking summary card, "Verified host",
+  and the Where/Check-in/Guests search pill are legal.
+- **track** — home: scoreboard/metrics hero + rows; detail: one record with a single primary
+  action. NEVER search, gallery, or reviews.
+- **create** — home: workspace + recent work; detail: inspect/configure one thing.
+- **operate** — home: toolbar + dense rows/stats; detail: one record's facts.
+- **learn** — home: sequence/curriculum; detail: one lesson with a continue action.
+- **social** — home: feed/activity; detail: one thread with community actions.
+
+A coaching, workspace, or dashboard product must never inherit marketplace structure (search
+toolbar, catalog grid, gallery-led detail, booking card, "guest reviews"), and a browse product
+must never inherit "Verified host"/"Dates"/"Guests" booking language unless it is transact/stays.
 
 ## 5. Component standards
 
@@ -89,7 +119,8 @@ ignores rhythm reads as a template; a screen that follows it reads as designed.
 - Interactive elements: hover + focus + active. Buttons have explicit sizes; badges have tones
   (success/warning/destructive/secondary/muted).
 - Dense data lives in **tables** with hairline dividers, right-aligned numerics, status badges.
-- Data screens have a toolbar: search + filter + primary action.
+- Browse/operate screens may have a toolbar: search + filter + primary action — never on
+  dashboard/coaching/feed homes that don't browse.
 - Empty states are compact and actionable: icon, one sentence, one button.
 - Charts use `--chart-N` palette, subtle gridlines, faint axis labels.
 
@@ -162,7 +193,7 @@ Designs must feel authored by a professional, not generated from a catalog:
 - Transitions: 120–200ms, `cubic-bezier(0.22, 1, 0.36, 1)` for enters, `ease-out` for hovers.
 - No autoplaying carousels, no infinite animations. Subtle hover lifts are fine.
 
-## 8. Cross-screen integrity & the detail screen (V14 — hard)
+## 8. Cross-screen integrity & the detail screen (V15 — hard)
 
 - **A screen shows ONLY its own data.** Every screen reads from its OWN scoped data view
   (`DATA.screens.<screen-id>`): home renders its primary workflow; detail renders ONE item and
@@ -170,17 +201,17 @@ Designs must feel authored by a professional, not generated from a catalog:
   the detail screen's photos/fields/reviews NEVER appear on home.
 - **The detail screen is ONE item.** Its gallery (when media-rich), fact rows, reviews, and price
   all describe that item — never other items from the catalog.
-- **Detail-screen law (V14, product-led):** the detail screen serves the brief's focused
-  secondary workflow — for a media-rich item (listing, episode, product, photo-driven item):
-  gallery (dominant moment) → summary card (the ONE card, sticky on desktop) → fact rows →
-  reviews as divided rows → one quiet trust band. For a record/task/exercise: info pane
-  (dominant moment) → one primary action → fact rows. A booking summary (price + dates + guests)
-  is ONLY legal for commerce/travel products; a coaching or dashboard detail must never render
-  "Reserve", "Verified host", guest counts, or an Airbnb-shaped summary card.
-- **Media & imagery:** photo-first rendering. Every tile is a real visual — scene art or a
-  photograph — never a colored block with a letter. Tiles keep fixed aspect ratios; overlay
-  text sits on a scrim (`bg-background/90`) with AA contrast; heart/save controls float on
-  tiles with focus + pressed states.
+- **Detail-screen law (V15, mode-led):** the detail screen serves the brief's focused secondary
+  workflow in the shape the brief's MODE prescribes (§4c) — a media-rich item gets a gallery-led
+  detail; a record/task/exercise gets an info-pane detail with ONE primary action; a booking
+  summary (price + dates + guests + verified host) is ONLY legal for transact/stay products. A
+  coaching, workspace, or dashboard detail must never render "Reserve", "Verified host", guest
+  counts, or a marketplace-shaped summary card.
+- **Media & imagery:** every tile is a real visual — scene art or a photograph — never a colored
+  block with a letter. The media style comes from the run's design system (illustration
+  families, duotone, photo treatment), not one hardcoded photo-first rule. Tiles keep fixed
+  aspect ratios; overlay text sits on a scrim (`bg-background/90`) with AA contrast; heart/save
+  controls float on tiles with focus + pressed states.
 - **No dead links** (`onClick={(e) => e.preventDefault()}`), no console errors, no blank sections.
 
 ## 9. Self-sufficiency

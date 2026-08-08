@@ -4,19 +4,19 @@ import { listCatalog, scoreCompanies, loadCompany, compileCompanyBlock, megadesi
 import { companyManifestSchema } from "../lib/pastel-agent/knowledge/manifest-schema";
 import { contrastRatio } from "../lib/pastel-agent/lib/colors";
 import { compileStyles } from "../lib/pastel-agent/compile";
-import { composeAll } from "../lib/pastel-agent/compose-v6";
+import { composeAll } from "../lib/pastel-agent/compose";
 import { mockDataset } from "../lib/pastel-agent/lib/content";
 import { pickDomain, scoreDomains } from "../lib/pastel-agent/lib/domains";
 import { auditContent } from "../lib/pastel-agent/checks/content";
-import { fallbackCopy, sanitizeCopyPlan } from "../lib/pastel-agent/agents/copy-v6";
-import { fallbackWireframe, enforceWireframeRules } from "../lib/pastel-agent/agents/wireframe-v6";
-import { fallbackUx } from "../lib/pastel-agent/agents/ux-v6";
+import { fallbackCopy, sanitizeCopyPlan } from "../lib/pastel-agent/agents/copy";
+import { fallbackWireframe, enforceWireframeRules } from "../lib/pastel-agent/agents/wireframe";
+import { fallbackUx } from "../lib/pastel-agent/agents/ux";
 import { normalizeTwoScreens, resolveUxDesign, enforceUxDesign, canonicalStructure } from "../lib/pastel-agent/lib/ux-design";
-import { inspirationFromAnswers } from "../lib/pastel-agent/agents/brief-v6";
-import { mergeReviewResults } from "../lib/pastel-agent/agents/review-v6";
+import { inspirationFromAnswers } from "../lib/pastel-agent/agents/brief";
+import { mergeReviewResults } from "../lib/pastel-agent/agents/review-merge";
 import { IncrementalScreenVerifier } from "../lib/pastel-agent/sandbox";
 import { baseComponentCode, baseComponentNames } from "../lib/pastel-agent/base-components/index";
-import { productBriefSchema, type ProductBrief, type V6ReviewResult } from "../lib/pastel-agent/schemas-v6";
+import { productBriefSchema, type ProductBrief, type V6ReviewResult } from "../lib/pastel-agent/schemas";
 
 const SLUGS = ["apple", "nike", "uber", "airbnb", "spotify", "stripe", "notion", "netflix", "linear", "duolingo", "figma"];
 
@@ -51,15 +51,6 @@ test("v11 knowledge: catalog lists every registered company with swatches + prev
     assert.ok(c.name.length > 0);
     assert.ok(c.swatches.length >= 2);
   }
-});
-
-test("v12 knowledge: Figma product reference is available independently of inspiration", async () => {
-  const { visualReferenceImageBlocks, visualReferenceBlock } = await import("../lib/pastel-agent/knowledge/index");
-  const images = await visualReferenceImageBlocks("fitness-coach");
-  assert.equal(images.length, 1);
-  assert.equal(images[0].source.media_type, "image/jpeg");
-  assert.ok(images[0].source.data.length > 1000);
-  assert.ok((await visualReferenceBlock("fitness-coach")).includes("Figma Reference"));
 });
 
 test("v6 knowledge: every manifest validates against the schema", async () => {
@@ -509,7 +500,7 @@ test("v8 compose: custom block without a component emits no blank section", asyn
       {
         id: "home", archetype: "app-dashboard", title: "Home", purpose: "Dashboard", nav: "tabbar",
         blocks: [
-          { block: "hero", variant: "statement", emphasis: true },
+          { block: "hero", variant: "app", emphasis: true },
           { block: "custom", variant: "default" }, // no component — must vanish
           { block: "stats", variant: "scoreboard" },
         ],
@@ -1262,11 +1253,11 @@ test("v11 gate: off-rhythm component sizes and unlabeled inputs are flagged; py-
 // ── V14: de-Airbnb — design tokens + product-led structures + brief catalog ──
 
 test("v14 design: manifest-derived fallback tokens validate (WCAG + scales) and compile to a theme", async () => {
-  const { designTokensFromManifest, validateDesignTokens } = await import("../lib/pastel-agent/agents/design-v14");
+  const { designTokensFromManifest, validateDesignTokens } = await import("../lib/pastel-agent/agents/design");
   const { themeFromDesignTokens } = await import("../lib/pastel-agent/knowledge/index");
   const company = await loadCompany("stripe");
   const tokens = designTokensFromManifest(company, "light");
-  const parsed = (await import("../lib/pastel-agent/schemas-v6")).designTokensSchema.parse(tokens);
+  const parsed = (await import("../lib/pastel-agent/schemas")).designTokensSchema.parse(tokens);
   assert.equal(parsed.version, "1.0.0");
   const { ok, errors } = validateDesignTokens(parsed);
   assert.ok(ok, `manifest-derived tokens must pass validation: ${errors.join("; ")}`);
@@ -1280,9 +1271,9 @@ test("v14 design: manifest-derived fallback tokens validate (WCAG + scales) and 
 });
 
 test("v14 design: WCAG validator rejects a low-contrast palette", async () => {
-  const { validateDesignTokens } = await import("../lib/pastel-agent/agents/design-v14");
+  const { validateDesignTokens } = await import("../lib/pastel-agent/agents/design");
   const company = await loadCompany("linear");
-  const good = (await import("../lib/pastel-agent/agents/design-v14")).designTokensFromManifest(company, "light");
+  const good = (await import("../lib/pastel-agent/agents/design")).designTokensFromManifest(company, "light");
   const bad = structuredClone(good);
   bad.colors.foreground = "#101010";
   bad.colors.background = "#101010";
@@ -1331,7 +1322,7 @@ test("v14 wireframe fallback: a dashboard product NEVER degrades into an Airbnb 
   assert.ok(detail.blocks.some((b) => b.block === "detail"), "focused record pane present");
 
   // Compose + sandbox + gates must all pass on the product-led fallback.
-  const { designTokensFromManifest } = await import("../lib/pastel-agent/agents/design-v14");
+  const { designTokensFromManifest } = await import("../lib/pastel-agent/agents/design");
   const { themeFromDesignTokens } = await import("../lib/pastel-agent/knowledge/index");
   const tokens = designTokensFromManifest(company, "light");
   const theme = themeFromDesignTokens(tokens, company);
@@ -1394,7 +1385,7 @@ test("v14 wireframe fallback: a genuine catalog product keeps the browse structu
 });
 
 test("v14 brief: the catalog is the only source of inspiration (no hardcoded fallback)", async () => {
-  const { inspirationFromAnswers } = await import("../lib/pastel-agent/agents/brief-v6");
+  const { inspirationFromAnswers } = await import("../lib/pastel-agent/agents/brief");
   assert.equal(inspirationFromAnswers({}).primary, null, "no answer → no hardcoded company");
   const scored = await scoreCompanies("build a fitness training app for runners");
   assert.ok(scored.length >= 10, "every registered company is scored");
@@ -1406,7 +1397,7 @@ test("v14 brief: the catalog is the only source of inspiration (no hardcoded fal
 test("v14 pipeline: phases + model roles are in the wire contract", async () => {
   const { PHASE_ORDER } = await import("../lib/pastel-agent/types");
   assert.deepEqual(PHASE_ORDER, ["discovery", "design", "brief", "data", "wireframe", "build", "assemble", "present", "review"]);
-  const { designTokensSchema, dataPlanSchema } = await import("../lib/pastel-agent/schemas-v6");
+  const { designTokensSchema, dataPlanSchema } = await import("../lib/pastel-agent/schemas");
   assert.ok(designTokensSchema, "design-token schema exists");
   assert.ok(dataPlanSchema, "data-plan schema exists");
   const { MODELS, CHEAP_DEFAULT, MID_DEFAULT } = await import("../lib/pastel-agent/gateway");
@@ -1436,8 +1427,8 @@ test("v14 data: fallback dataset fills every page-content slot from the packs", 
 });
 
 test("v14 data: sanitizeDataPlan rejects duplicate labels and off-domain currency", async () => {
-  const { sanitizeDataPlan } = await import("../lib/pastel-agent/agents/data-v14");
-  const { dataPlanSchema } = await import("../lib/pastel-agent/schemas-v6");
+  const { sanitizeDataPlan } = await import("../lib/pastel-agent/agents/data");
+  const { dataPlanSchema } = await import("../lib/pastel-agent/schemas");
   const base = {
     version: "1.0.0" as const,
     people: Array.from({ length: 6 }, (_, i) => ({ name: `Person ${i}`, role: "Member", email: `p${i}@example.com` })),
@@ -1486,7 +1477,7 @@ test("v14 data: sanitizeDataPlan rejects duplicate labels and off-domain currenc
 
 test("v14 data: runData falls back to the domain packs when the gateway is unavailable", async () => {
   const { __setTestClient } = await import("../lib/pastel-agent/gateway");
-  const { runData } = await import("../lib/pastel-agent/agents/data-v14");
+  const { runData } = await import("../lib/pastel-agent/agents/data");
   const brief = fitnessBrief();
   try {
     __setTestClient({ responses: { create: async () => { throw new Error("stub: gateway down"); } } });
@@ -1535,11 +1526,11 @@ test("v14 data: compose reads the dataset's content (heading, trust items, CTA) 
   assert.ok(detail.includes("Money-back promise"), "trust items come from the dataset");
   assert.ok(dataFile.includes("Book my trip"), "primary CTA comes from the dataset (rendered via DATA.screens.detail.primaryCta)");
   assert.ok(detail.includes("DATA.screens.detail.primaryCta"), "detail renders the dataset CTA");
-  assert.ok(!detail.includes("Verified host"), "baked fallback text not used when the dataset provides content");
+  assert.ok(detail.includes("Verified host"), "stay products keep the host signal (V15: booking language is legal for transact/stay)");
 });
 
 test("v14 review: screen-composition audit flags duplicate and missing components", async () => {
-  const { auditScreenComposition } = await import("../lib/pastel-agent/checks/review-v14");
+  const { auditScreenComposition } = await import("../lib/pastel-agent/checks/review");
   const wireframe: any = {
     version: "1.0.0",
     screens: [
@@ -1567,7 +1558,7 @@ test("v14 review: screen-composition audit flags duplicate and missing component
 });
 
 test("v14 review: geometry summary + screen context feed the vision model", async () => {
-  const { geometrySummary, screenContext } = await import("../lib/pastel-agent/agents/review-v14");
+  const { geometrySummary, screenContext } = await import("../lib/pastel-agent/agents/review");
   const clean = geometrySummary("home", { overflow: false, fonts: [], overlaps: [], blanks: [], offGrid: 0, sampled: 10, minHeightOk: true, rhythm: [], flush: [], heroScale: true });
   assert.ok(clean.includes("clean"), "clean geometry reports clean");
   const dirty = geometrySummary("detail", { overflow: false, fonts: [], overlaps: [], blanks: [], offGrid: 2, sampled: 10, minHeightOk: true, rhythm: ["a"], flush: ["b"], heroScale: false });

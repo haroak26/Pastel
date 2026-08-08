@@ -90,6 +90,13 @@ export const companyManifestSchema = z.object({
   signatureMoves: z.array(z.string()),
   /** Patterns the brand never uses. */
   avoidPatterns: z.array(z.string()),
+  /** v16: product jobs this visual language adapts to well. */
+  suitableModes: z.array(z.string()).optional(),
+  /** v16: visual moves independent of any one page archetype. */
+  layoutMoves: z.array(z.string()).optional(),
+  interactionMoves: z.array(z.string()).optional(),
+  mediaDirection: z.string().optional(),
+  density: z.enum(["quiet", "balanced", "dense"]).optional(),
   /** Voice & tone guidance for copy. */
   voiceAndTone: z.string(),
   /** Per-archetype screen recipes — the wireframe agent's strong prior. */

@@ -1,9 +1,9 @@
-import type { WireframePlan, WireframeScreen, BlockInstance, ComponentInventory, UxDesignPlan, UxScreenDesign, ProductBrief } from "../schemas-v6";
+import type { WireframePlan, WireframeScreen, BlockInstance, ComponentInventory, UxDesignPlan, UxScreenDesign, ProductBrief, ProductMode, ProductContext, V17SectionPlan, V17ScreenLayout } from "../schemas";
 
 /**
  * V14 UX design engine — the deterministic half of the UX component.
  *
- * V14 (de-Airbnb fix): the canonical model is PRODUCT-LED, not marketplace-
+ * The canonical model is PRODUCT-LED, not marketplace-
  * led. Exactly two screens still ship, but their structure derives from the
  * brief's screen purposes:
  *   1. "home"    — the product's primary workflow (dashboard, feed,
@@ -22,6 +22,94 @@ import type { WireframePlan, WireframeScreen, BlockInstance, ComponentInventory,
  */
 
 // ── Two-screen canonical model ────────────────────────────────────────────
+
+// ── V15: product-mode helpers (layout intent, never keyword domains) ─────
+
+/** A product whose primary job is discovering items (search + grid legal). */
+export function isBrowseMode(mode?: ProductMode | string | null): boolean {
+  return mode === "browse" || mode === "transact";
+}
+
+/** A product that books/purchases — the ONLY mode where a price/dates/guests
+ * booking summary card is legal. */
+export function isStayMode(mode?: ProductMode | string | null): boolean {
+  return mode === "transact";
+}
+
+/** A product whose detail screen carries social proof (reviews). */
+export function modeWantsReviews(mode?: ProductMode | string | null): boolean {
+  return mode === "browse" || mode === "transact" || mode === "social";
+}
+
+/** Deterministic mode classifier — the fallback when the brief model fails
+ * or a legacy brief has no mode. Keyword-based like the domain packs, but it
+ * only ever feeds CONTENT-adjacent structure (search/grid/reviews), and the
+ * booking card stays gated on `transact` alone. */
+const MODE_RULES: Array<[ProductMode, RegExp[]]> = [
+  ["transact", [/book(?:ing| a| your)? stay/, /vacation rental/, /airbnb/, /checkout/, /purchase/, /add to cart/, /cart/, /reserve/, /host(?:s|ed|ing)?\b/, /nightly/, /check-in/, /book your/]],
+  ["social", [/social/, /community/, /feed/, /post(?:s)?\b/, /follow/, /connect/, /share/, /network/, /messag/, /chat/, /creator/, /thread/]],
+  ["browse", [/browse/, /catalog/, /marketplace/, /shop/, /store/, /discover/, /explore/, /search.*(?:filter|find)/, /listing/, /collection/]],
+  ["create", [/create/, /build(?:ing)?\b/, /design(?:er)?\b/, /author/, /write/, /compose/, /develop(?:er|ment)?\b/, /template/, /agent/, /automate/, /draft/, /code/]],
+  ["learn", [/learn/, /coach/, /course/, /lesson/, /train(?:er|ing)?\b/, /practice/, /teach/, /study/, /quiz/, /skill/, /guide/]],
+  ["operate", [/manage/, /team/, /project/, /task/, /ops/, /admin/, /email/, /invoice/, /report/, /schedule/, /workflow/, /pipeline/, /dashboard.*team/]],
+  ["track", [/track/, /dashboard/, /metric/, /streak/, /habit/, /health/, /fitness/, /workout/, /\brun/, /\bruns/, /record/, /stat/, /progress/, /monitor/, /readiness/, /activity/]],
+];
+
+const MODE_PRIORITY: ProductMode[] = ["transact", "social", "browse", "create", "learn", "operate", "track"];
+
+export function classifyMode(text: string): ProductMode {
+  const t = text.toLowerCase();
+  const scores = new Map<ProductMode, number>();
+  for (const [mode, res] of MODE_RULES) {
+    scores.set(mode, res.reduce((n, re) => (re.test(t) ? n + 1 : n), 0));
+  }
+  let best: ProductMode = "track";
+  let bestScore = 0;
+  for (const mode of MODE_PRIORITY) {
+    const s = scores.get(mode) ?? 0;
+    if (s > bestScore) {
+      best = mode;
+      bestScore = s;
+    }
+  }
+  return best;
+}
+
+// ── V17: product-context classifier (app vs marketing) ────────────────────
+//
+// V17 classifies the PRODUCT CONTEXT — "what kind of surface experience is
+// this?" — independently from the mode ("what job does the product do?").
+// A fitness-tracking dashboard is context=dashboard, mode=track.
+// A landing page is context=marketing regardless of mode.
+// A coding workspace is context=workspace (or editor), mode=create.
+
+const CONTEXT_RULES: Array<[ProductContext, RegExp[]]> = [
+  ["onboarding", [/onboarding/, /sign.?up/, /sign.?in/, /welcome screen/, /registration/, /login page/, /getting started page/]],
+  ["marketing", [/landing page/, /marketing/, /product website/, /pricing page/, /campaign/, /promotional/, /company site/, /homepage for/, /public page/]],
+  ["catalog", [/browse.*(?:catalog|store|shop)|catalog.*page|shop.*page|store.*page/]],
+  ["editor", [/canvas/, /text editor/, /writing tool/, /drawing app/, /design tool/, /creative app/, /code editor/]],
+  ["feed", [/feed/, /timeline/, /activity stream/, /social.*page|social.*app/, /content feed/]],
+  ["dashboard", [/dashboard/, /metrics page/, /analytics dashboard/, /report.*dashboard/, /admin.*panel/]],
+  ["workspace", [/workspace/, /project.*page/, /team.*workspace/, /manage.*project/, /document.*workspace/]],
+  ["app", [/app/, /application/, /mobile app/, /web app/, /product interface/, /tool/]],
+];
+
+const CONTEXT_PRIORITY: ProductContext[] = ["onboarding", "marketing", "editor", "catalog", "feed", "dashboard", "workspace", "app"];
+
+export function classifyContext(text: string): ProductContext {
+  const t = text.toLowerCase();
+  const scores = new Map<ProductContext, number>();
+  for (const [ctx, res] of CONTEXT_RULES) {
+    scores.set(ctx, res.reduce((n, re) => (re.test(t) ? n + 1 : n), 0));
+  }
+  let best: ProductContext = "app";
+  let bestScore = 0;
+  for (const ctx of CONTEXT_PRIORITY) {
+    const s = scores.get(ctx) ?? 0;
+    if (s > bestScore) { best = ctx; bestScore = s; }
+  }
+  return best;
+}
 
 export const CANONICAL_SCREENS = [
   {
@@ -49,18 +137,27 @@ const MEDIA_DETAIL_RE =
 const REVIEW_DETAIL_RE =
   /listing|stay|property|reviews?|episode|album|book(?:ing)?|product/i;
 
-/** A home screen that genuinely browses (search + grid are legal and forced). */
-export function isCatalogHome(purpose?: string): boolean {
+/** A home screen that genuinely browses (search + grid are legal and forced).
+ * V15: the brief's MODE wins; the purpose regex is only the fallback for
+ * legacy briefs without a mode. */
+export function isCatalogHome(purpose?: string, mode?: ProductMode | string | null): boolean {
+  if (mode !== undefined && mode !== null) return isBrowseMode(mode);
   return CATALOG_HOME_RE.test(purpose ?? "");
 }
 
-/** A detail screen that is media-rich (photo/video gallery is the hero). */
-export function isMediaDetail(purpose?: string): boolean {
+/** A detail screen that is media-rich (photo/video gallery is the hero).
+ * V15: media-richness is a property of the ITEM (its purpose/data), not the
+ * mode — a template catalog or a shop is not automatically photo-first. */
+export function isMediaDetail(purpose?: string, mode?: ProductMode | string | null): boolean {
+  if (mode === "transact") return true;
   return MEDIA_DETAIL_RE.test(purpose ?? "");
 }
 
-/** A detail screen whose secondary section is social proof (reviews). */
-export function detailWantsReviews(purpose?: string): boolean {
+/** A detail screen whose secondary section is social proof (reviews).
+ * V15: browse/transact/social modes want reviews; otherwise the purpose
+ * wording decides. */
+export function detailWantsReviews(purpose?: string, mode?: ProductMode | string | null): boolean {
+  if (mode !== undefined && mode !== null) return modeWantsReviews(mode);
   return REVIEW_DETAIL_RE.test(purpose ?? "");
 }
 
@@ -129,11 +226,18 @@ export function normalizeTwoScreens(
 // ── Per-role block discipline ─────────────────────────────────────────────
 
 /** Blocks that belong on each canonical screen. Everything else is a random
- * element in the wrong place and is dropped by enforcement. */
+ * element in the wrong place and is dropped by enforcement.
+ * V17: sidebar and topbar are nav metadata, not content blocks — preserved
+ * for the compose layer to interpret as shell configuration. */
 export const ROLE_ALLOWED: Record<ScreenRole, Set<string>> = {
-  home: new Set(["hero", "stats", "search", "list", "chart", "custom"]),
-  detail: new Set(["media", "detail", "cta", "list", "custom"]),
+  home: new Set(["hero", "stats", "search", "list", "chart", "custom", "sidebar", "topbar"]),
+  detail: new Set(["media", "detail", "cta", "list", "custom", "sidebar", "topbar"]),
 };
+
+/** V15: the home hero variants a dashboard/coaching/workspace home may use —
+ * the app scoreboard (default) or a statement/split/banded/fullbleed moment.
+ * Marketing-only "none"-nav variants stay illegal on app screens. */
+export const APP_HERO_VARIANTS = new Set(["app", "statement", "split", "banded", "fullbleed"]);
 
 /** Variant normalization — the composer's surface IS the variant, so the
  * wireframe must pick the non-card surface for non-moment sections. */
@@ -171,9 +275,9 @@ export const ROLE_CARD_BUDGET: Record<ScreenRole, number> = {
  * product grid; a dashboard/feed home emphasizes its hero moment; a
  * media-rich detail emphasizes the gallery; a focused detail emphasizes the
  * info pane. */
-export function dominantMomentFor(role: ScreenRole, screen: { purpose?: string }): string {
-  if (role === "home") return isCatalogHome(screen.purpose) ? "list:cards" : "hero:app";
-  return isMediaDetail(screen.purpose) ? "media:gallery" : "detail:pane";
+export function dominantMomentFor(role: ScreenRole, screen: { purpose?: string }, mode?: ProductMode | string | null): string {
+  if (role === "home") return isCatalogHome(screen.purpose, mode) ? "list:cards" : "hero:app";
+  return isMediaDetail(screen.purpose, mode) ? "media:gallery" : "detail:pane";
 }
 
 // ── V10/V14 layout structures ─────────────────────────────────────────────
@@ -203,56 +307,77 @@ export function canonicalStructure(role: ScreenRole, structure?: string, catalog
 
 /** V14: the product-led default home structure — catalog layout only for
  * products that browse, dashboard-led otherwise. */
-export function homeStructureFor(purpose?: string): UxStructure {
-  return canonicalStructure("home", undefined, isCatalogHome(purpose));
+export function homeStructureFor(purpose?: string, mode?: ProductMode | string | null): UxStructure {
+  return canonicalStructure("home", undefined, isCatalogHome(purpose, mode));
 }
 
 const HOME_REQUIRED = ["search", "list"];
 const DETAIL_REQUIRED_CATALOG = ["media", "detail", "cta", "list"];
 const DETAIL_REQUIRED_FOCUSED = ["detail", "cta"];
 
-function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[], screen: { purpose?: string }): { blocks: BlockInstance[]; notes: string[] } {
+function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[], screen: { purpose?: string }, mode?: ProductMode | string | null): { blocks: BlockInstance[]; notes: string[] } {
   const notes: string[] = [];
   const allowed = ROLE_ALLOWED[role];
   const variants = ROLE_VARIANTS[role];
   // V14: product-led requirements from the screen's own purpose.
-  const catalogHome = role === "home" && isCatalogHome(screen.purpose);
-  const mediaDetail = role === "detail" && isMediaDetail(screen.purpose);
-  const wantsReviews = role === "detail" && detailWantsReviews(screen.purpose);
+  // V15: the brief's mode wins; the purpose wording is the legacy fallback.
+  const catalogHome = role === "home" && isCatalogHome(screen.purpose, mode);
+  const mediaDetail = role === "detail" && isMediaDetail(screen.purpose, mode);
+  const wantsReviews = role === "detail" && detailWantsReviews(screen.purpose, mode);
 
   let kept = blocks.filter((b) => {
     if (!allowed.has(b.block)) return false;
+    // V17: sidebar and topbar are nav metadata — always keep them through
+    // enforcement; compose handles nav separately.
+    if (b.block === "sidebar" || b.block === "topbar") return true;
+    // V15 hard gate: off-mode blocks are DROPPED, not just left out — a
+    // track/create/operate/learn detail can never keep a gallery the model
+    // added, and a non-browse home can never keep a search toolbar.
+    if (role === "home" && b.block === "search" && !catalogHome) return false;
+    if (role === "detail" && b.block === "media" && !mediaDetail) return false;
     // Only the variant(s) that serve this role survive.
-    if (role === "home" && b.block === "list" && b.variant && !["cards", "featured", "sequence"].includes(b.variant)) return false;
-    if (role === "home" && b.block === "hero" && b.variant && b.variant !== "app") return false;
+    // V17: non-browse home screens allow rows, sequence, and featured list
+    // variants (not just catalog cards). Browse screens get cards/featured.
+    if (role === "home" && b.block === "list" && b.variant && catalogHome && !["cards", "featured"].includes(b.variant)) return false;
+    if (role === "home" && b.block === "list" && b.variant && !catalogHome && !["rows", "sequence", "featured"].includes(b.variant)) return false;
+    if (role === "home" && b.block === "hero" && b.variant && b.variant !== "app" && !APP_HERO_VARIANTS.has(b.variant)) return false;
     if (role === "detail" && b.block === "list" && b.variant && b.variant !== "activity") return false;
     if (role === "detail" && b.block === "detail" && b.variant && !["pane", "bottom"].includes(b.variant)) return false;
     return true;
   });
 
-  // Normalize variants to the role's surface (hero:app, search:dropdown,
-  // list:cards, stats:scoreboard, chart:band, media:gallery, cta:band).
-  kept = kept.map((b) =>
-    variants[b.block] && b.variant && b.variant !== variants[b.block] && !(b.block === "list" && b.variant === "featured")
+  // Normalize variants to the role's surface.
+  // V17: browse homes normalize list to "cards"; non-browse homes normalize to "rows".
+  const homeListDefault = catalogHome ? "cards" : "rows";
+  kept = kept.map((b) => {
+    if (b.block === "hero" && role === "home" && b.variant && APP_HERO_VARIANTS.has(b.variant)) return b;
+    if (b.block === "sidebar" || b.block === "topbar") return b;
+    if (b.block === "list" && role === "home") {
+      return variants[b.block] && b.variant && b.variant !== homeListDefault
+        ? { ...b, variant: homeListDefault }
+        : b;
+    }
+    return variants[b.block] && b.variant && b.variant !== variants[b.block] && !(b.block === "list" && b.variant === "featured")
       ? { ...b, variant: variants[b.block] }
-      : b,
-  );
+      : b;
+  });
 
   const dropped = blocks.filter((b) => !kept.includes(b));
   if (dropped.length > 0) notes.push(`dropped off-archetype blocks: ${dropped.map((b) => `${b.block}:${b.variant ?? "default"}`).join(", ")}`);
 
-  // Canonical order: role order first, custom blocks trail in their order.
+  // Canonical order: role order first, custom blocks trail, nav blocks last.
   const ordered: BlockInstance[] = [];
   const customs = kept.filter((b) => b.block === "custom");
+  const navMeta = kept.filter((b) => b.block === "sidebar" || b.block === "topbar");
   for (const name of ROLE_ORDER[role]) {
     for (const b of kept) if (b.block === name && !ordered.includes(b)) ordered.push(b);
   }
   for (const b of customs) if (!ordered.includes(b)) ordered.push(b);
+  for (const b of navMeta) if (!ordered.includes(b)) ordered.push(b);
   if (ordered.length !== kept.length) notes.push("reordered blocks to the canonical layout");
 
   // Required blocks are guaranteed by construction — but only the ones the
-  // product's own purpose calls for (V14: no Airbnb-shaped defaults for
-  // non-browse products).
+  // product's own purpose calls for.
   const present = new Set(ordered.map((b) => b.block));
   if (role === "home") {
     // Browse products get search + grid; everything else is product-led and
@@ -269,7 +394,7 @@ function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[], screen: { pu
         notes.push("added product grid to home (browse product)");
       }
     } else {
-      notes.push(`home is product-led (${(screen.purpose ?? "no purpose").slice(0, 60)}) — no forced search/grid`);
+      notes.push(`home is product-led (${(screen.purpose ?? "no purpose").slice(0, 60)}) — no forced discovery sections`);
     }
   } else {
     const required = mediaDetail ? DETAIL_REQUIRED_CATALOG : wantsReviews ? [...DETAIL_REQUIRED_FOCUSED, "list"] : DETAIL_REQUIRED_FOCUSED;
@@ -317,7 +442,7 @@ function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[], screen: { pu
   }
 
   // Exactly ONE emphasized (dominant) block per screen.
-  const dominantKey = dominantMomentFor(role, screen);
+  const dominantKey = dominantMomentFor(role, screen, mode);
   const emphasized = ordered.filter((b) => b.emphasis);
   if (emphasized.length === 0) {
     const [kind, variant] = dominantKey.split(":");
@@ -340,7 +465,6 @@ function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[], screen: { pu
 }
 
 function normalizeNav(role: ScreenRole, nav: WireframeScreen["nav"]): WireframeScreen["nav"] {
-  if (nav === "none") return "topbar";
   return nav;
 }
 
@@ -375,6 +499,7 @@ function pickScreens(screens: WireframeScreen[]): { home: WireframeScreen; detai
 export function enforceUxDesign(
   plan: WireframePlan,
   inventory?: ComponentInventory,
+  mode?: ProductMode | string | null,
 ): { plan: WireframePlan; inventory: ComponentInventory; notes: string[] } {
   const notes: string[] = [];
   const { home, detail, dropped } = pickScreens(plan.screens);
@@ -383,7 +508,7 @@ export function enforceUxDesign(
   const normalize = (s: WireframeScreen, role: ScreenRole): WireframeScreen => {
     // V14: product-led derivation runs on the MODEL's purpose (the screen
     // purpose is canonicalized AFTER block normalization).
-    const { blocks, notes: blockNotes } = normalizeBlocks(role, s.blocks, s);
+    const { blocks, notes: blockNotes } = normalizeBlocks(role, s.blocks, s, mode);
     notes.push(...blockNotes.map((n) => `${role}/${s.id}: ${n}`));
     const archetype = role === "home" ? (s.archetype === "app-dashboard" ? "app-dashboard" : "catalog") : "list-detail";
     const title = s.title ?? (role === "home" ? "Home" : "Detail");
@@ -462,29 +587,42 @@ export function enforceUxDesign(
 
 // ── UX design plan (default) ──────────────────────────────────────────────
 
-const SURFACE_OF: Record<string, UxSectionSurface> = {
-  "hero:app": "band",
-  "stats:scoreboard": "band",
-  "search:dropdown": "toolbar",
-  "search:filters": "toolbar",
+const SURFACE_OF: Record<string, string> = {
+  "hero:app": "tonal-band",
+  "stats:scoreboard": "soft-wash",
+  "search:dropdown": "plain",
+  "search:filters": "plain",
   "list:cards": "card",
-  "chart:band": "band",
-  "media:gallery": "gallery",
-  "detail:pane": "rows",
-  "cta:band": "band",
-  "list:activity": "rows",
-  custom: "card",
+  "chart:band": "soft-wash",
+  "media:gallery": "plain",
+  "detail:pane": "inset-panel",
+  "cta:band": "tonal-band",
+  "list:activity": "divided-list",
+  list: "divided-list",
+  custom: "plain",
+  hero: "tonal-band",
+  stats: "plain",
+  chart: "inset-panel",
+  search: "plain",
+  media: "plain",
+  detail: "inset-panel",
+  cta: "tonal-band",
+  table: "inset-panel",
 };
 
-function defaultUxFor(screen: WireframeScreen, role: ScreenRole): UxScreenDesign {
+function defaultUxFor(screen: WireframeScreen, role: ScreenRole, mode?: ProductMode | string | null): UxScreenDesign {
   const dominant = screen.blocks.find((b) => b.emphasis) ?? screen.blocks[0];
-  const catalogHome = role === "home" && isCatalogHome(screen.purpose);
-  const mediaDetail = role === "detail" && isMediaDetail(screen.purpose);
+  const catalogHome = role === "home" && isCatalogHome(screen.purpose, mode);
+  const mediaDetail = role === "detail" && isMediaDetail(screen.purpose, mode);
+  const grid = catalogHome
+    ? { cols: "3" as const, pattern: "uniform" as const }
+    : { cols: "3" as const, pattern: "featured-first" as const };
   return {
     screenId: screen.id,
     layout: {
-      structure: role === "home" ? homeStructureFor(screen.purpose) : canonicalStructure("detail", undefined),
-      dominantMoment: dominant ? `${dominant.block}:${dominant.variant ?? "default"}` : dominantMomentFor(role, screen),
+      structure: role === "home" ? homeStructureFor(screen.purpose, mode) : canonicalStructure("detail", undefined),
+      dominantMoment: dominant ? `${dominant.block}:${dominant.variant ?? "default"}` : dominantMomentFor(role, screen, mode),
+      grid,
       sections: screen.blocks.map((b) => ({
         block: b.block,
         variant: b.variant,
@@ -501,12 +639,12 @@ function defaultUxFor(screen: WireframeScreen, role: ScreenRole): UxScreenDesign
 
 /**
  * Build the canonical default UX design for an enforced plan, then overlay a
- * model-authored plan (agents/ux-v6.ts): surface/pair/sticky/emphasis choices
+ * model-authored plan (agents/ux.ts): surface/pair/sticky/emphasis choices
  * are accepted only for blocks that actually exist. The result is what the
  * composer consumes.
  */
-export function resolveUxDesign(plan: WireframePlan, modelUx?: UxDesignPlan | null): UxDesignPlan {
-  const defaults = plan.screens.map((s) => defaultUxFor(s, screenRoleOf(s)));
+export function resolveUxDesign(plan: WireframePlan, modelUx?: UxDesignPlan | null, mode?: ProductMode | string | null): UxDesignPlan {
+  const defaults = plan.screens.map((s) => defaultUxFor(s, screenRoleOf(s), mode));
   if (!modelUx) return { version: "1.0.0", screens: defaults };
 
   const modelByScreen = new Map(modelUx.screens.map((s) => [s.screenId, s]));
@@ -536,9 +674,10 @@ export function resolveUxDesign(plan: WireframePlan, modelUx?: UxDesignPlan | nu
         // product-led default (catalog-classic for browse, dashboard-led
         // otherwise).
         structure: role === "home"
-          ? canonicalStructure(role, m.layout.structure, isCatalogHome(planScreen?.purpose))
+          ? canonicalStructure(role, m.layout.structure, isCatalogHome(planScreen?.purpose, mode))
           : canonicalStructure(role, m.layout.structure),
         dominantMoment: m.layout.dominantMoment ?? d.layout.dominantMoment,
+        grid: m.layout.grid ?? d.layout.grid,
         sections,
       },
       notes: m.notes ?? d.notes,

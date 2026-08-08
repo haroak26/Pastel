@@ -1,4 +1,4 @@
-import type { ResolvedTheme } from "./schemas-v6";
+import type { ResolvedTheme } from "./schemas";
 
 /**
  * Deterministic stylesheet compiler — Pastel v5.

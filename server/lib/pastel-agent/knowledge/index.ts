@@ -3,7 +3,7 @@ import path from "node:path";
 import { pastelAssetRoot } from "../asset-paths";
 import { companyManifestSchema, companyCatalogSchema, type CompanyManifest, type CompanyCatalog } from "./manifest-schema";
 import { rotateHue, darken, contrastRatio } from "../lib/colors";
-import type { ResolvedTheme, V6Selection } from "../schemas-v6";
+import type { ResolvedTheme, V6Selection, ProductMode } from "../schemas";
 
 /**
  * V6 knowledge base registry.
@@ -148,11 +148,14 @@ export function readCompanyImage(slug: string, file: string): Buffer | null {
  * UX, planner and builder prompts attach these so the models adapt structure
  * and components to the company's ACTUAL look (not just its tokens). Best
  * effort: returns [] when a company ships no imagery. `references/*` are
- * preferred over the gallery `preview.png`. */
+ * preferred over the gallery `preview.png`.
+ * V17: skips images where any dimension exceeds maxDimension (Anthropic
+ * rejects images larger than 8000px in either axis). */
 export async function companyRefImageBlocks(
   slug: string,
   max = 2,
   maxBytes = 1_500_000,
+  maxDimension = 7000,
 ): Promise<Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }>> {
   const out: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = [];
   try {
@@ -161,6 +164,8 @@ export async function companyRefImageBlocks(
     for (const file of ordered.slice(0, max)) {
       const buf = readCompanyImage(slug, file);
       if (!buf || buf.byteLength <= 0 || buf.byteLength > maxBytes) continue;
+      const dims = imageDimensions(buf, file);
+      if (dims && (dims.w > maxDimension || dims.h > maxDimension)) continue;
       const media_type = file.endsWith(".webp") ? "image/webp"
         : file.endsWith(".jpg") || file.endsWith(".jpeg") ? "image/jpeg"
         : "image/png";
@@ -172,45 +177,39 @@ export async function companyRefImageBlocks(
   return out;
 }
 
-/** V12 product reference imagery. These references describe the intended
- * composition for a product, independently of the selected inspiration brand.
- * The local Figma export is optional in production, so every caller remains
- * best-effort when the asset is not present. */
-export async function visualReferenceImageBlocks(
-  reference = "fitness-coach",
-  max = 1,
-  maxBytes = 1_500_000,
-): Promise<Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }>> {
-  const candidates = reference === "fitness-coach"
-    ? [
-        path.join(process.cwd(), "IMG_4629.jpeg"),
-        path.join(pastelAssetRoot(), "knowledge", "visual-references", "fitness-coach.jpeg"),
-      ]
-    : [path.join(pastelAssetRoot(), "knowledge", "visual-references", `${reference}.png`)];
-  const out: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = [];
-  for (const file of candidates.slice(0, max + 1)) {
-    try {
-      if (!fs.existsSync(file)) continue;
-      const buf = fs.readFileSync(file);
-      if (buf.byteLength <= 0 || buf.byteLength > maxBytes) continue;
-      const media_type = /\.jpe?g$/i.test(file) ? "image/jpeg" : "image/png";
-      out.push({ type: "image", source: { type: "base64", media_type, data: buf.toString("base64") } });
-      if (out.length >= max) break;
-    } catch {
-      // The reference is optional and must never block generation.
-    }
-  }
-  return out;
-}
-
-/** Compact textual direction paired with a product reference image. */
-export async function visualReferenceBlock(reference = "fitness-coach"): Promise<string> {
-  const p = path.join(pastelAssetRoot(), "knowledge", "visual-references", `${reference}.md`);
+/** Parse image width/height from JPEG or PNG bytes without external deps. */
+function imageDimensions(buf: Buffer, filename: string): { w: number; h: number } | null {
   try {
-    return fs.existsSync(p) ? fs.readFileSync(p, "utf8") : "";
-  } catch {
-    return "";
-  }
+    if (filename.endsWith(".png")) {
+      if (buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47) {
+        const w = buf.readUInt32BE(16);
+        const h = buf.readUInt32BE(20);
+        return { w, h };
+      }
+    }
+    if (filename.endsWith(".jpg") || filename.endsWith(".jpeg")) {
+      let i = 2;
+      while (i < buf.length) {
+        if (buf[i] !== 0xFF) return null;
+        while (buf[i] === 0xFF) i++;
+        const marker = buf[i];
+        i++;
+        if (marker === 0xD8) continue;
+        if (marker === 0xD9) return null;
+        if (marker === 0xDA) return null;
+        if (i + 1 >= buf.length) return null;
+        const len = buf.readUInt16BE(i);
+        if (marker >= 0xC0 && marker <= 0xCF && marker !== 0xC4 && marker !== 0xC8 && marker !== 0xCC) {
+          if (i + 5 > buf.length) return null;
+          const h = buf.readUInt16BE(i + 3);
+          const w = buf.readUInt16BE(i + 5);
+          return { w, h };
+        }
+        i += len;
+      }
+    }
+  } catch { /* ignore */ }
+  return null;
 }
 
 /** The universal design law, compiled to a compact prompt block. */
@@ -303,6 +302,13 @@ export async function compileCompanyBlock(slug: string): Promise<string> {
     "",
     "## Avoid",
     ...m.avoidPatterns.map((a) => `- ${a}`),
+    "",
+    "## v16 visual adaptation",
+    `Suitable product modes: ${(m.suitableModes ?? ["any"]).join(", ")}`,
+    `Layout moves: ${(m.layoutMoves ?? []).join(", ") || "Adapt hierarchy and rhythm to the product contract."}`,
+    `Interaction moves: ${(m.interactionMoves ?? []).join(", ") || "Use clear, accessible state changes."}`,
+    `Media direction: ${m.mediaDirection ?? "Use media only when the product contract calls for it."}`,
+    `Density: ${m.density ?? "balanced"}`,
   ];
   // V10: when the company ships reference imagery, every agent knows it
   // exists (the visual review attaches the actual images).
@@ -311,6 +317,87 @@ export async function compileCompanyBlock(slug: string): Promise<string> {
     lines.push("", "## Reference imagery", `Shipped files: ${images.join(", ")} — use them as the ground truth for brand fidelity.`);
   }
   return lines.join("\n");
+}
+
+// ── v16 visual knowledge selection ─────────────────────────────────────────
+
+export interface DesignCapability {
+  id: string;
+  modes: ProductMode[];
+  moves: string[];
+  avoid: string[];
+}
+
+export interface CompanyReferencePack {
+  manifest: CompanyManifest;
+  block: string;
+  images: string[];
+  capabilityFit: number;
+  rationale: string;
+}
+
+const DESIGN_CAPABILITIES: DesignCapability[] = [
+  { id: "dashboard", modes: ["track", "operate", "create"], moves: ["hero-led", "metric-band", "progressive rows"], avoid: ["catalog grid", "booking controls"] },
+  { id: "workspace", modes: ["create", "operate"], moves: ["tool-first layout", "recent work", "inspector detail"], avoid: ["photo gallery", "guest language"] },
+  { id: "coaching", modes: ["track", "learn"], moves: ["today-first hero", "sequence rows", "quiet guidance"], avoid: ["ratings", "wishlist", "catalog shell"] },
+  { id: "feed", modes: ["social"], moves: ["activity stream", "author context", "thread detail"], avoid: ["commerce filters", "booking card"] },
+  { id: "catalog", modes: ["browse", "transact"], moves: ["discovery toolbar", "item comparison", "focused item detail"], avoid: ["dashboard metrics as lead"] },
+  { id: "editorial", modes: ["browse", "learn", "social"], moves: ["featured first", "asymmetric rhythm", "long-form sections"], avoid: ["uniform six-card repetition"] },
+  { id: "data-dense", modes: ["operate", "track"], moves: ["divided rows", "trend band", "compact controls"], avoid: ["decorative card stacks"] },
+];
+
+export function selectDesignCapabilities(mode: ProductMode, prompt: string): DesignCapability[] {
+  const text = prompt.toLowerCase();
+  const compatible = DESIGN_CAPABILITIES.filter((c) => c.modes.includes(mode));
+  return compatible
+    .map((capability) => ({ capability, score: capability.moves.reduce((n, move) => n + (text.includes(move.split("-")[0]) ? 1 : 0), 0) }))
+    .sort((a, b) => b.score - a.score || a.capability.id.localeCompare(b.capability.id))
+    .slice(0, mode === "browse" || mode === "transact" ? 2 : 3)
+    .map((item) => item.capability);
+}
+
+/** Selects visual references without allowing references to select page shape. */
+export async function selectCompanyReferences(
+  prompt: string,
+  mode: ProductMode,
+  preferred?: string,
+): Promise<{ primary: CompanyReferencePack; secondary: CompanyReferencePack[]; capabilities: DesignCapability[] }> {
+  const scores = await scoreCompanies(prompt);
+  const ordered: CompanyScore[] = preferred && listCompanySlugs().includes(preferred)
+    ? [{ slug: preferred, name: preferred, score: Number.MAX_SAFE_INTEGER, hits: ["user preference"] }, ...scores.filter((s) => s.slug !== preferred)]
+    : scores;
+  const capabilities = selectDesignCapabilities(mode, prompt);
+  const primaryScore = ordered[0];
+  if (!primaryScore) throw new Error("no registered company references available");
+  const makePack = async (score: CompanyScore): Promise<CompanyReferencePack> => {
+    const manifest = await loadCompany(score.slug);
+    const block = await compileCompanyBlock(score.slug);
+    const visualMoves = manifest.rules.concat(manifest.signatureMoves, manifest.layoutMoves ?? [], manifest.interactionMoves ?? []);
+    const capabilityFit = capabilities.reduce((n, capability) => n + (visualMoves.some((rule) => capability.moves.some((move) => rule.toLowerCase().includes(move.split("-")[0]))) ? 1 : 0), 0);
+    return { manifest, block, images: companyImageFiles(score.slug), capabilityFit, rationale: score.hits.join(", ") || "visual language match" };
+  };
+  const primary = await makePack(primaryScore);
+  const secondary: CompanyReferencePack[] = [];
+  for (const score of ordered.slice(1)) {
+    if (secondary.length >= 2 || score.slug === primary.manifest.slug) break;
+    const pack = await makePack(score);
+    if (pack.capabilityFit > 0 || secondary.length === 0) secondary.push(pack);
+  }
+  return { primary, secondary, capabilities };
+}
+
+export function compileDesignKnowledge(primary: CompanyReferencePack, secondary: CompanyReferencePack[], capabilities: DesignCapability[]): string {
+  return [
+    "# V16 DESIGN KNOWLEDGE",
+    "Company references control visual language. Product mode controls structure.",
+    `Primary reference: ${primary.manifest.name} — ${primary.rationale}`,
+    primary.block,
+    secondary.length ? `Secondary references: ${secondary.map((p) => p.manifest.name).join(", ")}` : "No secondary references.",
+    "## Product capabilities",
+    ...capabilities.map((c) => `- ${c.id}: moves=${c.moves.join(", ")}; avoid=${c.avoid.join(", ")}`),
+    "## Structural rule",
+    "Do not copy a reference company's page archetype. Adapt its visual language to the product contract.",
+  ].join("\n\n");
 }
 
 // ── Resolve company + selection → concrete values ─────────────────────────
@@ -411,7 +498,7 @@ export { contrastRatio };
 // HINT carried along for voice/review context (e.g. `theme.manifest.voiceAndTone`).
 
 export function themeFromDesignTokens(
-  tokens: import("../schemas-v6").DesignTokens,
+  tokens: import("../schemas").DesignTokens,
   hintManifest: CompanyManifest,
 ): ResolvedTheme {
   const c = tokens.colors;

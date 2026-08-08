@@ -76,6 +76,9 @@ export interface MockDataset {
   domain: string;
   /** V12 distinguishes an adaptive strength dashboard from a legacy running catalog. */
   strengthMode?: boolean;
+  /** V15: the media SUBJECT the run's imagery is about (scene families key).
+   * The data agent writes it; the fallback derives it from the domain pack. */
+  mediaSubject?: string;
   people: Person[];
   metrics: Metric[];
   series: Series[];
@@ -100,6 +103,19 @@ export interface MockDataset {
 
 export { mulberry32, hashSeed, pickDomain, briefText };
 export type { BriefLike };
+
+/** V15: default media subject per domain pack (scene families key). The
+ * data agent may override with a product-specific subject. */
+export const SUBJECT_OF_DOMAIN: Record<string, string> = {
+  fitness: "runner",
+  ecommerce: "product",
+  media: "album",
+  social: "chat",
+  productivity: "board",
+  rentals: "house",
+  travel: "house",
+  finance: "graph",
+};
 
 /** Normalize a unit string for comparison: lowercase, no spaces, and "·"
  * treated the same as "/" (min·km ≡ min/km). */
@@ -148,6 +164,7 @@ export function mockDataset(input: string | BriefLike, seedInput?: string): Mock
     seed,
     domain: pack.slug,
     strengthMode,
+    mediaSubject: SUBJECT_OF_DOMAIN[pack.slug] ?? "generic",
     people,
     metrics: pack.metrics(rnd),
     series: pack.series(rnd),

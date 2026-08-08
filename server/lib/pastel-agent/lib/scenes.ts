@@ -322,19 +322,230 @@ const SCENE_FNS: Record<string, (rnd: Rnd, seed: number) => string> = {
   default: sceneGeometric,
 };
 
+// ── V15: subject × strategy media families ────────────────────────────────
+//
+// The run's VisualIntent picks a SUBJECT (what the imagery is about) and a
+// STRATEGY (how it renders). Same (subject, strategy, seed, n, crop) always
+// produces the same artwork. The old domain-keyed functions stay as the
+// content-domain fallback (house/product/board/album/chat…).
+
+/** Style context every subject family renders through. */
+interface SceneStyle {
+  /** Color source — the full chart palette, or a duotone pair. */
+  pal: (max?: number) => string;
+  /** Decorative richness (minimal strategy renders quieter). */
+  rich: boolean;
+}
+
+function styleFor(strategy: string, rnd: Rnd): SceneStyle {
+  if (strategy === "duotone-art") {
+    // Two fixed chart colors — no full-palette noise.
+    return { pal: (max = 6) => (max < 2 ? "var(--chart-1)" : rnd() > 0.5 ? "var(--chart-1)" : "var(--chart-2)"), rich: true };
+  }
+  if (strategy === "minimal") {
+    return { pal: (max = 6) => chart(rnd, Math.min(max, 3)), rich: false };
+  }
+  if (strategy === "data-as-art") {
+    return { pal: (max = 6) => chart(rnd, Math.min(max, 4)), rich: true };
+  }
+  return { pal: (max = 6) => chart(rnd, max), rich: true };
+}
+
+/** Runner family — lanes, pace clock, runner silhouette (track mode). */
+function sceneRunner(rnd: Rnd, _seed: number, s: SceneStyle): string {
+  const field = s.pal(6);
+  const lane = s.pal(3);
+  const laneB = s.pal(4);
+  const runner = s.pal(5);
+  const rx = Math.round(between(rnd, 120, 300));
+  const clockX = Math.round(between(rnd, 40, 96));
+  return `<rect width="400" height="250" fill="${field}" opacity="0.16"/>
+<rect x="40" y="52" width="320" height="150" rx="75" fill="none" stroke="${lane}" stroke-width="16" opacity="0.85"/>
+<rect x="58" y="70" width="284" height="114" rx="57" fill="none" stroke="${laneB}" stroke-width="3" opacity="0.7"/>
+${s.rich ? `<circle cx="${clockX}" cy="34" r="16" fill="var(--background)" opacity="0.85"/><circle cx="${clockX}" cy="34" r="16" fill="none" stroke="${runner}" stroke-width="3"/><path d="M${clockX} 34 L${clockX} 26 M${clockX} 34 L${clockX + 6} 34" stroke="${runner}" stroke-width="2.5" stroke-linecap="round"/>` : ""}
+<rect x="90" y="180" width="220" height="10" rx="5" fill="${field}" opacity="0.5"/>
+${groundShadow(rx, 60, 156, 0.2)}
+<circle cx="${rx}" cy="140" r="14" fill="${runner}" opacity="0.95"/>
+<path d="M${rx - 26} 152 Q${rx - 40} ${Math.round(between(rnd, 120, 150))},${rx - 52} ${Math.round(between(rnd, 108, 140))}" stroke="${runner}" stroke-width="5" stroke-linecap="round" fill="none"/>
+<path d="M${rx + 14} 128 Q${rx + 30} 112,${rx + 44} ${Math.round(between(rnd, 96, 120))}" stroke="${runner}" stroke-width="5" stroke-linecap="round" fill="none"/>`;
+}
+
+/** Dumbbell family — weight plates on a floor with a mat (strength mode). */
+function sceneDumbbell(rnd: Rnd, _seed: number, s: SceneStyle): string {
+  const back = s.pal(6);
+  const plate = s.pal(3);
+  const plateB = s.pal(4);
+  const bar = s.pal(5);
+  const x = Math.round(between(rnd, 90, 160));
+  const w = Math.round(between(rnd, 120, 180));
+  const barY = Math.round(between(rnd, 118, 138));
+  const plateW = 22;
+  const plateH = Math.round(between(rnd, 34, 52));
+  const top = barY - plateH / 2;
+  return `<rect width="400" height="250" fill="${back}" opacity="0.16"/>
+<rect x="30" y="196" width="340" height="12" rx="6" fill="${back}" opacity="0.35"/>
+${s.rich ? `<rect x="40" y="150" width="320" height="52" rx="26" fill="${plateB}" opacity="0.16"/>` : ""}
+${groundShadow(x + w / 2, w + 80, 196, 0.2)}
+<rect x="${x}" y="${barY - 6}" width="${w}" height="12" rx="6" fill="${bar}" opacity="0.95"/>
+<rect x="${x - 8}" y="${top}" width="${plateW}" height="${plateH}" rx="8" fill="${plate}" opacity="0.95"/>
+<rect x="${x - plateW - 10}" y="${top + 6}" width="${plateW}" height="${plateH - 12}" rx="8" fill="${plateB}" opacity="0.9"/>
+<rect x="${x + w - 14}" y="${top}" width="${plateW}" height="${plateH}" rx="8" fill="${plate}" opacity="0.95"/>
+<rect x="${x + w + 2}" y="${top + 6}" width="${plateW}" height="${plateH - 12}" rx="8" fill="${plateB}" opacity="0.9"/>
+<circle cx="${x + w / 2}" cy="${barY}" r="7" fill="var(--background)" opacity="0.7"/>`;
+}
+
+/** Graph family — connected nodes (networks, agents, data). */
+function sceneGraph(rnd: Rnd, _seed: number, s: SceneStyle): string {
+  const back = s.pal(6);
+  const a = s.pal(4);
+  const b = s.pal(4);
+  const c = s.pal(5);
+  const nodes = [
+    { x: 90, y: 70, r: 18, f: a },
+    { x: 300, y: 60, r: 14, f: b },
+    { x: 210, y: 130, r: 22, f: c },
+    { x: 110, y: 180, r: 13, f: a },
+    { x: 310, y: 170, r: 16, f: b },
+    { x: 200, y: 40, r: 10, f: c },
+  ];
+  const links = [[0, 2], [1, 2], [2, 3], [2, 4], [0, 5], [1, 5]];
+  const linkStr = links.map(([i, j]) => {
+    const n1 = nodes[i];
+    const n2 = nodes[j];
+    return `<line x1="${n1.x}" y1="${n1.y}" x2="${n2.x}" y2="${n2.y}" stroke="${n1.f}" stroke-width="2.5" opacity="0.55"/>`;
+  }).join("");
+  const nodeStr = nodes.map((n, i) => {
+    const ring = s.rich && i % 2 === 0 ? `<circle cx="${n.x}" cy="${n.y}" r="${n.r + 7}" fill="none" stroke="${n.f}" stroke-width="2" opacity="0.4"/>` : "";
+    return `${ring}<circle cx="${n.x}" cy="${n.y}" r="${n.r}" fill="${n.f}" opacity="0.92"/>
+<circle cx="${n.x - 4}" cy="${n.y - 4}" r="${Math.max(2, n.r * 0.22)}" fill="var(--background)" opacity="0.6"/>`;
+  }).join("");
+  return `<rect width="400" height="250" fill="${back}" opacity="0.16"/>
+<path d="M0 250 L0 168 Q120 130 260 178 T400 160 L400 250 Z" fill="${a}" opacity="0.22"/>
+${linkStr}
+${nodeStr}
+${s.rich ? `<circle cx="${Math.round(between(rnd, 320, 380))}" cy="${Math.round(between(rnd, 24, 60))}" r="5" fill="${c}" opacity="0.8"/>` : ""}`;
+}
+
+/** Document family — stacked sheets with text lines. */
+function sceneDoc(rnd: Rnd, _seed: number, s: SceneStyle): string {
+  const back = s.pal(6);
+  const sheet = s.pal(4);
+  const ink = s.pal(5);
+  const accent = s.pal(3);
+  const x = Math.round(between(rnd, 80, 120));
+  const y = Math.round(between(rnd, 40, 60));
+  const w = Math.round(between(rnd, 160, 200));
+  const h = Math.round(between(rnd, 120, 150));
+  const lines = [0.42, 0.6, 0.78, 0.3, 0.52].map((f, i) => {
+    const lw = Math.round(w * f);
+    const ly = y + Math.round(h * 0.18) + i * Math.round(h * 0.16);
+    if (ly + 6 > y + h - 14) return "";
+    return `<rect x="${x + 18}" y="${ly}" width="${lw}" height="6" rx="3" fill="${i === 0 ? accent : ink}" opacity="${i === 0 ? 0.9 : 0.55}"/>`;
+  }).join("");
+  return `<rect width="400" height="250" fill="${back}" opacity="0.16"/>
+${s.rich ? `<rect x="${x + 14}" y="${y + 14}" width="${w}" height="${h}" rx="10" fill="${sheet}" opacity="0.4"/>` : ""}
+<rect x="${x}" y="${y}" width="${w}" height="${h}" rx="10" fill="${sheet}" opacity="0.92"/>
+<rect x="${x + 18}" y="${y + 18}" width="${Math.round(w * 0.32)}" height="9" rx="4.5" fill="${accent}" opacity="0.9"/>
+${lines}
+<rect x="${x + 18}" y="${y + h - 20}" width="${Math.round(w * 0.24)}" height="8" rx="4" fill="${ink}" opacity="0.7"/>`;
+}
+
+/** Chat family — message bubbles (social/messaging). */
+function sceneChat(rnd: Rnd, _seed: number, s: SceneStyle): string {
+  const back = s.pal(6);
+  const a = s.pal(4);
+  const b = s.pal(4);
+  const dot = s.pal(5);
+  const bw = Math.round(between(rnd, 130, 180));
+  const bh = Math.round(between(rnd, 42, 60));
+  const x2 = 400 - 36 - bw;
+  const by = Math.round(between(rnd, 122, 140));
+  const bubble = (x: number, y: number, w2: number, h2: number, fill: string, tail: string): string =>
+    `<rect x="${x}" y="${y}" width="${w2}" height="${h2}" rx="20" fill="${fill}" opacity="0.85"/>${tail}`;
+  return `<rect width="400" height="250" fill="${back}" opacity="0.16"/>
+${bubble(36, 52, bw, bh, a, `<path d="M${36 + 22} ${52 + bh} L${36 + 6} ${Math.round(between(rnd, 138, 152))} L${36 + 44} ${52 + bh} Z" fill="${a}" opacity="0.85"/>`)}
+${bubble(x2, by, bw, bh, b, `<path d="M${x2 + bw - 22} ${by + bh} L${x2 + bw - 6} ${Math.round(between(rnd, 162, 176))} L${x2 + bw - 44} ${by + bh} Z" fill="${b}" opacity="0.85"/>`)}
+${s.rich ? `<circle cx="66" cy="30" r="16" fill="${dot}" opacity="0.9"/>
+<circle cx="${x2 + bw - 30}" cy="${Math.round(between(rnd, 176, 200))}" r="16" fill="${dot}" opacity="0.9"/>
+<rect x="${36 + 18}" y="70" width="${bw - 36}" height="9" rx="4.5" fill="var(--background)" opacity="0.75"/>
+<rect x="${36 + 18}" y="88" width="${Math.round(bw * 0.55)}" height="9" rx="4.5" fill="var(--background)" opacity="0.5"/>
+<rect x="${x2 + 18}" y="${by + 18}" width="${bw - 36}" height="9" rx="4.5" fill="var(--background)" opacity="0.75"/>
+<rect x="${x2 + 18}" y="${by + 36}" width="${Math.round(bw * 0.5)}" height="9" rx="4.5" fill="var(--background)" opacity="0.5"/>` : ""}`;
+}
+
+/** Album family — vinyl / equalizer tiles (media). */
+function sceneAlbum(rnd: Rnd, _seed: number, s: SceneStyle): string {
+  const back = s.pal(6);
+  const vinyl = s.pal(3);
+  const accent = s.pal(5);
+  if (rnd() > 0.45) {
+    const cx = Math.round(between(rnd, 150, 250));
+    const cy = Math.round(between(rnd, 110, 140));
+    const r = Math.round(between(rnd, 52, 68));
+    return `<rect width="400" height="250" fill="${back}" opacity="0.18"/>
+${groundShadow(cx, r * 2.4, cy + r + 8, 0.2)}
+<rect x="${cx - r}" y="${cy - r}" width="${r * 2}" height="${r * 2}" rx="14" fill="${vinyl}" opacity="0.95"/>
+<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="var(--background)" stroke-width="2" opacity="0.75"/>
+<circle cx="${cx}" cy="${cy}" r="${Math.round(r * 0.62)}" fill="none" stroke="var(--background)" stroke-width="2" opacity="0.6"/>
+<circle cx="${cx}" cy="${cy}" r="${Math.round(r * 0.3)}" fill="none" stroke="var(--background)" stroke-width="2" opacity="0.5"/>
+<circle cx="${cx}" cy="${cy}" r="7" fill="${accent}"/>`;
+  }
+  const bars = [46, 82, 118, 154, 190, 226].map((x) => {
+    const h = Math.round(between(rnd, 40, 120));
+    return `<rect x="${x}" y="${250 - 30 - h}" width="26" height="${h}" rx="6" fill="${s.pal(5)}" opacity="0.85"/>`;
+  }).join("");
+  return `<rect width="400" height="250" fill="${back}" opacity="0.18"/>
+<rect x="28" y="40" width="344" height="170" rx="16" fill="var(--background)" opacity="0.5"/>
+${bars}`;
+}
+
+/** Subject-keyed families (V15) — the run's VisualIntent picks the subject;
+ * the domain-keyed functions remain the content fallback. */
+const SUBJECT_FNS: Record<string, (rnd: Rnd, seed: number, s: SceneStyle) => string> = {
+  runner: sceneRunner,
+  dumbbell: sceneDumbbell,
+  graph: sceneGraph,
+  doc: sceneDoc,
+  chat: sceneChat,
+  album: sceneAlbum,
+  house: sceneStay,
+  product: sceneProduct,
+  board: sceneBoard,
+  generic: sceneGeometric,
+};
+
+/** V15: default subject per content domain (fallback when the data agent
+ * did not write one). */
+const SUBJECT_OF_DOMAIN: Record<string, string> = {
+  fitness: "runner",
+  ecommerce: "product",
+  media: "album",
+  social: "chat",
+  productivity: "board",
+  rentals: "house",
+  travel: "house",
+  finance: "graph",
+};
+
 /**
- * V11 deterministic scene SVG for one media slot.
+ * V15 deterministic scene SVG for one media slot.
  *
- * Same (domain, seed, n, crop) always produces the same artwork — fully
- * reproducible across runs, repair cycles, and reference rendering.
+ * Same (subject/domain, seed, n, crop, strategy) always produces the same
+ * artwork — fully reproducible across runs, repair cycles, and reference
+ * rendering.
+ * - `subject` (V15) is the imagery subject from the run's VisualIntent;
+ *   the content domain is the fallback.
+ * - `strategy` (V15) renders the family per the media strategy.
  * - `seed` should be the ITEM's id hash (per-item art, never per-slot).
  * - `n` varies the composition within one item's art set.
- * - `crop` picks the angle/crop preset (the detail gallery's five shots of
- *   ONE property).
+ * - `crop` picks the angle/crop preset (the detail gallery's shots of ONE
+ *   item).
  */
-export function sceneSvg(domain: string, seed: number, n = 0, crop = 0): string {
+export function sceneSvg(domain: string, seed: number, n = 0, crop = 0, subject?: string, strategy = "flat-illustration"): string {
   const rnd = mulberry32((seed ^ (n * 2654435761)) >>> 0);
-  const fn = SCENE_FNS[domain] ?? SCENE_FNS.default;
-  const body = fn(rnd, seed);
-  return svg(body, `${domain} scene ${seed}`, seed, crop);
+  const subj = subject ?? SUBJECT_OF_DOMAIN[domain] ?? "generic";
+  const style = styleFor(strategy, rnd);
+  const fn = SUBJECT_FNS[subj] ?? SCENE_FNS[domain] ?? sceneGeometric;
+  const body = fn(rnd, seed, style);
+  return svg(body, `${subj} scene ${seed}`, seed, crop);
 }

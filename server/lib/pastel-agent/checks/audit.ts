@@ -1,5 +1,5 @@
 import { contrastRatio } from "../lib/colors";
-import type { ResolvedTheme } from "../schemas-v6";
+import type { ResolvedTheme } from "../schemas";
 
 /**
  * Deterministic quality gate — Pastel v5 (code-level, $0).

@@ -1,6 +1,6 @@
 import type { Express, Request, Response } from "express";
 import { z } from "zod";
-import type { PastelEvent, AgentManifest, BrandKit, VisualReference } from "../lib/pastel-agent/types";
+import type { PastelEvent, AgentManifest, BrandKit } from "../lib/pastel-agent/types";
 import { getRunState, getLatestRunForProject, subscribeToRun, getRunLiveStatus } from "../lib/pastel-agent/run-store";
 import type { User, PlanTier } from "@shared/schema";
 import { requireAuth } from "./helpers";
@@ -17,27 +17,7 @@ const generateSchema = z.object({
   prompt: z.string().trim().min(1).max(4000),
   answers: z.record(z.string()).optional(),
   projectId: z.string().uuid().optional(),
-  referenceImages: z.array(z.object({
-    name: z.string().trim().min(1).max(160),
-    mimeType: z.enum(["image/png", "image/jpeg", "image/webp"]),
-    data: z.string().min(100).max(2_100_000),
-  })).max(3).optional(),
 });
-
-function visualReferenceFromRequest(images: Array<{ name: string; mimeType: string; data: string }> | undefined): VisualReference | undefined {
-  if (!images?.length) return undefined;
-  return {
-    names: images.map((image) => image.name),
-    images: images.map((image) => ({
-      type: "image" as const,
-      source: {
-        type: "base64" as const,
-        media_type: image.mimeType,
-        data: image.data.replace(/^data:image\/(?:png|jpeg|webp);base64,/, ""),
-      },
-    })),
-  };
-}
 
 function escapeHtml(s: string): string {
   return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
@@ -99,7 +79,7 @@ export function registerPastelAgentRoutes(app: Express) {
         return res.status(402).json({ message: allowance.reason, balance: allowance.balance, monthlyUsed: allowance.monthlyUsed, monthlyAllowance: allowance.monthlyAllowance });
       }
 
-      const { runClarify } = await import("../lib/pastel-agent/agents/clarify-v6");
+      const { runClarify } = await import("../lib/pastel-agent/agents/clarify");
       const { result } = await runClarify({ prompt: parsed.data.prompt });
       return res.json(result);
     } catch (err: any) {
@@ -150,8 +130,6 @@ export function registerPastelAgentRoutes(app: Express) {
         answers: parsed.data.answers ?? {},
       });
 
-      const visualReference = visualReferenceFromRequest(parsed.data.referenceImages);
-
       let holdId: string | undefined;
       try {
         holdId = await creditService.createHold(user.id, estCredits, run.id);
@@ -161,8 +139,7 @@ export function registerPastelAgentRoutes(app: Express) {
 
       startAgentLoop(run.id, parsed.data.prompt, parsed.data.answers ?? {}, parsed.data.projectId, holdId, user.id, {
         maxCredits: Math.max(estCredits * 2, 10),
-        holdAmount: estCredits,
-        visualReference,
+         holdAmount: estCredits,
       }).catch(
         (err) => console.error("[pastel-agent] loop crashed:", err instanceof Error ? err.message : err),
       );

@@ -10,13 +10,13 @@
  * construction. Deterministic (seeded RNG), same reproducibility contract.
  */
 
-import type { ProductBrief } from "../schemas-v6";
+import type { ProductBrief } from "../schemas";
 
 // ── V14: fallback page-content vocabulary ─────────────────────────────────
 //
 // Everything the DATA agent normally generates lives here as the
 // DETERMINISTIC FALLBACK (the safety net, never the default). The data agent
-// (agents/data-v14.ts, mid-tier Luna) writes fresh content per run; when it
+// (agents/data.ts, mid-tier Luna) writes fresh content per run; when it
 // fails or its output fails validation, these packs produce the dataset.
 
 /** Domain-aware primary action for the detail page's summary card + band. */

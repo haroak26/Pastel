@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useUser } from '@/hooks/use-user';
-import { PromptInput, type VisualReferenceInput } from '@/components/PromptInput';
+import { PromptInput } from '@/components/PromptInput';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Plus, ArrowRight } from 'lucide-react';
 import { useLocation } from 'wouter';
@@ -48,11 +48,7 @@ export default function HomePage() {
 
   const recentProjects = projects.slice(0, 3);
 
-  const handlePrompt = async (prompt: string, referenceImages?: VisualReferenceInput[]) => {
-    try {
-      if (referenceImages?.length) sessionStorage.setItem('pastel-visual-reference', JSON.stringify(referenceImages));
-      else sessionStorage.removeItem('pastel-visual-reference');
-    } catch {}
+  const handlePrompt = async (prompt: string) => {
     setLoading(true);
     try {
       const res = await fetch('/api/projects', {
