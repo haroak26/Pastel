@@ -86,7 +86,7 @@ Placement rules:
 - NEVER hardcode: #hex, rgb(), rgba(), hsl(), bg-blue-500, text-indigo-600, or any raw Tailwind color literal.
 - The accent color appears 3-7 times per screen MAXIMUM. The screen must not read as "the accent-color screen."
 - Never blue-to-purple gradients. Never gradient backgrounds at all. No floating geometric blobs, dots, or abstract decorations.
-- No drop-shadows on non-interactive panels. Shadows only on things that actually hover/raise.
+- Elevation (V22): no drop-shadows on non-interactive panels. shadow-[var(--shadow-sm)] / shadow-[var(--shadow-md)] are reserved for floating/overlay elements (dropdowns, popovers, modals) and the ONE dominant surface per screen — never general card panels. Everything else stays flat.
 
 ### Typography
 - Fonts come from the theme: var(--font-display) for headings, var(--font-body) for text. The Screen wrapper already sets fontFamily: var(--font-body).

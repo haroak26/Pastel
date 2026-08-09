@@ -1,0 +1,192 @@
+{
+  "screens": [
+    {
+      "id": "landing",
+      "name": "Landing Page",
+      "route": "/",
+      "description": "Public-facing homepage that introduces Wavelength and encourages sign-up.",
+      "gridColumns": 12,
+      "regions": [
+        {
+          "name": "Hero",
+          "role": "hero",
+          "componentTypes": [
+            {
+              "name": "HeroHeadline",
+              "taxonomy": "atom",
+              "description": "Bold, playful headline introducing the app's core value proposition"
+            },
+            {
+              "name": "HeroSubheadline",
+              "taxonomy": "atom",
+              "description": "Supporting copy explaining the game-like budgeting experience"
+            },
+            {
+              "name": "HeroIllustration",
+              "taxonomy": "atom",
+              "description": "Engaging visual or animation showcasing the app's personality"
+            },
+            {
+              "name": "CTAButton",
+              "taxonomy": "primitive",
+              "description": "Primary call-to-action button directing to sign-up"
+            }
+          ]
+        },
+        {
+          "name": "Features",
+          "role": "content",
+          "componentTypes": [
+            {
+              "name": "FeatureGrid",
+              "taxonomy": "organism",
+              "description": "Grid of 3–4 feature cards highlighting auto-categorization, challenges, and bank integration"
+            },
+            {
+              "name": "FeatureCard",
+              "taxonomy": "molecule",
+              "description": "Individual feature card with icon, title, and brief description"
+            }
+          ]
+        },
+        {
+          "name": "Social Proof",
+          "role": "content",
+          "componentTypes": [
+            {
+              "name": "TestimonialCarousel",
+              "taxonomy": "organism",
+              "description": "Rotating testimonials from Gen Z users praising the app"
+            },
+            {
+              "name": "TestimonialCard",
+              "taxonomy": "molecule",
+              "description": "Single testimonial with user avatar, quote, and name"
+            }
+          ]
+        },
+        {
+          "name": "Footer",
+          "role": "footer",
+          "componentTypes": [
+            {
+              "name": "FooterLinks",
+              "taxonomy": "molecule",
+              "description": "Links to privacy policy, terms, and social media"
+            },
+            {
+              "name": "Copyright",
+              "taxonomy": "atom",
+              "description": "Copyright notice and company info"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "onboarding-start",
+      "name": "Onboarding – Welcome",
+      "route": "/onboarding/start",
+      "description": "First step of onboarding flow; collects basic user info and sets tone for the experience.",
+      "gridColumns": 12,
+      "regions": [
+        {
+          "name": "OnboardingContainer",
+          "role": "main",
+          "componentTypes": [
+            {
+              "name": "ProgressIndicator",
+              "taxonomy": "molecule",
+              "description": "Visual step indicator showing user is on step 1 of onboarding"
+            },
+            {
+              "name": "WelcomeHeading",
+              "taxonomy": "atom",
+              "description": "Friendly greeting and onboarding title"
+            },
+            {
+              "name": "NameInput",
+              "taxonomy": "primitive",
+              "description": "Text input for user's first name"
+            },
+            {
+              "name": "AgeRangeSelect",
+              "taxonomy": "primitive",
+              "description": "Dropdown or radio group for age range selection"
+            },
+            {
+              "name": "FinancialGoalCheckboxes",
+              "taxonomy": "molecule",
+              "description": "Set of checkboxes for selecting financial goals (save, spend less, invest, etc.)"
+            },
+            {
+              "name": "NextButton",
+              "taxonomy": "primitive",
+              "description": "Button to proceed to next onboarding step"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "globalRegions": [
+    {
+      "name": "TopBar",
+      "role": "nav",
+      "componentTypes": [
+        {
+          "name": "Logo",
+          "taxonomy": "atom",
+          "description": "Wavelength logo and app name (visible on all authenticated screens)"
+        },
+        {
+          "name": "NotificationBell",
+          "taxonomy": "primitive",
+          "description": "Icon button with unread notification count badge"
+        },
+        {
+          "name": "UserMenu",
+          "taxonomy": "molecule",
+          "description": "Dropdown menu with profile, settings, and logout options"
+        }
+      ]
+    },
+    {
+      "name": "BottomNavigation",
+      "role": "nav",
+      "componentTypes": [
+        {
+          "name": "DashboardTab",
+          "taxonomy": "primitive",
+          "description": "Navigation tab to dashboard with icon and label"
+        },
+        {
+          "name": "TransactionsTab",
+          "taxonomy": "primitive",
+          "description": "Navigation tab to transactions with icon and label"
+        },
+        {
+          "name": "ChallengesTab",
+          "taxonomy": "primitive",
+          "description": "Navigation tab to challenges with icon and label"
+        },
+        {
+          "name": "InsightsTab",
+          "taxonomy": "primitive",
+          "description": "Navigation tab to insights with icon and label"
+        },
+        {
+          "name": "ProfileTab",
+          "taxonomy": "primitive",
+          "description": "Navigation tab to profile with icon and label"
+        }
+      ]
+    }
+  ],
+  "breakpoints": {
+    "sm": "640px",
+    "md": "768px",
+    "lg": "1024px",
+    "xl": "1280px"
+  }
+}

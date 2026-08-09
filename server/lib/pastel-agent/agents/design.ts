@@ -1,6 +1,6 @@
 import { chatJSON, MAX_TOKENS_PER_CALL, type OnUsage } from "../gateway";
 import { designTokensSchema, visualIntentSchema, DESIGN_TOKEN_CONTRAST_PAIRS, type DesignTokens, type ResolvedTheme, type VisualIntent, type BrandKit } from "../schemas";
-import { contrastRatio } from "../lib/colors";
+import { contrastRatio, relativeLuminance, hexToHsl, hslToHex } from "../lib/colors";
 import { themeFromDesignTokens, megadesignBlock, compileCompanyBlock } from "../knowledge/index";
 import type { CompanyManifest } from "../knowledge/manifest-schema";
 import type { VisualReference } from "../types";
@@ -145,11 +145,15 @@ export function validateDesignTokens(tokens: DesignTokens): { ok: boolean; error
 
 /** V21 radius floor — components read as "not rounded" when the theme's
  * corner radius is tiny. The corner language sets the floor; tokens below
- * the floor are bumped up deterministically (never rejected). */
+ * the floor are bumped up deterministically (never rejected).
+ * V22: the sharp floor was 2/4px — imperceptible on real card/table/button
+ * sizes, so "sharp" rendered as "unrounded". Raised to 6/10px (still crisp
+ * and precise, but visibly intentional) with soft/pill raised proportionally
+ * so the three corner languages stay distinct from each other. */
 export function enforceRadiusFloor(tokens: DesignTokens, visual: VisualIntent): DesignTokens {
-  const floor = visual.cornerLanguage === "pill" ? { lg: 16, xl: 20 }
-    : visual.cornerLanguage === "soft" ? { lg: 8, xl: 12 }
-    : { lg: 2, xl: 4 };
+  const floor = visual.cornerLanguage === "pill" ? { lg: 18, xl: 24 }
+    : visual.cornerLanguage === "soft" ? { lg: 10, xl: 14 }
+    : { lg: 6, xl: 10 };
   const radius = { ...tokens.radius };
   let changed = false;
   if (radius.lg < floor.lg) { radius.lg = floor.lg; changed = true; }
@@ -158,6 +162,40 @@ export function enforceRadiusFloor(tokens: DesignTokens, visual: VisualIntent): 
   if (radius.sm >= radius.md) { radius.sm = Math.max(2, radius.md - 2); changed = true; }
   if (!changed) return tokens;
   return { ...tokens, radius, rationale: `${tokens.rationale ?? ""} Radius raised to the ${visual.cornerLanguage} corner floor (lg ≥ ${floor.lg}px).`.trim() };
+}
+
+/**
+ * V22 — card/background separation floor.
+ *
+ * When the model resolves card and background to (near-)identical colors, the
+ * ONLY thing separating a card from the page is a 1px hairline — the single
+ * biggest reason generated screens read as wireframes instead of shipped
+ * products (the v21 fixture's theme had --background:#FFFFFF and --card:
+ * #FFFFFF). Enforce a minimum perceptual gap: cards must differ from the page
+ * by at least a small luminance delta, so a surface reads as a surface even
+ * with the hairline removed. Never touches a palette that already separates.
+ */
+export function enforceCardContrast(tokens: DesignTokens): DesignTokens {
+  const { background, card } = tokens.colors;
+  const MIN_DELTA = 0.02;
+  if (Math.abs(relativeLuminance(background) - relativeLuminance(card)) >= MIN_DELTA) return tokens;
+
+  const dark = tokens.mode === "dark";
+  const { h, s, l } = hexToHsl(card);
+  let adjusted = card;
+  for (let step = 1; step <= 10; step++) {
+    // Light mode: cards sit ON the page → slightly darker. Dark mode: cards
+    // lift OFF the page → slightly lighter.
+    const newL = Math.min(100, Math.max(0, l + (dark ? step : -step)));
+    adjusted = hslToHex(h, s, newL);
+    if (Math.abs(relativeLuminance(background) - relativeLuminance(adjusted)) >= MIN_DELTA) break;
+  }
+  if (adjusted === card) return tokens;
+  return {
+    ...tokens,
+    colors: { ...tokens.colors, card: adjusted },
+    rationale: `${tokens.rationale ?? ""} Card nudged ${dark ? "lighter" : "darker"} than background so surfaces separate (V22 contrast floor).`.trim(),
+  };
 }
 
 /** Deterministic fallback: derive a token system from a company manifest
@@ -287,10 +325,13 @@ export async function runDesign(input: DesignInput): Promise<DesignOutput> {
     const visual = out.visual ?? visualIntentFromTokens(out.tokens, input.hintManifest.slug);
     const floored = enforceRadiusFloor(out.tokens, visual);
     if (floored !== out.tokens) notes.push("radius raised to the corner-language floor (components read as rounded)");
-    const brandKit = buildBrandKit(floored, visual, input.hintManifest.slug);
+    // V22: card/background separation — surfaces must read as surfaces.
+    const separated = enforceCardContrast(floored);
+    if (separated !== floored) notes.push("card color separated from background (surfaces read as surfaces, not hairlines)");
+    const brandKit = buildBrandKit(separated, visual, input.hintManifest.slug);
     return {
-      tokens: floored,
-      theme: themeFromDesignTokens(floored, input.hintManifest),
+      tokens: separated,
+      theme: themeFromDesignTokens(separated, input.hintManifest),
       visual,
       brandKit,
       usedFallback: false,
@@ -302,11 +343,13 @@ export async function runDesign(input: DesignInput): Promise<DesignOutput> {
     const fallbackVisual = visualIntentFromTokens(fallback, input.hintManifest.slug);
     const floored = enforceRadiusFloor(fallback, fallbackVisual);
     if (floored !== fallback) notes.push("radius raised to the corner-language floor (components read as rounded)");
+    const separated = enforceCardContrast(floored);
+    if (separated !== floored) notes.push("card color separated from background (surfaces read as surfaces, not hairlines)");
     return {
-      tokens: floored,
-      theme: themeFromDesignTokens(floored, input.hintManifest),
+      tokens: separated,
+      theme: themeFromDesignTokens(separated, input.hintManifest),
       visual: fallbackVisual,
-      brandKit: buildBrandKit(floored, fallbackVisual, input.hintManifest.slug),
+      brandKit: buildBrandKit(separated, fallbackVisual, input.hintManifest.slug),
       usedFallback: true,
       notes: [...notes, "deterministic token + visual-intent + brand-kit fallback used (design model unavailable/invalid)"],
     };

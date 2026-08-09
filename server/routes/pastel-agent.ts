@@ -178,7 +178,7 @@ export function registerPastelAgentRoutes(app: Express) {
       unsubscribe = subscribeToRun(runId, write);
 
       if (!live || live.status !== "running") {
-        if (state.run.status === "done") {
+        if (state.run.status === "done" || state.run.status === "done_needs_review") {
           const manifest = (state.run.manifest ?? {}) as unknown as AgentManifest;
           write({
             type: "done",

@@ -508,7 +508,7 @@ async function runOnce(prompt: string, outDir: string): Promise<number> {
   }, null, 2));
   log("run", `summary → ${path.relative(process.cwd(), path.join(outDir, "run-summary.json"))}`);
 
-  if (state.run.status === "done") {
+  if (state.run.status === "done" || state.run.status === "done_needs_review") {
     await captureScreens(run.id, screenDir, "screenproof (post-review)");
     await captureComponents(run.id, componentDir, "componentproof");
   } else {
@@ -719,7 +719,8 @@ async function runOnce(prompt: string, outDir: string): Promise<number> {
   labelsDetail = homeHasLabels ? "search controls have visible labels" : "inputs without labels found on home";
 
   const checks: Array<[boolean, string]> = [
-    [state.run.status === "done", `run completed (${state.run.status})`],
+    [state.run.status === "done" || state.run.status === "done_needs_review", `run completed (${state.run.status})`],
+    [state.run.status === "done", `run passed review (status=${state.run.status})`],
     [screens.length === 2, `exactly 2 screens (got ${screens.length})`],
     [twoScreensClean, `screens are the canonical pair: ${screens.join(", ")}`],
     [homeIsCatalog, `home leads its primary workflow: moment${briefIsCatalog ? " + search + grid" : " (product-led, no forced browse)"} (${homeHasMoment}/${homeHasSearch}/${homeHasGrid})`],

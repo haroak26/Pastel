@@ -195,6 +195,9 @@ function buildCssVars(tokens: DesignTokens): Record<string, string> {
   vars["--radius-md"] = `${tokens.radius.md}px`;
   vars["--radius-lg"] = `${tokens.radius.lg}px`;
   vars["--radius-xl"] = `${tokens.radius.xl}px`;
+  // V22: minimal elevation tokens — floating/overlay + one dominant surface only.
+  vars["--shadow-sm"] = "0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10)";
+  vars["--shadow-md"] = "0 4px 6px rgba(16, 24, 40, 0.04), 0 10px 20px rgba(16, 24, 40, 0.10)";
   vars["--font-display"] = tokens.fonts.display;
   vars["--font-body"] = tokens.fonts.body;
   if (tokens.fonts.mono) vars["--font-mono"] = tokens.fonts.mono;

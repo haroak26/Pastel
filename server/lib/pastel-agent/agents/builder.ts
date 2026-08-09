@@ -59,8 +59,11 @@ function tokensBlock(theme: ResolvedTheme): string {
   lines.push("  --radius-lg: " + theme.cssVars["--radius-lg"] + ";");
   lines.push("  --radius-xl: " + theme.cssVars["--radius-xl"] + ";");
   lines.push("  --control-sm: 32px; --control-md: 40px; --control-lg: 48px;");
+  lines.push("  --shadow-sm: 0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10);");
+  lines.push("  --shadow-md: 0 4px 6px rgba(16, 24, 40, 0.04), 0 10px 20px rgba(16, 24, 40, 0.10);");
   lines.push("}");
   lines.push("CONTROL SIZING (V11, hard): interactive heights come from the --control-* scale (h-[var(--control-sm)] / h-[var(--control-md)] / h-[var(--control-lg)]) — never raw h-9/h-10/h-11 utilities. Radii come from var(--radius-*) (rounded-[var(--radius-md)] etc.) — never raw rounded-md/xl values that override the theme.");
+  lines.push("ELEVATION (V22): shadow-[var(--shadow-sm)] / shadow-[var(--shadow-md)] ONLY for floating/overlay elements and the component's one dominant surface. Never on static panels — no drop-shadows there.");
   return lines.join("\n");
 }
 

@@ -1,0 +1,18 @@
+{
+  "productName": "Wavelength",
+  "description": "A budgeting app for Gen Z that makes tracking money feel like a game, not a chore. Connects to bank accounts, categorizes spending automatically, and uses friendly challenges to build habits.",
+  "audience": "Gen Z and younger millennials who are new to managing their own money. Students, early-career professionals, and anyone who finds traditional finance apps intimidating.",
+  "niche": "fintech",
+  "personality": [
+    "playful",
+    "bold",
+    "minimal"
+  ],
+  "density": "balanced",
+  "mode": "light",
+  "platform": "web",
+  "companyRefs": [
+    "stripe",
+    "duolingo"
+  ]
+}

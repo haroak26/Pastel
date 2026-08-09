@@ -1,0 +1,353 @@
+{
+  "runId": "test-1786295813902",
+  "startedAt": "2026-08-09T17:12:23.287Z",
+  "completedAt": "2026-08-09T17:17:03.707Z",
+  "durationMs": 280420,
+  "overallSuccess": true,
+  "stages": [
+    {
+      "stage": "stage-1-brief",
+      "start": "2026-08-09T17:12:23.289Z",
+      "end": "2026-08-09T17:12:29.160Z",
+      "durationMs": 5871,
+      "success": true
+    },
+    {
+      "stage": "stage-2-tokens",
+      "start": "2026-08-09T17:12:29.162Z",
+      "end": "2026-08-09T17:12:38.305Z",
+      "durationMs": 9143,
+      "success": true
+    },
+    {
+      "stage": "stage-3-layout",
+      "start": "2026-08-09T17:12:38.310Z",
+      "end": "2026-08-09T17:14:10.036Z",
+      "durationMs": 91726,
+      "success": true
+    },
+    {
+      "stage": "stage-3-manifest",
+      "start": "2026-08-09T17:14:10.037Z",
+      "end": "2026-08-09T17:14:34.149Z",
+      "durationMs": 24112,
+      "success": true
+    },
+    {
+      "stage": "stage-4-components",
+      "start": "2026-08-09T17:14:34.151Z",
+      "end": "2026-08-09T17:15:51.490Z",
+      "durationMs": 77339,
+      "success": true
+    },
+    {
+      "stage": "stage-4-catalog",
+      "start": "2026-08-09T17:15:51.493Z",
+      "end": "2026-08-09T17:16:14.791Z",
+      "durationMs": 23298,
+      "success": true
+    },
+    {
+      "stage": "stage-4-compose",
+      "start": "2026-08-09T17:16:14.791Z",
+      "end": "2026-08-09T17:16:33.996Z",
+      "durationMs": 19205,
+      "success": true
+    },
+    {
+      "stage": "stage-5-render",
+      "start": "2026-08-09T17:16:33.996Z",
+      "end": "2026-08-09T17:16:50.609Z",
+      "durationMs": 16613,
+      "success": true
+    },
+    {
+      "stage": "stage-5-critique",
+      "start": "2026-08-09T17:16:50.610Z",
+      "end": "2026-08-09T17:16:53.902Z",
+      "durationMs": 3289,
+      "success": true
+    },
+    {
+      "stage": "stage-6-finalize",
+      "start": "2026-08-09T17:16:53.902Z",
+      "end": "2026-08-09T17:17:03.707Z",
+      "durationMs": 9804,
+      "success": true
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "creative-directions.json",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/creative-directions.json",
+      "size": 2517,
+      "type": "json"
+    },
+    {
+      "name": "tokens.json",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/tokens.json",
+      "size": 2595,
+      "type": "json"
+    },
+    {
+      "name": "tailwind.config.ts",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/tailwind.config.ts",
+      "size": 3913,
+      "type": "ts"
+    },
+    {
+      "name": "tokens.css",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/tokens.css",
+      "size": 2757,
+      "type": "css"
+    },
+    {
+      "name": "layout-plan.json",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/layout-plan.json",
+      "size": 5887,
+      "type": "json"
+    },
+    {
+      "name": "components-manifest.json",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components-manifest.json",
+      "size": 21215,
+      "type": "json"
+    },
+    {
+      "name": "hero-headline.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/hero-headline.tsx",
+      "size": 867,
+      "type": "tsx"
+    },
+    {
+      "name": "hero-subheadline.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/hero-subheadline.tsx",
+      "size": 1062,
+      "type": "tsx"
+    },
+    {
+      "name": "hero-illustration.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/hero-illustration.tsx",
+      "size": 2431,
+      "type": "tsx"
+    },
+    {
+      "name": "cta-button.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/cta-button.tsx",
+      "size": 3753,
+      "type": "tsx"
+    },
+    {
+      "name": "feature-grid.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/feature-grid.tsx",
+      "size": 1050,
+      "type": "tsx"
+    },
+    {
+      "name": "feature-card.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/feature-card.tsx",
+      "size": 1847,
+      "type": "tsx"
+    },
+    {
+      "name": "testimonial-carousel.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/testimonial-carousel.tsx",
+      "size": 7994,
+      "type": "tsx"
+    },
+    {
+      "name": "testimonial-card.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/testimonial-card.tsx",
+      "size": 1850,
+      "type": "tsx"
+    },
+    {
+      "name": "footer-links.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/footer-links.tsx",
+      "size": 3279,
+      "type": "tsx"
+    },
+    {
+      "name": "copyright.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/copyright.tsx",
+      "size": 810,
+      "type": "tsx"
+    },
+    {
+      "name": "progress-indicator.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/progress-indicator.tsx",
+      "size": 3965,
+      "type": "tsx"
+    },
+    {
+      "name": "welcome-heading.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/welcome-heading.tsx",
+      "size": 1079,
+      "type": "tsx"
+    },
+    {
+      "name": "name-input.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/name-input.tsx",
+      "size": 1995,
+      "type": "tsx"
+    },
+    {
+      "name": "age-range-select.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/age-range-select.tsx",
+      "size": 6168,
+      "type": "tsx"
+    },
+    {
+      "name": "financial-goal-checkboxes.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/financial-goal-checkboxes.tsx",
+      "size": 4888,
+      "type": "tsx"
+    },
+    {
+      "name": "next-button.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/next-button.tsx",
+      "size": 2136,
+      "type": "tsx"
+    },
+    {
+      "name": "logo.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/logo.tsx",
+      "size": 2977,
+      "type": "tsx"
+    },
+    {
+      "name": "notification-bell.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/notification-bell.tsx",
+      "size": 2719,
+      "type": "tsx"
+    },
+    {
+      "name": "user-menu.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/user-menu.tsx",
+      "size": 7533,
+      "type": "tsx"
+    },
+    {
+      "name": "dashboard-tab.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/dashboard-tab.tsx",
+      "size": 1342,
+      "type": "tsx"
+    },
+    {
+      "name": "transactions-tab.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/transactions-tab.tsx",
+      "size": 1371,
+      "type": "tsx"
+    },
+    {
+      "name": "challenges-tab.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/challenges-tab.tsx",
+      "size": 1355,
+      "type": "tsx"
+    },
+    {
+      "name": "insights-tab.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/insights-tab.tsx",
+      "size": 1518,
+      "type": "tsx"
+    },
+    {
+      "name": "profile-tab.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/components/profile-tab.tsx",
+      "size": 1639,
+      "type": "tsx"
+    },
+    {
+      "name": "catalog-page.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/catalog-page.tsx",
+      "size": 18321,
+      "type": "tsx"
+    },
+    {
+      "name": "screen-landing.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/screens/landing.tsx",
+      "size": 4407,
+      "type": "tsx"
+    },
+    {
+      "name": "screen-onboarding-start.tsx",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/screens/onboarding-start.tsx",
+      "size": 2341,
+      "type": "tsx"
+    },
+    {
+      "name": "screenshot-catalog.png",
+      "path": "/home/runner/workspace/picassotests/agentv1/screenshots/catalog.png",
+      "size": 5965,
+      "type": "png"
+    },
+    {
+      "name": "critique-results.json",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/critique-results.json",
+      "size": 965,
+      "type": "json"
+    },
+    {
+      "name": "final-report.md",
+      "path": "/home/runner/workspace/picassotests/agentv1/output/final-report.md",
+      "size": 949,
+      "type": "md"
+    }
+  ],
+  "critiqueAverageScore": 1.1,
+  "critiquePassed": false,
+  "iterations": 1,
+  "modelCalls": [
+    {
+      "stage": "stage-1-brief",
+      "model": "openai/gpt-5.6-luna",
+      "estimated": false
+    },
+    {
+      "stage": "stage-2-tokens",
+      "model": "openai/gpt-5.6-luna",
+      "estimated": false
+    },
+    {
+      "stage": "stage-3-layout",
+      "model": "anthropic/claude-haiku-4-5",
+      "estimated": false
+    },
+    {
+      "stage": "stage-3-manifest",
+      "model": "unknown",
+      "estimated": false
+    },
+    {
+      "stage": "stage-4-components",
+      "model": "openai/gpt-5.6-luna (custom) / anthropic/claude-haiku-4-5 (shell)",
+      "estimated": false
+    },
+    {
+      "stage": "stage-4-catalog",
+      "model": "unknown",
+      "estimated": false
+    },
+    {
+      "stage": "stage-4-compose",
+      "model": "unknown",
+      "estimated": false
+    },
+    {
+      "stage": "stage-5-render",
+      "model": "unknown",
+      "estimated": false
+    },
+    {
+      "stage": "stage-5-critique",
+      "model": "openai/gpt-5.6-luna (vision)",
+      "estimated": false
+    },
+    {
+      "stage": "stage-6-finalize",
+      "model": "n/a",
+      "estimated": false
+    }
+  ],
+  "errorSummary": null
+}

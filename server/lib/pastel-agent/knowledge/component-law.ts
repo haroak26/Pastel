@@ -29,7 +29,7 @@ STRUCTURE & PLACEMENT
 SURFACES & SHAPE
 - Only ONE card-like container per component. Everything else uses flat bands, hairlines (divide-y / border-b), or no container at all.
 - Radii come ONLY from the run's corner language: rounded-[var(--radius-md)] for small elements, rounded-[var(--radius-lg)] for panels, rounded-[var(--radius-xl)] only for the component's hero surface. Use them — a component with zero rounded corners reads as unfinished.
-- No gradients. No drop-shadows on static elements. No decorative blobs/dots.
+- No gradients. No drop-shadows on static elements. Elevation (V22): shadow-[var(--shadow-sm)] / shadow-[var(--shadow-md)] are reserved for floating/overlay elements and the component's ONE dominant surface — never general panels. No decorative blobs/dots.
 - Interactive elements: hover + active states, focus-visible rings, control heights from var(--control-sm/md/lg).
 
 TOKENS & TYPE

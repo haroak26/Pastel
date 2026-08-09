@@ -26,6 +26,8 @@ const RAW_RADIUS_RE = /\brounded-(sm|md|lg|xl|2xl|3xl|full)\b(?![-\w]*\(var\(--r
 const RAW_HEIGHT_RE = /\bh-(9|10|11|12|14)\b/g;
 const RAW_BG_BLUE_RE = /\bbg-(blue|indigo|purple|pink)-(500|600|700)\b/g;
 const SHADOW_ON_STATIC_RE = /\bshadow-(sm|md|lg|xl)\b(?!\s+(hover|active|focus))/g;
+/** className literal(s) a generated element can carry. */
+const CLASS_STRING_RE = /className=\s*(?:"([^"]*)"|'([^']*)'|`([^`]*)`)/g;
 const TEXT_CENTER_BODY_RE = /className="[^"]*\btext-center\b[^"]*"[^>]*>[\s\S]*?<(?!div|section|span\s+className="[^"]*\b(absolute|sr-only|flex|grid|inline))/g;
 const AI_SLOP_RE = /\b(Get started|Learn more|Unlock your potential|Enterprise-grade security)\b/gi;
 const GRADIENT_RE = /\b(bg-gradient-to|from-(blue|indigo|purple)|via-(blue|indigo|purple)|to-(blue|indigo|purple))\b/g;
@@ -75,6 +77,40 @@ const RULES: LintRule[] = [
       fixed = fixed.replace(/\brounded-3xl\b/g, "rounded-[var(--radius-xl)]");
       fixed = fixed.replace(/\brounded-full\b/g, "rounded-full");
       return { fixed, changed: fixed !== code };
+    },
+  },
+  {
+    name: "progress-bar-square-track",
+    scan: (code) => {
+      const tracks: string[] = [];
+      for (const m of code.matchAll(CLASS_STRING_RE)) {
+        const cls = m[1] ?? m[2] ?? m[3] ?? "";
+        // A raw track signature: a clip container (overflow-hidden) sized by a
+        // height utility whose corners are forced square — the "unstyled HTML
+        // progress bar" look that reads as a bug on rounded content.
+        if (/overflow-hidden/.test(cls) && /\bh-[0-9.]+\b/.test(cls) && /\brounded-none\b/.test(cls)) {
+          tracks.push(m[0].slice(0, 60));
+        }
+      }
+      if (tracks.length === 0) return [];
+      return [{
+        severity: "medium" as const,
+        category: "lint",
+        description: `Progress/scroll track uses rounded-none (${tracks.length} element(s): ${tracks.join(", ")}) — square corners on rounded content reads as a bug. Use rounded-[var(--radius-full)].`,
+      }];
+    },
+    fix: (code) => {
+      let changed = false;
+      const fixed = code.replace(CLASS_STRING_RE, (whole, dq: string | undefined, sq: string | undefined, bt: string | undefined) => {
+        const cls = dq ?? sq ?? bt ?? "";
+        if (!/overflow-hidden/.test(cls) || !/\bh-[0-9.]+\b/.test(cls) || !/\brounded-none\b/.test(cls)) return whole;
+        const next = cls.replace(/\brounded-none\b/g, "rounded-[var(--radius-full)]");
+        if (next !== cls) changed = true;
+        const wrap = whole.slice(0, whole.indexOf("="));
+        const quote = dq !== undefined ? '"' : sq !== undefined ? "'" : "`";
+        return `${wrap}=${quote}${next}${quote}`;
+      });
+      return { fixed, changed };
     },
   },
   {

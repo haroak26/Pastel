@@ -37,7 +37,12 @@ export const MODELS = {
   compose:      process.env.PASTEL_MODEL_COMPOSE       || MID_DEFAULT,
   review:       process.env.PASTEL_MODEL_REVIEW       || MID_DEFAULT,
   visualReview: process.env.PASTEL_MODEL_VISUAL_REVIEW || MID_DEFAULT,
-  repair:       process.env.PASTEL_MODEL_REPAIR       || CHEAP_DEFAULT,
+  /** V22: repair must be AT LEAST as capable as the model that found the
+   * defects (review runs on MID). v21 ran repair on the cheap tier with a
+   * 5000-token ceiling — structural fixes (real charts, viewport-filling
+   * restructures) were beyond its budget, so every repair round no-oped and
+   * broken runs shipped as "done". */
+  repair:       process.env.PASTEL_MODEL_REPAIR       || MID_DEFAULT,
 } as const;
 
 export type ModelRole = keyof typeof MODELS;
@@ -56,7 +61,10 @@ export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
   compose:      Number(process.env.PASTEL_MAX_TOKENS_COMPOSE)      || 10000,
   review:       Number(process.env.PASTEL_MAX_TOKENS_REVIEW)       || 4000,
   visualReview: Number(process.env.PASTEL_MAX_TOKENS_VISUAL_REVIEW) || 4000,
-  repair:       Number(process.env.PASTEL_MAX_TOKENS_REPAIR)       || 5000,
+  /** V22: a screen-level structural rewrite (new chart with axes/gridlines,
+   * restructured detail layout) needs the same budget the builder gets for a
+   * full file — not the smallest tier in the table. */
+  repair:       Number(process.env.PASTEL_MAX_TOKENS_REPAIR)       || 9000,
 } as const;
 
 const TRUNCATION_SCALE = 2.5;

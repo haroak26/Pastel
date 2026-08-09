@@ -1,4 +1,5 @@
 import type { ResolvedTheme } from "./schemas";
+import { hexToRgb } from "./lib/colors";
 
 /**
  * Deterministic stylesheet compiler — Pastel v5.
@@ -8,6 +9,12 @@ import type { ResolvedTheme } from "./schemas";
  * and type-scale overrides, focus rings, and layout helpers. The generated
  * components reference these classes; every pixel is token-driven.
  * Zero model tokens, zero variance.
+ *
+ * V22: opacity-modified semantic classes (bg-accent/20, bg-muted/50, …) have
+ * NO static rule here — the Tailwind CDN doesn't know the semantic tokens and
+ * silently emits nothing for them, so those elements render transparent.
+ * `compileStylesForRun` scans the run's actual generated files and emits an
+ * explicit rule for every opacity class the model wrote.
  */
 
 export interface CompiledStyles {
@@ -15,7 +22,83 @@ export interface CompiledStyles {
   fontFamilies: string[];
 }
 
-export function compileStyles(theme: ResolvedTheme): CompiledStyles {
+/** Semantic color tokens compileStyles() hand-writes base utilities for. */
+const SEMANTIC_TOKENS =
+  "background|foreground|card|card-foreground|popover|popover-foreground|primary|primary-foreground|secondary|secondary-foreground|muted|muted-foreground|accent|accent-foreground|destructive|destructive-foreground|success|success-subtle|warning|warning-subtle|border|input|ring";
+
+/** Every {prefix}-{token}/{opacity} usage — optional hover:/focus: chain. */
+const OPACITY_CLASS_RE = new RegExp(
+  `\\b((?:(?:hover|focus|focus-visible|active|group-hover|even|odd|disabled)\\s*:\\s*)*(?:bg|text|border|ring|divide))-(${SEMANTIC_TOKENS})\\/(\\d{1,3})\\b`,
+  "g",
+);
+
+const OPACITY_PROPERTY: Record<string, string> = {
+  bg: "background-color",
+  text: "color",
+  border: "border-color",
+  ring: "--tw-ring-color",
+  divide: "border-color",
+};
+
+/**
+ * V22 — deterministic opacity coverage for the run's ACTUAL class usage.
+ *
+ * Scans every generated source file for opacity-modified semantic classes
+ * (with or without hover:/focus: prefixes) and emits an explicit rule per
+ * unique (prefix, token, opacity) triple. It is generated from the resolved
+ * theme hex + the alpha, so it always matches exactly what the model wrote —
+ * no static allowlist to drift out of sync with the CDN.
+ *
+ * Each rule carries BOTH declarations: a precomputed rgba() (zero runtime
+ * support risk — verified against the headless Chromium screenshots render)
+ * and a color-mix() that keeps the CSS-var reference for evergreen browsers.
+ */
+export function compileOpacityCoverage(files: Record<string, string>, theme: ResolvedTheme): string {
+  const seen = new Set<string>();
+  const rules: Array<{ prefix: string; token: string; opacity: number; pseudos: string[] }> = [];
+
+  for (const [path, code] of Object.entries(files)) {
+    if (!path.startsWith("src/") || !/\.(jsx|tsx)$/.test(path)) continue;
+    for (const m of code.matchAll(OPACITY_CLASS_RE)) {
+      const chain = m[1];
+      const token = m[2];
+      const opacity = Number(m[3]);
+      if (!Number.isInteger(opacity) || opacity < 1 || opacity > 100) continue;
+      const pseudos = chain.match(/[\w-]+(?=:)/g) ?? [];
+      const prefix = chain.split(":").pop() as string;
+      const key = `${pseudos.join(",")}:${prefix}-${token}/${opacity}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      rules.push({ prefix, token, opacity, pseudos });
+    }
+  }
+
+  const lines: string[] = [];
+  for (const { prefix, token, opacity, pseudos } of rules) {
+    const varName = `--${token}`;
+    const hex = theme.cssVars[varName];
+    if (!hex || !/^#[0-9a-fA-F]{6}$/.test(hex)) continue;
+    const { r, g, b } = hexToRgb(hex);
+    const alpha = opacity / 100;
+    const prop = OPACITY_PROPERTY[prefix];
+    if (!prop) continue;
+
+    const escapedClass = [...pseudos.map((p) => `${p}\\:`), `${prefix}-${token}\\/${opacity}`].join("");
+    const pseudoSelectors = pseudos.map((p) => `:${p}`).join("");
+    const selector = prefix === "divide"
+      ? `.${escapedClass}${pseudoSelectors} > :not([hidden]) ~ :not([hidden])`
+      : `.${escapedClass}${pseudoSelectors}`;
+
+    const rgba = `rgba(${r}, ${g}, ${b}, ${alpha})`;
+    const colorMix = `color-mix(in srgb, var(${varName}) ${opacity}%, transparent)`;
+    lines.push(`${selector} { ${prop}: ${rgba}; ${prop}: ${colorMix}; }`);
+  }
+
+  return lines.length > 0 ? `/* ── V22 opacity coverage (scanned from generated files) ── */\n${lines.join("\n")}` : "";
+}
+
+/** Base stylesheet — the full token + semantic-utility sheet (no opacity coverage). */
+function compileBaseStyles(theme: ResolvedTheme): string {
   const vars = Object.entries(theme.cssVars)
     .map(([k, v]) => `  ${k}: ${v};`)
     .join("\n");
@@ -170,5 +253,23 @@ export function compileStyles(theme: ResolvedTheme): CompiledStyles {
     "",
   ].join("\n");
 
+  return css;
+}
+
+/** Thin wrapper kept for callers that only need the base sheet. */
+export function compileStyles(theme: ResolvedTheme): CompiledStyles {
+  return { css: compileBaseStyles(theme), fontFamilies: theme.fontFamilies };
+}
+
+/**
+ * V22 — full run stylesheet: base tokens + opacity coverage for every
+ * semantic {color}/{opacity} class the run's generated files actually use.
+ * Every render path (screenshots, final export, component proofs) should call
+ * this with the final generated file set so no opacity class ever renders
+ * transparent.
+ */
+export function compileStylesForRun(theme: ResolvedTheme, files: Record<string, string>): CompiledStyles {
+  const coverage = compileOpacityCoverage(files, theme);
+  const css = coverage ? `${compileBaseStyles(theme)}\n${coverage}` : compileBaseStyles(theme);
   return { css, fontFamilies: theme.fontFamilies };
 }

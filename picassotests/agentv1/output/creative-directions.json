@@ -1,0 +1,30 @@
+[
+  {
+    "name": "Bright Quest",
+    "summary": "A cheerful habit-building direction that turns budgeting into a clear series of small wins. Playful visual cues and expressive progress moments make money management feel approachable without making the product feel childish.",
+    "influences": [
+      "duolingo"
+    ],
+    "paletteDirection": "A light neutral foundation with one saturated electric green accent reserved for primary actions, active progress, and positive feedback. Supporting semantic colors are vivid but tightly contained in badges and status moments; backgrounds remain white and soft gray to keep the interface minimal. Use warm, high-contrast text and restrained dark surfaces only for focused challenge panels or account summaries.",
+    "densityFit": "medium"
+  },
+  {
+    "name": "Signal & Spend",
+    "summary": "A technically polished fintech direction built around the idea of reading your financial wavelength. Stripe-like clarity and structured data presentation create trust, while bold accent moments keep the experience energetic for first-time budgeters.",
+    "influences": [
+      "stripe"
+    ],
+    "paletteDirection": "Use cool near-white and blue-gray neutrals as the dominant light-mode canvas, with a single saturated indigo accent for calls to action, selected categories, and focus states. Spending categories rely on neutral structure first, with restrained semantic tints for warnings and positive trends rather than a rainbow palette. Introduce a near-black blue-gray only for high-priority summaries, challenge headers, or code-like transaction details.",
+    "densityFit": "medium"
+  },
+  {
+    "name": "Playful Precision",
+    "summary": "A hybrid direction that pairs a crisp, trustworthy financial shell with compact moments of game energy. The core experience stays calm and legible, while challenges, streaks, and milestones use bold shapes and encouraging feedback to make progress feel tangible.",
+    "influences": [
+      "stripe",
+      "duolingo"
+    ],
+    "paletteDirection": "Anchor the interface in warm light neutrals and charcoal text, then select one bold coral-orange accent for the primary action and motivational milestones. Use green, amber, and red only as clearly labeled semantic states, each in restrained surface and text variants. Keep saturation concentrated in challenge cards, progress indicators, and reward moments; avoid decorative color washes and maintain a mostly flat light-mode presentation.",
+    "densityFit": "medium"
+  }
+]

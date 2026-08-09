@@ -5,9 +5,9 @@ import type { PastelPhase, PhaseStatus, AgentManifest, VisualReference } from ".
 import type { UsageRecord } from "./gateway";
 import { ledgerFromUsage } from "./lib/ledger";
 import * as creditService from "../credit-service";
-import type { ProductBrief, WireframePlan, ComponentInventory, CopyPlan, ResolvedTheme, V6ReviewResult, UxDesignPlan, DesignTokens, VisualIntent, V21LayoutPlan } from "./schemas";
+import type { ProductBrief, WireframePlan, ComponentInventory, CopyPlan, ResolvedTheme, V6ReviewResult, UxDesignPlan, DesignTokens, VisualIntent, V21LayoutPlan, ComponentUISpec } from "./schemas";
 import { compileCompanyBlock, megadesignBlock, loadCompanyDoc, selectCompanyReferences, compileDesignKnowledge } from "./knowledge/index";
-import { compileStyles } from "./compile";
+import { compileStyles, compileStylesForRun } from "./compile";
 import type { MockDataset } from "./lib/content";
 import { generateCompositionSummary } from "./compose";
 import { auditFiles, type GateReport } from "./checks/audit";
@@ -59,6 +59,10 @@ export interface V6RunState {
   ux: UxDesignPlan | null;
   /** V21 deterministic placement plan — the composer fills it exactly. */
   layoutPlan: V21LayoutPlan | null;
+  /** V22: planner specs keyed by component name — the prop-binding gate
+   * (checks/props.ts) verifies every mounted component got its required
+   * props, so "pass real data" is enforced, not just prompted. */
+  componentSpecs: Record<string, ComponentUISpec>;
   copy: CopyPlan | null;
   theme: ResolvedTheme | null;
   data: MockDataset | null;
@@ -81,7 +85,9 @@ export interface V6RunState {
   composerRetries: Record<string, number>;
 
   costs: UsageRecord[];
-  status: "running" | "done" | "error";
+  /** V22: a run that exhausted the repair budget and still fails review
+   * reports done_needs_review — never "done" identically to a passing run. */
+  status: "running" | "done" | "done_needs_review" | "error";
   error: string | null;
 
   /** V10: per-screen DOM-geometry audits (layout law) — feed the gate. */
@@ -128,6 +134,7 @@ function createState(opts: {
     inventory: null,
     ux: null,
     layoutPlan: null,
+    componentSpecs: {},
     copy: null,
     theme: null,
     data: null,
@@ -391,8 +398,10 @@ export async function startAgentLoop(
     // components with the EXACT props they declare (v18 passed a fixed
     // items/metrics/people/settings set to every component — wrong for
     // components like HostTrustProfile that declare their own props).
+    // V22: also stored on state for the prop-binding gate (checks/props.ts).
     const componentSpecs: Record<string, (typeof specs)[number]> = {};
     for (const spec of specs) componentSpecs[spec.name] = spec;
+    s.componentSpecs = componentSpecs;
 
     const { components } = await runBuilder({
       specs,
@@ -608,9 +617,13 @@ export async function startAgentLoop(
     }
 
     // ══ DONE ══
-    s.status = "done";
+    // V22: failed-QA output is NOT a clean pass. When the repair budget is
+    // exhausted and review still fails, surface a distinct status so the UI
+    // can tell a shipped-but-broken run apart from a passing one.
+    s.status = s.reviewResult?.passed ? "done" : "done_needs_review";
     const costs = ledgerFromUsage(s.costs);
     emitActivity(runId, `Run cost: $${costs.totalDollars.toFixed(4)} (${costs.totalCredits.toFixed(2)} credits) across ${costs.entries.length} model call(s)`);
+    if (s.status === "done_needs_review") emitActivity(runId, "Review did not pass after all repair cycles — run marked done_needs_review (shipped but QA-failed).");
 
     const manifestOut: AgentManifest & Record<string, unknown> = {
       screens: s.generatedScreens,
@@ -660,7 +673,7 @@ export async function startAgentLoop(
     };
 
     await updateRun(runId, {
-      status: "done",
+      status: s.status,
       title: brief.title,
       manifest: manifestOut,
     });
@@ -705,6 +718,17 @@ async function runVerification(s: V6RunState): Promise<void> {
   for (const [name, js] of Object.entries(s.bundles)) {
     await persistGeneratedFile(s.runId, `.build/${name}.js`, js);
   }
+
+  // V22: regenerate the stylesheet WITH opacity coverage for whatever classes
+  // this run's files actually use (bg-accent/20, bg-muted/50, …). The Tailwind
+  // CDN can't alpha-blend the semantic CSS vars, so without this the velocity
+  // chart bars and tonal bands render fully transparent. Recomputing per
+  // verification keeps coverage in sync across repair rounds.
+  const { css: runCss, fontFamilies } = compileStylesForRun(s.theme!, s.generatedFiles);
+  s.styles = runCss;
+  s.fontFamilies = fontFamilies;
+  s.generatedFiles["src/styles.css"] = s.styles;
+  await persistGeneratedFile(s.runId, "src/styles.css", s.styles);
 
   s.screenshots = [];
   s.screenshotNames = [];
@@ -807,6 +831,13 @@ async function runGate(s: V6RunState): Promise<void> {
   if (s.layoutPlan) {
     const { auditV21Layout } = await import("./checks/layout");
     issues.push(...auditV21Layout(s.layoutPlan, s.generatedFiles, s.generatedFiles));
+  }
+
+  // V22: prop-binding gate — every mounted custom component must receive the
+  // required props its own spec declares (no missing props, no empty arrays).
+  if (s.componentSpecs && Object.keys(s.componentSpecs).length > 0) {
+    const { auditPropBindings } = await import("./checks/props");
+    issues.push(...auditPropBindings(s.componentSpecs, s.generatedFiles));
   }
 
   // V10: the DOM-geometry audit (layout law) is ground truth — rhythm,
@@ -936,6 +967,20 @@ function collectRepairTargets(s: V6RunState): Map<string, string[]> {
     const evidence = `${issue.category}: ${issue.description}`;
     map.set(file, [...(map.get(file) ?? []), evidence]);
   }
+  // V22: the model review's requiredFixes ARE the actionable repair brief
+  // ("src/screens/home.jsx: Replace the generic weekly focus-hours chart…").
+  // Route each literal fix string to its target file so the builder receives
+  // the exact prescribed change — not a generic "fix issues" instruction.
+  for (const fix of s.reviewResult?.requiredFixes ?? []) {
+    const m = fix.match(/^(src\/\S+?|[a-z0-9_-]+)\s*:\s*([\s\S]+)$/);
+    if (!m) continue;
+    const raw = m[1].trim();
+    const body = m[2].trim();
+    const file = raw.startsWith("src/") ? raw : `src/screens/${raw.replace(/\.(?:jsx|tsx)$/, "")}.jsx`;
+    if (s.generatedFiles[file]) {
+      map.set(file, [...(map.get(file) ?? []), body]);
+    }
+  }
   return map;
 }
 
@@ -971,7 +1016,7 @@ async function runRepairRound(s: V6RunState): Promise<void> {
 async function settleCredits(s: V6RunState): Promise<void> {
   if (!s.holdId || !s.userId) return;
   try {
-    if (s.status !== "done") {
+    if (s.status !== "done" && s.status !== "done_needs_review") {
       await creditService.releaseHold(s.holdId, 0);
       return;
     }

@@ -309,6 +309,9 @@ importers:
         specifier: ^3.5.4
         version: 3.5.4(zod@3.25.76)
     devDependencies:
+      '@babel/standalone':
+        specifier: ^7.29.8
+        version: 7.29.8
       '@replit/vite-plugin-cartographer':
         specifier: ^0.4.4
         version: 0.4.11
@@ -574,6 +577,10 @@ packages:
 
   '@babel/runtime@7.29.7':
     resolution: {integrity: sha512-Nq8OhGWiZIZGV6hLHoyAKLLcJihP/xFeBMGJoUrxTX2psI8dCifzLhZISFb+VWS3wFMRDmCGw5R+dOySCqPLhw==}
+    engines: {node: '>=6.9.0'}
+
+  '@babel/standalone@7.29.8':
+    resolution: {integrity: sha512-XgbPNz+u6JzB7cKGnPDoS1U24J5td8yp3HFWbT/6f4/ASZ0PqaQGIvts1o5v5AI+f6i3jdVB/L/o2CYLCv101A==}
     engines: {node: '>=6.9.0'}
 
   '@babel/template@7.29.7':
@@ -4761,6 +4768,8 @@ snapshots:
       - supports-color
 
   '@babel/runtime@7.29.7': {}
+
+  '@babel/standalone@7.29.8': {}
 
   '@babel/template@7.29.7':
     dependencies:

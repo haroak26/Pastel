@@ -492,6 +492,12 @@ export function resolveCompanyTheme(
     "--section-padding-y": `${manifest.sectionPaddingY}px`,
     "--section-gap": `${manifest.sectionGap}px`,
     "--content-max": "1280px",
+
+    // V22: minimal elevation tokens — RESERVED for floating/overlay elements
+    // (dropdowns, popovers, modals) and the one dominant surface per screen.
+    // Static content panels keep the no-shadow rule.
+    "--shadow-sm": "0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10)",
+    "--shadow-md": "0 4px 6px rgba(16, 24, 40, 0.04), 0 10px 20px rgba(16, 24, 40, 0.10)",
   };
 
   const fontFamilies = [...new Set([manifest.fonts.display, manifest.fonts.body, manifest.fonts.mono].filter(Boolean))] as string[];
@@ -582,6 +588,11 @@ export function themeFromDesignTokens(
     "--section-padding-y": `${tokens.sectionPaddingY}px`,
     "--section-gap": `${tokens.sectionGap}px`,
     "--content-max": "1280px",
+
+    // V22: minimal elevation tokens — floating/overlay + one dominant surface
+    // per screen only. Static panels stay shadow-free.
+    "--shadow-sm": "0 1px 2px rgba(16, 24, 40, 0.06), 0 1px 3px rgba(16, 24, 40, 0.10)",
+    "--shadow-md": "0 4px 6px rgba(16, 24, 40, 0.04), 0 10px 20px rgba(16, 24, 40, 0.10)",
   };
 
   const fontFamilies = [...new Set([tokens.fonts.display, tokens.fonts.body, tokens.fonts.mono].filter(Boolean))] as string[];

@@ -1720,7 +1720,10 @@ test("v14 pipeline: phases + model roles are in the wire contract", async () => 
   // V14 tier allocation: judgment stages on Luna, mechanical stages on Haiku.
   assert.equal(MODELS.planner, CHEAP_DEFAULT, "planner stays on Haiku");
   assert.equal(MODELS.builder, CHEAP_DEFAULT, "builder stays on Haiku");
-  assert.equal(MODELS.repair, CHEAP_DEFAULT, "repair stays on Haiku");
+  // V22: repair must be at least as capable as the model that found the
+  // defects (review runs on MID) — the cheap-tier/5000-token repair budget
+  // was the reason broken runs shipped as "done".
+  assert.equal(MODELS.repair, MID_DEFAULT, "repair moved to Luna (v22 — repair must execute structural fixes)");
   assert.equal(MODELS.copy, MID_DEFAULT, "copy moved to Luna (product voice)");
   assert.equal(MODELS.data, MID_DEFAULT, "data agent runs on Luna");
   assert.equal(MODELS.brief, MID_DEFAULT, "brief runs on Luna");

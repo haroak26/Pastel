@@ -1,0 +1,793 @@
+{
+  "entries": [
+    {
+      "id": "hero-headline",
+      "name": "HeroHeadline",
+      "taxonomy": "atom",
+      "description": "Bold, playful headline introducing the app's core value proposition",
+      "states": [
+        "default"
+      ],
+      "props": {
+        "children": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "The headline text or content to display"
+        },
+        "as": {
+          "type": "'h1' | 'h2' | 'h3'",
+          "required": false,
+          "description": "HTML heading level for semantic structure"
+        }
+      }
+    },
+    {
+      "id": "hero-subheadline",
+      "name": "HeroSubheadline",
+      "taxonomy": "atom",
+      "description": "Supporting copy explaining the game-like budgeting experience",
+      "states": [
+        "default"
+      ],
+      "props": {
+        "children": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "The subheadline text or content to display"
+        },
+        "emphasis": {
+          "type": "'default' | 'muted'",
+          "required": false,
+          "description": "Controls text emphasis level relative to the main headline"
+        }
+      }
+    },
+    {
+      "id": "hero-illustration",
+      "name": "HeroIllustration",
+      "taxonomy": "atom",
+      "description": "Engaging visual or animation showcasing the app's personality",
+      "states": [
+        "default",
+        "loading"
+      ],
+      "variants": {
+        "type": [
+          "static",
+          "animated"
+        ]
+      },
+      "props": {
+        "src": {
+          "type": "string",
+          "required": true,
+          "description": "URL or path to the illustration image or animation asset"
+        },
+        "alt": {
+          "type": "string",
+          "required": true,
+          "description": "Accessibility text describing the illustration"
+        },
+        "animated": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether the illustration should play animation on load"
+        }
+      }
+    },
+    {
+      "id": "cta-button",
+      "name": "CTAButton",
+      "taxonomy": "primitive",
+      "description": "Primary call-to-action button directing to sign-up",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading"
+      ],
+      "variants": {
+        "size": [
+          "sm",
+          "md",
+          "lg"
+        ],
+        "variant": [
+          "primary",
+          "secondary"
+        ]
+      },
+      "props": {
+        "children": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "Button label text"
+        },
+        "onClick": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when button is clicked"
+        },
+        "href": {
+          "type": "string",
+          "required": false,
+          "description": "URL to navigate to on click (renders as link if provided)"
+        },
+        "disabled": {
+          "type": "boolean",
+          "required": false,
+          "description": "Disables the button and prevents interaction"
+        },
+        "loading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Shows loading state and disables interaction during async operations"
+        },
+        "size": {
+          "type": "'sm' | 'md' | 'lg'",
+          "required": false,
+          "description": "Controls button size"
+        }
+      }
+    },
+    {
+      "id": "feature-grid",
+      "name": "FeatureGrid",
+      "taxonomy": "organism",
+      "description": "Grid of 3–4 feature cards highlighting auto-categorization, challenges, and bank integration",
+      "states": [
+        "default"
+      ],
+      "variants": {
+        "columns": [
+          "3",
+          "4"
+        ],
+        "layout": [
+          "grid"
+        ]
+      },
+      "props": {
+        "children": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "FeatureCard components to render in the grid"
+        },
+        "columns": {
+          "type": "3 | 4",
+          "required": false,
+          "description": "Number of columns in the grid layout"
+        }
+      }
+    },
+    {
+      "id": "feature-card",
+      "name": "FeatureCard",
+      "taxonomy": "molecule",
+      "description": "Individual feature card with icon, title, and brief description",
+      "states": [
+        "default",
+        "hover"
+      ],
+      "props": {
+        "icon": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "Icon component or SVG representing the feature"
+        },
+        "title": {
+          "type": "string",
+          "required": true,
+          "description": "Feature title or heading"
+        },
+        "description": {
+          "type": "string",
+          "required": true,
+          "description": "Brief explanation of the feature"
+        }
+      }
+    },
+    {
+      "id": "testimonial-carousel",
+      "name": "TestimonialCarousel",
+      "taxonomy": "organism",
+      "description": "Rotating testimonials from Gen Z users praising the app",
+      "states": [
+        "default"
+      ],
+      "variants": {
+        "autoplay": [
+          "true",
+          "false"
+        ]
+      },
+      "props": {
+        "testimonials": {
+          "type": "Array<{ avatar: string; quote: string; name: string; role?: string }>",
+          "required": true,
+          "description": "Array of testimonial objects with user info and quote"
+        },
+        "autoplay": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether carousel automatically rotates through testimonials"
+        },
+        "interval": {
+          "type": "number",
+          "required": false,
+          "description": "Milliseconds between auto-rotation (default 5000)"
+        }
+      }
+    },
+    {
+      "id": "testimonial-card",
+      "name": "TestimonialCard",
+      "taxonomy": "molecule",
+      "description": "Single testimonial with user avatar, quote, and name",
+      "states": [
+        "default"
+      ],
+      "props": {
+        "avatar": {
+          "type": "string",
+          "required": true,
+          "description": "URL to user's avatar image"
+        },
+        "quote": {
+          "type": "string",
+          "required": true,
+          "description": "The testimonial quote text"
+        },
+        "name": {
+          "type": "string",
+          "required": true,
+          "description": "User's name"
+        },
+        "role": {
+          "type": "string",
+          "required": false,
+          "description": "User's role or title (e.g., 'Student', 'Early-career professional')"
+        }
+      }
+    },
+    {
+      "id": "footer-links",
+      "name": "FooterLinks",
+      "taxonomy": "molecule",
+      "description": "Links to privacy policy, terms, and social media",
+      "states": [
+        "default"
+      ],
+      "props": {
+        "links": {
+          "type": "Array<{ label: string; href: string; external?: boolean }>",
+          "required": true,
+          "description": "Array of link objects with label and href"
+        },
+        "socialLinks": {
+          "type": "Array<{ icon: ReactNode; href: string; label: string }>",
+          "required": false,
+          "description": "Array of social media links with icons"
+        }
+      }
+    },
+    {
+      "id": "copyright",
+      "name": "Copyright",
+      "taxonomy": "atom",
+      "description": "Copyright notice and company info",
+      "states": [
+        "default"
+      ],
+      "props": {
+        "year": {
+          "type": "number",
+          "required": false,
+          "description": "Copyright year (defaults to current year)"
+        },
+        "company": {
+          "type": "string",
+          "required": true,
+          "description": "Company name to display in copyright notice"
+        }
+      }
+    },
+    {
+      "id": "progress-indicator",
+      "name": "ProgressIndicator",
+      "taxonomy": "molecule",
+      "description": "Visual step indicator showing user is on step 1 of onboarding",
+      "states": [
+        "default"
+      ],
+      "variants": {
+        "style": [
+          "dots",
+          "bars",
+          "numbered"
+        ]
+      },
+      "props": {
+        "currentStep": {
+          "type": "number",
+          "required": true,
+          "description": "The current step number (1-indexed)"
+        },
+        "totalSteps": {
+          "type": "number",
+          "required": true,
+          "description": "Total number of steps in the onboarding flow"
+        },
+        "style": {
+          "type": "'dots' | 'bars' | 'numbered'",
+          "required": false,
+          "description": "Visual style of the progress indicator"
+        }
+      }
+    },
+    {
+      "id": "welcome-heading",
+      "name": "WelcomeHeading",
+      "taxonomy": "atom",
+      "description": "Friendly greeting and onboarding title",
+      "states": [
+        "default"
+      ],
+      "props": {
+        "children": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "The welcome heading text or content"
+        },
+        "userName": {
+          "type": "string",
+          "required": false,
+          "description": "User's name to personalize the greeting"
+        }
+      }
+    },
+    {
+      "id": "name-input",
+      "name": "NameInput",
+      "taxonomy": "primitive",
+      "description": "Text input for user's first name",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "error"
+      ],
+      "props": {
+        "value": {
+          "type": "string",
+          "required": false,
+          "description": "Current input value"
+        },
+        "onChange": {
+          "type": "(value: string) => void",
+          "required": false,
+          "description": "Callback fired when input value changes"
+        },
+        "placeholder": {
+          "type": "string",
+          "required": false,
+          "description": "Placeholder text when input is empty"
+        },
+        "disabled": {
+          "type": "boolean",
+          "required": false,
+          "description": "Disables the input field"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message to display below the input"
+        },
+        "required": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether the field is required"
+        }
+      }
+    },
+    {
+      "id": "age-range-select",
+      "name": "AgeRangeSelect",
+      "taxonomy": "primitive",
+      "description": "Dropdown or radio group for age range selection",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled"
+      ],
+      "variants": {
+        "type": [
+          "dropdown",
+          "radio"
+        ]
+      },
+      "radixPrimitive": "Select",
+      "props": {
+        "value": {
+          "type": "string",
+          "required": false,
+          "description": "Currently selected age range value"
+        },
+        "onChange": {
+          "type": "(value: string) => void",
+          "required": false,
+          "description": "Callback fired when selection changes"
+        },
+        "options": {
+          "type": "Array<{ label: string; value: string }>",
+          "required": true,
+          "description": "Array of age range options to select from"
+        },
+        "disabled": {
+          "type": "boolean",
+          "required": false,
+          "description": "Disables the select control"
+        },
+        "type": {
+          "type": "'dropdown' | 'radio'",
+          "required": false,
+          "description": "Visual presentation style of the selector"
+        }
+      }
+    },
+    {
+      "id": "financial-goal-checkboxes",
+      "name": "FinancialGoalCheckboxes",
+      "taxonomy": "molecule",
+      "description": "Set of checkboxes for selecting financial goals (save, spend less, invest, etc.)",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "disabled"
+      ],
+      "radixPrimitive": "Checkbox",
+      "props": {
+        "goals": {
+          "type": "Array<{ id: string; label: string; description?: string }>",
+          "required": true,
+          "description": "Array of financial goal options with labels"
+        },
+        "selectedGoals": {
+          "type": "string[]",
+          "required": false,
+          "description": "Array of currently selected goal IDs"
+        },
+        "onChange": {
+          "type": "(selectedIds: string[]) => void",
+          "required": false,
+          "description": "Callback fired when selection changes"
+        },
+        "disabled": {
+          "type": "boolean",
+          "required": false,
+          "description": "Disables all checkboxes"
+        }
+      }
+    },
+    {
+      "id": "next-button",
+      "name": "NextButton",
+      "taxonomy": "primitive",
+      "description": "Button to proceed to next onboarding step",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading"
+      ],
+      "props": {
+        "onClick": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when button is clicked to advance to next step"
+        },
+        "disabled": {
+          "type": "boolean",
+          "required": false,
+          "description": "Disables the button (e.g., when form is incomplete)"
+        },
+        "loading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Shows loading state during step transition"
+        },
+        "children": {
+          "type": "ReactNode",
+          "required": false,
+          "description": "Button label (defaults to 'Next')"
+        }
+      }
+    },
+    {
+      "id": "logo",
+      "name": "Logo",
+      "taxonomy": "atom",
+      "description": "Wavelength logo and app name (visible on all authenticated screens)",
+      "states": [
+        "default"
+      ],
+      "variants": {
+        "size": [
+          "sm",
+          "md",
+          "lg"
+        ],
+        "variant": [
+          "full",
+          "icon"
+        ]
+      },
+      "props": {
+        "size": {
+          "type": "'sm' | 'md' | 'lg'",
+          "required": false,
+          "description": "Controls logo size"
+        },
+        "variant": {
+          "type": "'full' | 'icon'",
+          "required": false,
+          "description": "Whether to show full logo with text or icon only"
+        },
+        "href": {
+          "type": "string",
+          "required": false,
+          "description": "URL to navigate to when logo is clicked (typically home/dashboard)"
+        }
+      }
+    },
+    {
+      "id": "notification-bell",
+      "name": "NotificationBell",
+      "taxonomy": "primitive",
+      "description": "Icon button with unread notification count badge",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "props": {
+        "unreadCount": {
+          "type": "number",
+          "required": false,
+          "description": "Number of unread notifications to display in badge"
+        },
+        "onClick": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when bell icon is clicked"
+        },
+        "ariaLabel": {
+          "type": "string",
+          "required": false,
+          "description": "Accessibility label for the button"
+        }
+      }
+    },
+    {
+      "id": "user-menu",
+      "name": "UserMenu",
+      "taxonomy": "molecule",
+      "description": "Dropdown menu with profile, settings, and logout options",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "radixPrimitive": "DropdownMenu",
+      "props": {
+        "userName": {
+          "type": "string",
+          "required": true,
+          "description": "User's display name shown in menu trigger"
+        },
+        "avatar": {
+          "type": "string",
+          "required": false,
+          "description": "URL to user's avatar image"
+        },
+        "onProfile": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when profile option is clicked"
+        },
+        "onSettings": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when settings option is clicked"
+        },
+        "onLogout": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when logout option is clicked"
+        }
+      }
+    },
+    {
+      "id": "dashboard-tab",
+      "name": "DashboardTab",
+      "taxonomy": "primitive",
+      "description": "Navigation tab to dashboard with icon and label",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "props": {
+        "icon": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "Icon component representing the dashboard"
+        },
+        "label": {
+          "type": "string",
+          "required": true,
+          "description": "Tab label text"
+        },
+        "href": {
+          "type": "string",
+          "required": true,
+          "description": "URL path to navigate to"
+        },
+        "active": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether this tab is currently active"
+        }
+      }
+    },
+    {
+      "id": "transactions-tab",
+      "name": "TransactionsTab",
+      "taxonomy": "primitive",
+      "description": "Navigation tab to transactions with icon and label",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "props": {
+        "icon": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "Icon component representing transactions"
+        },
+        "label": {
+          "type": "string",
+          "required": true,
+          "description": "Tab label text"
+        },
+        "href": {
+          "type": "string",
+          "required": true,
+          "description": "URL path to navigate to"
+        },
+        "active": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether this tab is currently active"
+        }
+      }
+    },
+    {
+      "id": "challenges-tab",
+      "name": "ChallengesTab",
+      "taxonomy": "primitive",
+      "description": "Navigation tab to challenges with icon and label",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "props": {
+        "icon": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "Icon component representing challenges"
+        },
+        "label": {
+          "type": "string",
+          "required": true,
+          "description": "Tab label text"
+        },
+        "href": {
+          "type": "string",
+          "required": true,
+          "description": "URL path to navigate to"
+        },
+        "active": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether this tab is currently active"
+        }
+      }
+    },
+    {
+      "id": "insights-tab",
+      "name": "InsightsTab",
+      "taxonomy": "primitive",
+      "description": "Navigation tab to insights with icon and label",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "props": {
+        "icon": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "Icon component representing insights"
+        },
+        "label": {
+          "type": "string",
+          "required": true,
+          "description": "Tab label text"
+        },
+        "href": {
+          "type": "string",
+          "required": true,
+          "description": "URL path to navigate to"
+        },
+        "active": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether this tab is currently active"
+        }
+      }
+    },
+    {
+      "id": "profile-tab",
+      "name": "ProfileTab",
+      "taxonomy": "primitive",
+      "description": "Navigation tab to profile with icon and label",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "props": {
+        "icon": {
+          "type": "ReactNode",
+          "required": true,
+          "description": "Icon component representing profile"
+        },
+        "label": {
+          "type": "string",
+          "required": true,
+          "description": "Tab label text"
+        },
+        "href": {
+          "type": "string",
+          "required": true,
+          "description": "URL path to navigate to"
+        },
+        "active": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether this tab is currently active"
+        }
+      }
+    }
+  ],
+  "generatedAt": "2025-01-10T18:45:00Z"
+}

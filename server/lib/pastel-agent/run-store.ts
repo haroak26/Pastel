@@ -25,7 +25,7 @@ interface RunEntry {
   runId: string;
   emitter: EventEmitter;
   events: PastelEvent[];
-  status: "running" | "done" | "error";
+  status: "running" | "done" | "done_needs_review" | "error";
   phase: string | null;
 }
 
@@ -97,7 +97,7 @@ export function emitEvent(runId: string, event: PastelEvent): void {
 export async function updateRun(
   runId: string,
   patch: Partial<{
-    status: "running" | "done" | "error";
+    status: "running" | "done" | "done_needs_review" | "error";
     phase: string | null;
     error: string | null;
     title: string | null;
@@ -176,7 +176,7 @@ export interface RunState {
   docs: AgentDocument[];
   files: AgentFile[];
   /** live in-memory status (more current than DB during a run) */
-  liveStatus: "running" | "done" | "error";
+  liveStatus: "running" | "done" | "done_needs_review" | "error";
   livePhase: string | null;
 }
 
