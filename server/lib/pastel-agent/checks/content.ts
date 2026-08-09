@@ -1,4 +1,3 @@
-import { baseComponentCode } from "../base-components/index";
 import type { MockDataset } from "../lib/content";
 import type { GateIssue } from "./audit";
 
@@ -93,10 +92,11 @@ const OUTLINE_OVERLOAD = 4;
 /** Domains where prices/currency/booking are legitimate product content. */
 const FINANCE_DOMAINS = new Set(["finance", "ecommerce", "travel", "rentals"]);
 
-function isMaterializedPrimitive(path: string, content: string): boolean {
-  const name = path.replace(/^src\/components\//, "").replace(/\.jsx$/, "");
-  const base = baseComponentCode(name);
-  return base !== null && content === base;
+/** V21: the base-component library is gone — nothing is "materialized from a
+ * base file" anymore. Kept as a no-op hook so the audit call sites stay
+ * stable; every component is builder-authored per run. */
+function isMaterializedPrimitive(_path: string, _content: string): boolean {
+  return false;
 }
 
 function isScreen(path: string): boolean {

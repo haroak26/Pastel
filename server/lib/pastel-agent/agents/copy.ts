@@ -134,7 +134,6 @@ export async function runCopy(input: CopyInput): Promise<CopyPlan> {
   const screensBlock = input.wireframe.screens
     .map((s) => `- ${s.id} (${s.archetype}): ${s.purpose}`)
     .join("\n");
-
   const system = `You are a senior product copywriter. Write specific, human, honest copy for a product's UI in the voice of the company design language provided.
 
 NEVER write AI-slop copy: no "Enterprise-grade security", no "Unlock your potential", no exclamation-mark hype, no alliteration chains. Write like a real product team: specific, calm, useful.
@@ -174,6 +173,25 @@ For each screen provide:
         maxTokens: MAX_TOKENS_PER_CALL.copy,
         validate: (v) => copyPlanSchema.parse(v),
         onUsage: input.onUsage,
+        // V19: never let a single malformed field nuke the whole copy plan.
+        // Salvage the raw output by dropping the offending per-screen fields
+        // and re-validating — only fall back to template if nothing survives.
+        onRawFailure: (raw) => {
+          const salvaged = salvageCopyPlan(raw);
+          if (salvaged) {
+            const { plan: clean, corrected } = sanitizeCopyPlan(salvaged, data);
+            input.onUsage?.({
+              role: "copy",
+              modelId: "salvage",
+              inputChars: raw.length,
+              outputChars: raw.length,
+              inputTokens: 0,
+              outputTokens: 0,
+              imageBlocks: 0,
+            });
+            salvagedPlan = { plan: clean, corrected };
+          }
+        },
       },
     );
     const { plan: clean, corrected } = sanitizeCopyPlan(plan, data);
@@ -183,6 +201,54 @@ For each screen provide:
     return clean;
   } catch (err) {
     console.warn("[pastel v6] copy failed, using template fallback:", err instanceof Error ? err.message : err);
+    if (salvagedPlan) {
+      console.warn(`[pastel v19] salvaged copy plan from raw output (${salvagedPlan.corrected.join(", ") || "fields dropped"})`);
+      return salvagedPlan.plan;
+    }
     return sanitizeCopyPlan(fallbackCopy(input.brief, input.wireframe, data), data).plan;
+  }
+}
+
+let salvagedPlan: { plan: CopyPlan; corrected: string[] } | null = null;
+
+/** V19: salvage a raw copy output that failed schema validation. Drops
+ * per-screen fields that don't fit the schema (e.g. statLabels as strings)
+ * so the model's voice survives instead of the whole plan reverting to
+ * template scaffolding. Returns null when nothing salvageable exists. */
+function salvageCopyPlan(raw: string): CopyPlan | null {
+  let json: unknown;
+  try {
+    json = JSON.parse(raw.replace(/^```(?:json)?\s*\n?/, "").replace(/\n?```\s*$/, ""));
+  } catch {
+    try {
+      const start = raw.indexOf("{");
+      const end = raw.lastIndexOf("}");
+      if (start === -1 || end === -1 || end <= start) return null;
+      json = JSON.parse(raw.slice(start, end + 1));
+    } catch {
+      return null;
+    }
+  }
+  const obj = json as { productTitle?: string; screens?: unknown[] };
+  if (typeof obj.productTitle !== "string" || !Array.isArray(obj.screens)) return null;
+
+  const screens = obj.screens.map((s) => {
+    const rawScreen = s as Record<string, unknown>;
+    const out: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(rawScreen)) {
+      if (k === "statLabels" && (!Array.isArray(v) || (v as unknown[]).some((x) => typeof x !== "object"))) continue;
+      if (k === "settingsSections" && !Array.isArray(v)) continue;
+      if (k === "tableColumns" && !Array.isArray(v)) continue;
+      if (k === "bullets" && !Array.isArray(v)) continue;
+      if (k === "detailFields" && !Array.isArray(v)) continue;
+      if (typeof v === "string" || typeof v === "number" || typeof v === "boolean" || v === null) out[k] = v;
+    }
+    return out;
+  });
+  try {
+    const raw = obj as { productTitle?: string; tagline?: string; screens?: unknown[] };
+    return copyPlanSchema.parse({ productTitle: raw.productTitle, tagline: raw.tagline, screens });
+  } catch {
+    return null;
   }
 }

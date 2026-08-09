@@ -363,7 +363,9 @@ async function getPlanTier(userId: string): Promise<PlanTier> {
  *   repair (cheap)  × bounded (≤2 rounds × a few files)
  */
 function estimateRunCredits(prompt: string): number {
-  const components = 6;
+  // V21: shell components (8) are planned deterministically and built cheap;
+  // only the 4-6 custom components run planner (cheap) + builderCustom (MID).
+  const customComponents = 5;
 
   const designCost = calcCost(MODELS.design, prompt.length + 5000, 3000);
   const briefCost = calcCost(MODELS.brief, prompt.length + 5000, 2500);
@@ -371,20 +373,24 @@ function estimateRunCredits(prompt: string): number {
   const wireframeCost = calcCost(MODELS.wireframe, prompt.length + 6000, 6000);
   const uxCost = calcCost(MODELS.wireframe, prompt.length + 4000, 4000);
   const plannerCost = calcCost(MODELS.planner, 3000, 1500);
-  const builderCost = calcCost(MODELS.builder, 4000, 3500);
+  const builderCustomCost = calcCost(MODELS.builderCustom, 4000, 6000);
+  const builderShellCost = calcCost(MODELS.builder, 4000, 2500);
   const copyCost = calcCost(MODELS.copy, prompt.length + 3000, 2000);
+  const composeCost = calcCost(MODELS.compose, 12000, 9000);
   const reviewCost = calcCost(MODELS.review, prompt.length + 6000, 2500);
   const visualCost = calcCost(MODELS.visualReview, prompt.length + 4000, 2500);
   const repairCost = calcCost(MODELS.repair, 5000, 3000);
 
-  // Planner + builder run PER component (that was the underestimate: they were
-  // added once instead of ×components). 4 repair calls = 2 bounded rounds × ~2
+  // V21 cost structure: planner only for custom components; custom components
+  // build on the MID tier; shell chrome builds cheap; two compose calls
+  // (the composer + retry budget); 4 repair calls = 2 bounded rounds × ~2
   // targeted files.
   const subtotal = [
     designCost, briefCost, dataCost, wireframeCost, uxCost,
-    copyCost, reviewCost,
+    copyCost, composeCost, reviewCost,
   ].reduce((s, c) => s + c.costDollars, 0)
-    + (plannerCost.costDollars + builderCost.costDollars) * components
+    + (plannerCost.costDollars + builderCustomCost.costDollars) * customComponents
+    + builderShellCost.costDollars * 8
     + repairCost.costDollars * 4;
 
   const totalDollars = (subtotal + visualCost.costDollars * 0.5) * 1.15 + 0.002;

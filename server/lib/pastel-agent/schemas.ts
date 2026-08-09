@@ -585,15 +585,21 @@ export type UxScreenDesign = z.infer<typeof uxScreenSchema>;
 export type UxSectionDesign = z.infer<typeof uxSectionSchema>;
 
 // ── Component inventory (wireframe output → planner input) ───────────────
+//
+// V21: the base-component library is GONE. Components are designed from the
+// Component Design Law (knowledge/component-law.ts) + the planner's spec —
+// there is no code anchor, so no two runs share a component skeleton.
 
 export const componentInventorySchema = z.object({
   version: z.literal("1.0.0"),
   components: z.array(z.object({
     name: z.string().trim().min(1),
     purpose: z.string().trim().min(1),
-    basedOn: z.string().trim().min(1),
+    /** Legacy field — unused since v21 (no base-component anchor). Kept
+     * optional so persisted runs and fixtures stay parseable. */
+    basedOn: z.string().trim().optional(),
     usedBy: z.array(z.string()).min(1),
-  })).min(6).max(8),
+  })).min(4).max(8),
 });
 
 export type ComponentInventory = z.infer<typeof componentInventorySchema>;
@@ -603,7 +609,8 @@ export type ComponentInventory = z.infer<typeof componentInventorySchema>;
 export const componentUISpecSchema = z.object({
   name: z.string().trim().min(1),
   purpose: z.string().trim().min(1),
-  basedOn: z.string().trim().min(1),
+  /** Legacy field — unused since v21 (no base-component anchor). */
+  basedOn: z.string().trim().optional(),
   /** Screen ids that mount this component (from the inventory). */
   usedBy: z.array(z.string()).optional(),
   props: z.array(z.object({
@@ -623,6 +630,50 @@ export const componentUISpecSchema = z.object({
 });
 
 export type ComponentUISpec = z.infer<typeof componentUISpecSchema>;
+
+// ── V21 layout plan (deterministic placement — the composer obeys it) ─────
+//
+// V20 let the composer invent placement, which produced sparse, unbalanced
+// screens. V21 derives a deterministic placement plan (lib/layout-plan.ts)
+// from the enforced wireframe + UX design + tokens. The composer must render
+// EXACTLY the planned sections, in order, with the planned widths and
+// headers — the layout gate (checks/layout.ts) verifies it.
+
+export const v21SectionSchema = z.object({
+  block: z.string(),
+  variant: z.string().optional(),
+  component: z.string().optional(),
+  /** Where the section sits inside the content frame. */
+  placement: z.enum(["full", "split-left", "split-right", "rail"]),
+  width: z.enum(["full", "content"]),
+  heightIntent: z.enum(["compact", "standard", "dominant"]),
+  surface: z.string().optional(),
+  /** Deterministic section header (eyebrow + title + optional action).
+   * Dominant moments have NO header — they are the statement. */
+  header: z.object({
+    eyebrow: z.string().optional(),
+    title: z.string(),
+    action: z.string().optional(),
+  }).optional(),
+  emphasis: z.boolean().optional(),
+});
+
+export const v21ScreenLayoutSchema = z.object({
+  screenId: z.string(),
+  frame: v17ColumnLayoutSchema,
+  contentMaxWidth: z.number().optional(),
+  sections: z.array(v21SectionSchema).min(1).max(6),
+});
+
+export const v21LayoutPlanSchema = z.object({
+  version: z.literal("1.0.0"),
+  screens: z.array(v21ScreenLayoutSchema).min(2).max(6),
+  rationale: z.string().max(300).optional(),
+});
+
+export type V21Section = z.infer<typeof v21SectionSchema>;
+export type V21ScreenLayout = z.infer<typeof v21ScreenLayoutSchema>;
+export type V21LayoutPlan = z.infer<typeof v21LayoutPlanSchema>;
 
 // ── Copy plan ────────────────────────────────────────────────────────────
 

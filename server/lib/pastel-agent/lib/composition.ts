@@ -118,21 +118,21 @@ export function surfaceCls(surface: CompositionSurface): string {
     case "hairline-section":
       return "border-b";
     case "inset-panel":
-      return "rounded-xl border bg-card px-6 py-5";
+      return "rounded-[var(--radius-lg)] border bg-card px-6 py-5";
     case "floating-action":
-      return "rounded-2xl bg-background shadow-md";
+      return "rounded-[var(--radius-lg)] bg-background shadow-md";
     case "accent-block":
-      return "bg-accent/10 rounded-2xl";
+      return "bg-accent/10 rounded-[var(--radius-lg)]";
     case "split-panel":
       return "";
     case "editorial-tile":
-      return "rounded-xl bg-muted/40 overflow-hidden";
+      return "rounded-[var(--radius-lg)] bg-muted/40 overflow-hidden";
     case "metric-cluster":
       return "";
     case "plain":
       return "";
     case "card":
-      return "rounded-xl border bg-card";
+      return "rounded-[var(--radius-lg)] border bg-card";
   }
 }
 

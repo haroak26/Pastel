@@ -545,7 +545,10 @@ async function runOnce(prompt: string, outDir: string): Promise<number> {
     const inventory = JSON.parse(inventoryDoc.content) as { components: Array<{ name: string; usedBy: string[] }> };
     inventoryMounted = inventory.components.length;
     const mounted = new Set(plan.screens.flatMap((s) => s.blocks.filter((b) => b.block === "custom" && b.component).map((b) => b.component as string)));
-    const unmounted = inventory.components.filter((c) => !mounted.has(c.name)).map((c) => c.name);
+    // V21: the 8 shell components are chrome — they mount through the
+    // deterministic shell, never through custom blocks. Exclude them.
+    const SHELL = new Set(["Topbar", "Sidebar", "Button", "Avatar", "Badge", "Input", "Select", "Separator"]);
+    const unmounted = inventory.components.filter((c) => !SHELL.has(c.name) && !mounted.has(c.name)).map((c) => c.name);
     mountClean = unmounted.length === 0 && inventory.components.length >= 1;
     mountDetail = unmounted.length === 0
       ? `${inventory.components.length} components, all mounted`
@@ -583,8 +586,11 @@ async function runOnce(prompt: string, outDir: string): Promise<number> {
   }
 
   // V8: builder must stay on the cheap model (never minimax/mid for bulk work).
-  const { MODELS, CHEAP_DEFAULT } = await import("../server/lib/pastel-agent/gateway");
+  // V21: shell chrome stays cheap; CUSTOM components are designed on the MID
+  // tier (builderCustom) — they ARE the visible design surface.
+  const { MODELS, CHEAP_DEFAULT, MID_DEFAULT } = await import("../server/lib/pastel-agent/gateway");
   const builderOnCheap = MODELS.builder === CHEAP_DEFAULT;
+  const customBuilderOnMid = MODELS.builderCustom === MID_DEFAULT;
 
   // ── V9: two-screen canonical model + layout discipline ──────────────────
   const canonicalIds = ["home", "detail"];
@@ -624,9 +630,16 @@ async function runOnce(prompt: string, outDir: string): Promise<number> {
   // workspace, feed) it's a scoreboard — giant tabular numbers marked by
   // display-scale type. The hero patterns below cover browse products; the
   // scoreboard checks cover v18's mode-led dominant moments.
-  const homeHasMoment = /text-4xl font-black/.test(homeSrc) || /lg:col-span-2/.test(homeSrc) || /text-4xl sm:text-5xl font-black/.test(homeSrc) || /text-4xl font-semibold/.test(homeSrc) || /text-4xl font-bold/.test(homeSrc) || /text-5xl font-black/.test(homeSrc) || (/font-black tracking-tight tabular-nums/.test(homeSrc) && /text-5xl/.test(homeSrc));
+  const homeHasMoment = /text-4xl font-black/.test(homeSrc) || /lg:col-span-2/.test(homeSrc) || /text-4xl sm:text-5xl font-black/.test(homeSrc) || /text-4xl font-semibold/.test(homeSrc) || /text-4xl font-bold/.test(homeSrc) || /text-5xl font-black/.test(homeSrc) || (/font-black tracking-tight tabular-nums/.test(homeSrc) && /text-5xl/.test(homeSrc)) || /text-3xl font-semibold tabular-nums/.test(homeSrc);
   const homeHasSearch = /<Select/.test(homeSrc) && /placeholder=/.test(homeSrc);
   const homeHasGrid = /DATA\.screens\.home\.rows\.slice\(0, 6\)/.test(homeSrc) && /<Card\b/.test(homeSrc);
+  // V21: every non-dominant section opens with the deterministic SectionHeader.
+  const homeHeaders = (homeSrc.match(/<SectionHeader\b/g) ?? []).length;
+  const detailHeaders = (detailSrc.match(/<SectionHeader\b/g) ?? []).length;
+  // V21: the section budget — home ≤ 5 <section> wrappers, detail ≤ 4.
+  const homeSections = (homeSrc.match(/<section\b/g) ?? []).length;
+  const detailSections = (detailSrc.match(/<section\b/g) ?? []).length;
+  const homeBudgetClean = homeSections <= 5 && detailSections <= 4;
   // V18: browse products require search + grid; non-browse (dashboard/workspace/feed)
   // only need a dominant moment (scoreboard, feed, etc.) — no hero, no search.
   const homeIsCatalog = briefIsCatalog ? (homeHasMoment && homeHasSearch && homeHasGrid) : homeHasMoment;
@@ -711,6 +724,9 @@ async function runOnce(prompt: string, outDir: string): Promise<number> {
     [twoScreensClean, `screens are the canonical pair: ${screens.join(", ")}`],
     [homeIsCatalog, `home leads its primary workflow: moment${briefIsCatalog ? " + search + grid" : " (product-led, no forced browse)"} (${homeHasMoment}/${homeHasSearch}/${homeHasGrid})`],
     [detailIsInfoPage, `detail is the focused secondary workflow: summary + action${detailIsMediaRich ? " + gallery" : ""}${detailWantsSocial ? " + reviews" : ""} (${detailHasGallery}/${detailHasSummary}/${detailHasAction}/${detailHasReviews})`],
+    [homeHeaders >= 1, `SectionHeader present on home (${homeHeaders})`],
+    [detailHeaders >= 1, `SectionHeader present on detail (${detailHeaders})`],
+    [homeBudgetClean, `section budget: home ${homeSections} ≤ 5, detail ${detailSections} ≤ 4`],
     [!bookingLeak, `no booking language outside transact/stay products (mode=${briefMode ?? "track"})`],
     [cardsClean, `card budgets respected: home ${homeCards} ≤ ${ROLE_CARD_BUDGET.home}, detail ${detailCards} ≤ ${ROLE_CARD_BUDGET.detail}`],
     [outlinesClean, `no outline-button stacks: home ${homeOutlines}, detail ${detailOutlines} (≤ 2 each)`],
@@ -720,15 +736,16 @@ async function runOnce(prompt: string, outDir: string): Promise<number> {
     [deltasClean, `no broken "+-" delta strings in rendered screens`],
     [blanksClean, `no blank sections in rendered screens`],
     [zeroTilesClean, `no hardcoded zero tiles in screens or components (${zeroTilesClean ? "clean" : "FOUND"})`],
-    [mountClean && inventoryMounted >= 0, `every inventory component mounted by a custom block (${mountDetail})`],
+    [mountClean && inventoryMounted >= 0, `every custom inventory component mounted by a custom block (${mountDetail})`],
     [unitsClean, `stat label units match their metrics (${unitsDetail})`],
-    [builderOnCheap, `builder model is the cheap stack (${MODELS.builder})`],
+    [builderOnCheap, `shell builder model is the cheap stack (${MODELS.builder})`],
+    [customBuilderOnMid, `custom component builder is the mid tier (${MODELS.builderCustom})`],
     [dataClean, `catalog rows unique + semantic detail pairs (${dataDetail})`],
     [summaryClean, `item-derived booking summary (${summaryDetail})`],
     [singleCtaClean, `single conversion point (${singleCtaDetail})`],
     [labelsClean, `visible input labels on home (${labelsDetail})`],
     [quality?.score != null && quality.score >= 30, `review score >= 30 (got ${quality?.score ?? "n/a"})`],
-    [(costs?.totalCredits ?? 99) < 35, `cost under 35 credits (got ${costs?.totalCredits ?? "n/a"})`],
+    [(costs?.totalCredits ?? 99) < 50, `cost under 50 credits (got ${costs?.totalCredits ?? "n/a"})`],
     [!errorEvent, "no pipeline error event"],
   ];
   const failed = checks.filter(([, ok]) => !ok);

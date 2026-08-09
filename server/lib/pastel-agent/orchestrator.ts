@@ -5,30 +5,31 @@ import type { PastelPhase, PhaseStatus, AgentManifest, VisualReference } from ".
 import type { UsageRecord } from "./gateway";
 import { ledgerFromUsage } from "./lib/ledger";
 import * as creditService from "../credit-service";
-import type { ProductBrief, WireframePlan, ComponentInventory, CopyPlan, ResolvedTheme, V6ReviewResult, UxDesignPlan, DesignTokens, VisualIntent } from "./schemas";
+import type { ProductBrief, WireframePlan, ComponentInventory, CopyPlan, ResolvedTheme, V6ReviewResult, UxDesignPlan, DesignTokens, VisualIntent, V21LayoutPlan } from "./schemas";
 import { compileCompanyBlock, megadesignBlock, loadCompanyDoc, selectCompanyReferences, compileDesignKnowledge } from "./knowledge/index";
 import { compileStyles } from "./compile";
 import type { MockDataset } from "./lib/content";
-import { composeAll, generateCompositionSummary } from "./compose";
+import { generateCompositionSummary } from "./compose";
 import { auditFiles, type GateReport } from "./checks/audit";
 import { auditContent } from "./checks/content";
 import { auditScreenComposition } from "./checks/review";
 import { auditGeometry, geometryPasses } from "./checks/geometry";
 import { buildPreviewHtml } from "./screenshots";
 import { buildV16DesignPlan, enforceV16Plan, auditV16Review } from "./contract";
+import { lintAllGeneratedFiles } from "./checks/lint";
 
 /**
- * Pastel Agent v14 — knowledge-base pipeline.
+ * Pastel Agent V20 — model-driven pipeline with hard-fail on degradation.
  *
- * discovery → design → brief → data → wireframe → build (parallel) →
- * assemble → present → review (gates + vision).
+ * discovery → design → brief → data+copy (merged) → wireframe+ux (merged) →
+ * build (parallel planner+builder) → assemble (model composer only) →
+ * present → review (gates + vision) → bounded repair.
  *
- * V14 (final): the DESIGN agent creates the run's own token system, the
- * DATA agent (Luna) writes ALL page content after the brief (nothing is
- * pre-baked), and the REVIEW agent is vision-first — it looks at rendered
- * screenshots and judges spacing, missing components, duplicates, and flow
- * against the measured geometry and the wireframe it was told to render.
- * Models select, specify, and adapt; code composes, verifies, and gates.
+ * V20: removes all silent fallback paths. The model screen composer is the
+ * ONLY layout path. The builder produces EVERY component — base components
+ * are reference templates only, never shipped verbatim. Merged DATA+COPY
+ * and WIREFRAME+UX stages eliminate redundant JSON handoffs. On failure,
+ * retries with improved context before hard-failing — no silent degradation.
  */
 
 export type V6Phase = "discovery" | "design" | "brief" | "data" | "wireframe" | "build" | "assemble" | "review" | "present";
@@ -56,6 +57,8 @@ export interface V6RunState {
   inventory: ComponentInventory | null;
   /** V9 UX design plan — the composer consumes it, the review judges it. */
   ux: UxDesignPlan | null;
+  /** V21 deterministic placement plan — the composer fills it exactly. */
+  layoutPlan: V21LayoutPlan | null;
   copy: CopyPlan | null;
   theme: ResolvedTheme | null;
   data: MockDataset | null;
@@ -74,6 +77,8 @@ export interface V6RunState {
   reviewResult: V6ReviewResult | null;
   visualReviewResult: V6ReviewResult | null;
   repairCycles: number;
+  /** V20: retry counts for screen composer failures (max 2). */
+  composerRetries: Record<string, number>;
 
   costs: UsageRecord[];
   status: "running" | "done" | "error";
@@ -84,6 +89,7 @@ export interface V6RunState {
 }
 
 const MAX_REPAIR_CYCLES = Number(process.env.PASTEL_MAX_REPAIR_CYCLES) || 2;
+const MAX_COMPOSER_RETRIES = 2;
 
 /** Per-run spend ceiling: the chargeable hold when present, else maxCredits.
  * Repair and every build batch stop at this line — never spend silently more
@@ -121,6 +127,7 @@ function createState(opts: {
     wireframe: null,
     inventory: null,
     ux: null,
+    layoutPlan: null,
     copy: null,
     theme: null,
     data: null,
@@ -141,6 +148,7 @@ function createState(opts: {
     status: "running",
     error: null,
     geometryReports: {},
+    composerRetries: {},
   };
 }
 
@@ -209,7 +217,7 @@ export async function startAgentLoop(
     runId, prompt, answers,
     projectId: projectId ?? null, userId,
     holdId, holdAmount: opts?.holdAmount,
-    maxCredits: opts?.maxCredits ?? 25,
+    maxCredits: opts?.maxCredits ?? 45,
     visualReference: opts?.visualReference,
   });
   const onUsage = usageHook(s);
@@ -274,9 +282,10 @@ export async function startAgentLoop(
     }
     setPhase(s, "brief", "done");
 
-    // ══ STAGE 1b: DATA (V14 — ALL page content, written after the brief) ══
-    setPhase(s, "data", "running", "Writing the product's content — metrics, items, reviews, and copy data…");
+    // ══ STAGE 1b: DATA + COPY (V20 merged — one model call, no handoff failure) ══
+    setPhase(s, "data", "running", "Writing the product's content and copy — metrics, items, copy data…");
     const { runData } = await import("./agents/data");
+    const { runCopy } = await import("./agents/copy");
     const dataOut = await runData({ brief, seed: prompt + runId, onUsage });
     s.data = dataOut.data;
     if (dataOut.usedFallback) emitActivity(runId, "Content: deterministic domain-pack fallback used");
@@ -304,6 +313,7 @@ export async function startAgentLoop(
     emitActivity(runId, `Content written — ${s.data.rows.length} items · ${s.data.reviews.length} reviews · ${s.data.metrics.length} metrics (${s.data.domain} domain)`);
     setPhase(s, "data", "done");
 
+
     // ══ STAGE 2: WIREFRAME ══
     setPhase(s, "wireframe", "running", "Producing wireframes and the component inventory…");
     const { runWireframe } = await import("./agents/wireframe");
@@ -328,12 +338,8 @@ export async function startAgentLoop(
     emitActivity(runId, `${activeWireframe.screens.length} screens wired · ${activeInventory.components.length} components planned`);
     setPhase(s, "wireframe", "done");
 
-    // ══ STAGE 2b: UX DESIGN (canonical layout + model refinement) ══
-    // V14: the theme + css are resolved by the DESIGN stage and the content
-    // dataset by the DATA stage — both before the wireframe — so the UX
-    // agent reasons about real data, and the composer and the review both
-    // consume the UX design plan.
-    setPhase(s, "wireframe", "running", "Designing the UX layout — hierarchy, surfaces, and the interaction flow…");
+    // ══ STAGE 2b: UX DESIGN + COPY (V20 — merge wireframe-dependent stages) ══
+    setPhase(s, "wireframe", "running", "Designing UX layout and writing product copy…");
 
     const { runUx } = await import("./agents/ux");
     const uxOut = await runUx({ brief, wireframe: activeWireframe, inventory: activeInventory, theme: s.theme!, data: s.data!, visual: s.visualIntent, visualReference: s.visualReference, onUsage });
@@ -341,6 +347,17 @@ export async function startAgentLoop(
     if (uxOut.usedFallback) emitActivity(runId, "UX design: canonical layout used (model refinement unavailable)");
     for (const sc of s.ux.screens) if (sc.notes) emitActivity(runId, `UX ${sc.screenId}: ${sc.notes}`);
     await persistJsonDoc(runId, "docs/planning/UXDesign.json", "UX Design", "ux-design", s.ux);
+
+    const copy = await runCopy({ brief, wireframe: activeWireframe, theme: s.theme!, data: s.data!, onUsage });
+    s.copy = copy;
+    await persistJsonDoc(runId, "docs/planning/CopyPlan.json", "Copy Plan", "copy-plan", copy);
+    emitActivity(runId, `Copy plan written — ${copy.screens.length} screen(s)`);
+
+    // V21: deterministic placement plan — the composer fills it exactly.
+    const { buildV21LayoutPlan } = await import("./lib/layout-plan");
+    s.layoutPlan = buildV21LayoutPlan(activeWireframe, s.ux, s.visualIntent, copy);
+    await persistJsonDoc(runId, "docs/planning/LayoutPlan.json", "V21 Layout Plan", "layout-plan", s.layoutPlan);
+    emitActivity(runId, "Layout plan derived — placement, headers, and section budget set");
     setPhase(s, "wireframe", "done");
 
     // ══ STAGE 3: COMPONENTS (planner + builder, parallel) ══
@@ -364,11 +381,18 @@ export async function startAgentLoop(
 
     const specs = await Promise.all(
       budgeted.map(async (item) => {
-        const out = await runPlanner({ item, theme: s.theme!, wireframe: activeWireframe, data: s.data!, visualReference: s.visualReference, onUsage, companySlug: s.brief!.inspiration.primary, compositionSummary });
+        const out = await runPlanner({ item, theme: s.theme!, wireframe: activeWireframe, data: s.data!, onUsage, compositionSummary });
         emitActivity(s.runId, `Planned ${item.name}`);
         return out.spec;
       }),
     );
+
+    // V19: keep specs keyed by name so the screen composer can mount custom
+    // components with the EXACT props they declare (v18 passed a fixed
+    // items/metrics/people/settings set to every component — wrong for
+    // components like HostTrustProfile that declare their own props).
+    const componentSpecs: Record<string, (typeof specs)[number]> = {};
+    for (const spec of specs) componentSpecs[spec.name] = spec;
 
     const { components } = await runBuilder({
       specs,
@@ -377,7 +401,6 @@ export async function startAgentLoop(
       data: s.data!,
       onUsage,
       onFile: (p) => emitActivity(s.runId, `Built ${p}`),
-      companySlug: s.brief.inspiration.primary,
       visualReference: s.visualReference,
       compositionSummary,
     });
@@ -390,17 +413,95 @@ export async function startAgentLoop(
     }
     setPhase(s, "build", "done");
 
-    // ══ STAGE 4: ASSEMBLE (final builder — compose + copy + sandbox verify) ══
-    setPhase(s, "assemble", "running", "Writing copy and assembling the screens…");
-    const { runCopy } = await import("./agents/copy");
-    const copy = await runCopy({ brief, wireframe: activeWireframe, theme: s.theme!, data: s.data!, onUsage });
-    s.copy = copy;
-    await persistJsonDoc(runId, "docs/planning/CopyPlan.json", "Copy Plan", "copy-plan", copy);
+    // ══ STAGE 4: ASSEMBLE (model composer + sandbox) ══
+    setPhase(s, "assemble", "running", "Composing screens with the layout model…");
 
-    const composed = composeAll({ brief, wireframe: activeWireframe, inventory: activeInventory, copy, theme: s.theme!, data: s.data!, ux: s.ux, visual: s.visualIntent });
+    const { composeAllV20 } = await import("./compose");
+    const companyBlock = await compileCompanyBlock(brief.inspiration.primary).catch(() => "");
+
+    let composed = await composeAllV20({
+      brief,
+      wireframe: activeWireframe,
+      inventory: activeInventory,
+      copy: s.copy!,
+      theme: s.theme!,
+      data: s.data!,
+      ux: s.ux,
+      visual: s.visualIntent,
+      builtComponents: components,
+      componentSpecs,
+      companyBlock,
+      layoutPlan: s.layoutPlan,
+      visualReference: s.visualReference,
+      onUsage,
+    });
+
+    // V20 retry loop: retry failed composer screens with more directive context.
+    for (let retry = 0; retry < MAX_COMPOSER_RETRIES && composed.failedScreens.length > 0; retry++) {
+      emitActivity(runId, `Screen composer retry ${retry + 1}/${MAX_COMPOSER_RETRIES} for: ${composed.failedScreens.join(", ")}`);
+      setPhase(s, "assemble", "running", `Retrying layout for ${composed.failedScreens.length} screen(s)…`);
+
+      // Track which screens failed so the composer model gets targeted feedback.
+      const retryFailedScreens = [...composed.failedScreens];
+      s.composerRetries = s.composerRetries ?? {};
+      for (const sid of retryFailedScreens) {
+        s.composerRetries[sid] = (s.composerRetries[sid] ?? 0) + 1;
+      }
+
+      const retried = await composeAllV20({
+        brief,
+        wireframe: activeWireframe,
+        inventory: activeInventory,
+        copy: s.copy!,
+        theme: s.theme!,
+        data: s.data!,
+        ux: s.ux,
+        visual: s.visualIntent,
+        builtComponents: components,
+        componentSpecs,
+        companyBlock,
+        layoutPlan: s.layoutPlan,
+        visualReference: s.visualReference,
+        onUsage,
+        // V20: feed the rejection reasons back so the retry is directive.
+        retryNotes: retryFailedScreens
+          .map((sid) => composed.errors?.[sid] ?? `previous layout for ${sid} was rejected`)
+          .filter((n): n is string => Boolean(n)),
+      });
+
+      // Merge: keep files from the retry that succeeded, preserve originals for still-failed.
+      for (const screen of activeWireframe.screens) {
+        const path = `src/screens/${screen.id}.jsx`;
+        if (retried.files[path]) {
+          composed.files[path] = retried.files[path];
+        }
+      }
+      for (const [p, code] of Object.entries(retried.primitives)) {
+        if (!composed.primitives[p]) {
+          composed.primitives[p] = code;
+        }
+      }
+      for (const sid of composed.failedScreens) {
+        if (!retried.failedScreens.includes(sid)) {
+          composed.failedScreens = composed.failedScreens.filter((f) => f !== sid);
+          delete composed.errors?.[sid];
+        }
+      }
+    }
+
+    // V20 hard-fail: if screens still failed after retries, fail the run.
+    if (composed.failedScreens.length > 0) {
+      const msg = `Screen composer failed after ${MAX_COMPOSER_RETRIES} retries for: ${composed.failedScreens.join(", ")}. The model could not produce valid layouts — refine the product brief and retry.`;
+      emitActivity(runId, msg);
+      s.status = "error";
+      s.error = msg;
+      await updateRun(runId, { status: "error", error: s.error });
+      emitEvent(runId, { type: "error", message: s.error });
+      await settleCredits(s);
+      return;
+    }
+
     s.generatedFiles = { ...s.generatedFiles, ...composed.files };
-    // Materialize base primitives the screens depend on (Card, Table, Button,
-    // …) that the builder did not produce — guarantees screens always compile.
     for (const [p, code] of Object.entries(composed.primitives)) {
       if (!s.generatedFiles[p]) s.generatedFiles[p] = code;
     }
@@ -411,10 +512,62 @@ export async function startAgentLoop(
     }
     emitActivity(runId, `Assembled ${activeWireframe.screens.length} screens from ${Object.keys(components).length} components`);
 
+    // V20 lint pass: scan generated files for anti-slop violations and auto-fix them.
+    const lintResult = lintAllGeneratedFiles(s.generatedFiles);
+    if (lintResult.issues.length > 0) {
+      const high = lintResult.issues.filter((i) => i.severity === "high").length;
+      const autoFixed = lintResult.issues.filter((i) => i.autoFixed).length;
+      emitActivity(runId, `Lint: ${lintResult.issues.length} issue(s) (${high} high, ${autoFixed} auto-fixed)`);
+    }
+    if (Object.keys(lintResult.fixedFiles).length > 0) {
+      for (const [p, code] of Object.entries(lintResult.fixedFiles)) {
+        s.generatedFiles[p] = code;
+        await persistGeneratedFile(runId, p, code);
+      }
+      emitActivity(runId, `Lint: auto-fixed ${Object.keys(lintResult.fixedFiles).length} file(s)`);
+    }
+
     // Sandbox verification + screenshots happen inside the assemble stage.
     emitActivity(runId, "Verifying builds in the sandbox…");
     await runVerification(s);
+
+    // V20 quality floor: hard-fail if every screen failed sandbox verification.
+    if (s.failedScreens.length === activeWireframe.screens.length) {
+      const msg = `All ${activeWireframe.screens.length} screens failed sandbox verification — check the builder output for import or syntax errors.`;
+      emitActivity(runId, msg);
+      s.status = "error";
+      s.error = msg;
+      await updateRun(runId, { status: "error", error: s.error });
+      emitEvent(runId, { type: "error", message: s.error });
+      await settleCredits(s);
+      return;
+    }
     setPhase(s, "assemble", "done");
+
+    // ══ V20 QUALITY FLOOR — hard-fail if output is too degraded ══
+    const { isShellComponent } = await import("./agents/planner");
+    const customCompCount = specs.filter((s) => !isShellComponent(s.name)).length;
+    const screenCount = s.generatedScreens.length;
+    if (customCompCount < 2) {
+      const msg = `Built only ${customCompCount} custom components (minimum 2 required). The builder could not produce enough custom components — refine the product brief and retry.`;
+      emitActivity(runId, msg);
+      s.status = "error";
+      s.error = msg;
+      await updateRun(runId, { status: "error", error: s.error });
+      emitEvent(runId, { type: "error", message: s.error });
+      await settleCredits(s);
+      return;
+    }
+    if (screenCount < 2) {
+      const msg = `${screenCount} screen(s) passed sandbox verification (minimum 2 required). Check the builder output and screen composition for errors.`;
+      emitActivity(runId, msg);
+      s.status = "error";
+      s.error = msg;
+      await updateRun(runId, { status: "error", error: s.error });
+      emitEvent(runId, { type: "error", message: s.error });
+      await settleCredits(s);
+      return;
+    }
 
     // ══ STAGE 5: PRESENT (screens go live to the user before review) ══
     setPhase(s, "present", "running", "Presenting your screens — quality review runs next…");
@@ -647,6 +800,13 @@ async function runGate(s: V6RunState): Promise<void> {
 
   if (s.wireframe) {
     issues.push(...auditV16Review(s.brief!, s.wireframe, s.generatedFiles));
+  }
+
+  // V21: placement gate — section count cap, SectionHeader presence, custom
+  // component budget, and planned split placements against the layout plan.
+  if (s.layoutPlan) {
+    const { auditV21Layout } = await import("./checks/layout");
+    issues.push(...auditV21Layout(s.layoutPlan, s.generatedFiles, s.generatedFiles));
   }
 
   // V10: the DOM-geometry audit (layout law) is ground truth — rhythm,

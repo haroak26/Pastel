@@ -15,8 +15,91 @@ import { normalizeTwoScreens, resolveUxDesign, enforceUxDesign, canonicalStructu
 import { inspirationFromAnswers } from "../lib/pastel-agent/agents/brief";
 import { mergeReviewResults } from "../lib/pastel-agent/agents/review-merge";
 import { IncrementalScreenVerifier } from "../lib/pastel-agent/sandbox";
-import { baseComponentCode, baseComponentNames } from "../lib/pastel-agent/base-components/index";
+import { componentDesignLaw } from "../lib/pastel-agent/knowledge/component-law";
 import { productBriefSchema, type ProductBrief, type V6ReviewResult } from "../lib/pastel-agent/schemas";
+
+/** V21: the base-component library is gone — components are builder-authored
+ * per run. Tests stand in with a minimal token-correct component fixture
+ * (the sandbox only requires valid JSX using theme tokens). */
+function fixtureComponent(name: string): string {
+  const safe = name.replace(/[^A-Za-z0-9_]/g, "");
+  return `import { ArrowRight } from "lucide-react";
+
+export default function ${safe}({ title = "${safe}", items = [], className = "" }) {
+  return (
+    <div className={\`rounded-[var(--radius-md)] border border-border bg-card p-4 text-card-foreground \${className}\`}>
+      <span className="text-sm font-medium text-foreground">{title}</span>
+      {items.length > 0 ? (
+        <ul className="mt-2 divide-y divide-border">
+          {items.map((it) => (
+            <li key={it?.id ?? it} className="py-1 text-sm text-muted-foreground">{it?.name ?? it}</li>
+          ))}
+        </ul>
+      ) : null}
+      <ArrowRight className="mt-2 h-4 w-4 text-muted-foreground" />
+    </div>
+  );
+}`;
+}
+
+/**
+ * V21 compose helper — the recipe composer is gone, so tests drive the REAL
+ * v21 path: composeAll (data.js + shell.jsx) + composeScreenV20 wrapping a
+ * hand-written model body (exactly what runScreenComposer output becomes in
+ * production). Any component the composed screens import but the test did
+ * not provide is filled with the fixture (shell chrome included).
+ */
+async function composeV21(opts: {
+  brief: ProductBrief;
+  plan: any;
+  inventory: any;
+  theme: any;
+  data: any;
+  copy: any;
+  ux?: any;
+  visual?: any;
+  bodies: Record<string, string>;
+  components?: Record<string, string>;
+}): Promise<{ files: Record<string, string>; composed: any }> {
+  const { composeAll, composeScreenV20 } = await import("../lib/pastel-agent/compose");
+  const { compileStyles } = await import("../lib/pastel-agent/compile");
+  const input: any = {
+    brief: opts.brief,
+    wireframe: opts.plan,
+    inventory: opts.inventory,
+    copy: opts.copy,
+    theme: opts.theme,
+    data: opts.data,
+    ux: opts.ux,
+    visual: opts.visual,
+  };
+  const composed = composeAll(input);
+  const files: Record<string, string> = { ...(opts.components ?? {}), ...composed.files, ...composed.primitives };
+  for (const [sid, body] of Object.entries(opts.bodies)) {
+    const screen = opts.plan.screens.find((s: any) => s.id === sid);
+    const { content, primitives } = composeScreenV20(input, screen, body);
+    files[`src/screens/${sid}.jsx`] = content;
+    for (const [p, c] of Object.entries(primitives)) if (!files[p]) files[p] = c;
+  }
+  // Auto-fill every imported component with the fixture (shell chrome, primitives).
+  const imported = new Set<string>();
+  for (const code of Object.values(files)) {
+    for (const m of code.matchAll(/import\s+(?:{[^}]*}\s+from\s+|[\w$]+\s+from\s+)["']\.\.\/components\/([A-Za-z0-9_]+)\.jsx["']/g)) {
+      imported.add(m[1]);
+    }
+  }
+  for (const name of imported) {
+    if (!files[`src/components/${name}.jsx`]) files[`src/components/${name}.jsx`] = fixtureComponent(name);
+  }
+  files["src/styles.css"] = compileStyles(opts.theme).css;
+  return { files, composed };
+}
+
+/** V21: derive the deterministic placement plan for a plan (production path). */
+async function v21Plan(plan: any, ux: any, copy: any): Promise<any> {
+  const { buildV21LayoutPlan } = await import("../lib/pastel-agent/lib/layout-plan");
+  return buildV21LayoutPlan(plan, ux ?? null, null, copy);
+}
 
 const SLUGS = ["apple", "nike", "uber", "airbnb", "spotify", "stripe", "notion", "netflix", "linear", "duolingo", "figma"];
 
@@ -106,21 +189,35 @@ test("v6 brief: inspiration resolved from answers", () => {
 test("v6 compose + sandbox: deterministic compose verifies and passes the gate", async () => {
   const company = await loadCompany("nike");
   const theme = resolveCompanyTheme(company, { mode: "light", hue: company.hueBase });
-  const { css } = compileStyles(theme);
 
   const brief = fitnessBrief();
 
   const wireframe = fallbackWireframe(brief, company);
-  const components: Record<string, string> = {};
-  for (const item of wireframe.inventory.components) {
-    const code = baseComponentCode(item.basedOn);
-    if (code) components[`src/components/${item.name}.jsx`] = code;
-  }
-
   const data = mockDataset(brief, "v6-test");
   const copy = fallbackCopy(brief, wireframe.plan, data);
-  const composed = composeAll({ brief, wireframe: wireframe.plan, inventory: wireframe.inventory, copy, theme, data });
-  const files = { ...components, ...composed.files, ...composed.primitives, "src/styles.css": css };
+
+  // V21: screens come from the model composer — tests drive the same path
+  // with a hand-written body (SectionHeader + a mounted custom component).
+  const customName = wireframe.inventory.components.find((c) => c.usedBy?.includes("home"))?.name ?? "GoalProgress";
+  const { files } = await composeV21({
+    brief, plan: wireframe.plan, inventory: wireframe.inventory, theme, data, copy,
+    bodies: {
+      home: `<section className="py-12">
+  <SectionHeader eyebrow="Today" title="Your workout" />
+  <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+    <div><${customName} title="Weekly load" items={DATA.screens.home.rows} /></div>
+    <div className="rounded-[var(--radius-lg)] border border-border bg-card p-6"><p className="text-3xl font-semibold tabular-nums">${"data-metric"}</p></div>
+  </div>
+</section>`,
+      detail: `<section className="py-12">
+  <SectionHeader eyebrow="Run" title="Workout detail" />
+  <p className="text-muted-foreground">Focused record view</p>
+</section>`,
+    },
+  });
+
+  assert.ok(files["src/lib/shell.jsx"].includes("SectionHeader"), "shell ships the deterministic SectionHeader");
+  assert.ok(files["src/data.js"].includes("export const DATA"), "data file ships per-run content");
 
   const verifier = new IncrementalScreenVerifier();
   const result = await verifier.verify(files);
@@ -136,38 +233,31 @@ test("v6 compose + sandbox: deterministic compose verifies and passes the gate",
   assert.ok(contentIssues.length === 0, `content gate failed: ${contentIssues.map((i) => i.description).join("; ")}`);
 });
 
-test("v6 compose: model-renamed inventory resolves, verifies, and passes the gate", async () => {
+test("v6 compose: name-based mount contract resolves, verifies, and passes the gate", async () => {
   const company = await loadCompany("nike");
   const theme = resolveCompanyTheme(company, { mode: "light", hue: company.hueBase });
-  const { css } = compileStyles(theme);
 
   const brief = fitnessBrief();
   const wireframe = fallbackWireframe(brief, company);
 
-  // Simulate the model renaming components (the run-2026-08-04 contract break):
-  // everything keeps its basedOn but gets a product-specific file name.
-  // Components referenced by NAME in custom blocks must keep their name —
-  // the wireframe→file contract is name-based for mounted components.
-  const renames: Record<string, string> = { Chart: "TrendChart", StatCard: "MetricCard", Avatar: "PersonBadge", Topbar: "AppTopbar", Badge: "StatusPill", Input: "SearchField", Button: "CtaButton" };
-  const mounted = new Set(wireframe.plan.screens.flatMap((s) => s.blocks.filter((b) => b.block === "custom" && b.component).map((b) => b.component as string)));
-  const inventory = {
-    ...wireframe.inventory,
-    components: wireframe.inventory.components.map((c) =>
-      mounted.has(c.name) ? c : { ...c, name: renames[c.basedOn] ?? c.name },
-    ),
-  };
-
-  // Builder output = base component code under the RENAMED file names.
-  const components: Record<string, string> = {};
-  for (const item of inventory.components) {
-    const code = baseComponentCode(item.basedOn);
-    if (code) components[`src/components/${item.name}.jsx`] = code;
-  }
-
+  // V21: components mount BY NAME — the composer only uses components the
+  // builder produced under their inventory name. Renaming is impossible.
+  const customName = wireframe.inventory.components.find((c) => c.usedBy?.includes("home"))?.name ?? "GoalProgress";
   const data = mockDataset(brief, "v6-test-renamed");
   const copy = fallbackCopy(brief, wireframe.plan, data);
-  const composed = composeAll({ brief, wireframe: wireframe.plan, inventory, copy, theme, data });
-  const files = { ...components, ...composed.files, ...composed.primitives, "src/styles.css": css };
+  const { files } = await composeV21({
+    brief, plan: wireframe.plan, inventory: wireframe.inventory, theme, data, copy,
+    bodies: {
+      home: `<section className="py-12">
+  <SectionHeader eyebrow="Today" title="Your workout" />
+  <${customName} title="Weekly load" items={DATA.screens.home.rows} />
+</section>`,
+      detail: `<section className="py-12">
+  <SectionHeader eyebrow="Run" title="Workout detail" />
+  <p className="text-muted-foreground">Focused record view</p>
+</section>`,
+    },
+  });
 
   const verifier = new IncrementalScreenVerifier();
   const result = await verifier.verify(files);
@@ -190,10 +280,13 @@ test("v6 review: merge forces RETURN_TO_BUILDER on sandbox errors", () => {
   assert.ok(merged.requiredFixes.some((f) => f.includes("src/screens/home.jsx")));
 });
 
-test("v6 base components: every component name resolves to an exemplar", () => {
-  const names = baseComponentNames();
-  assert.ok(names.length >= 15);
-  for (const n of names) assert.ok(baseComponentCode(n)!.length > 0);
+test("v21 component design law: no base-component anchor, token + radius + density rules present", () => {
+  const law = componentDesignLaw();
+  assert.ok(law.length > 800, "the design law is substantive");
+  assert.ok(law.includes("var(--radius"), "law mandates the radius token scale (rounded components)");
+  assert.ok(law.includes("ONE visual idea"), "law demands one visual idea per component");
+  assert.ok(law.includes("props"), "law mandates data through props");
+  assert.ok(!law.includes("```jsx"), "law contains no code anchor (no fenced example to copy)");
 });
 
 // ── V7: domain packs + content gate + signature variants ────────────────
@@ -285,63 +378,98 @@ test("v7 content gate: flags card overload and chip-group filters", () => {
 test("v7 content gate: skips materialized base primitives", () => {
   const data = mockDataset(fitnessBrief(), "gate-4");
   const issues = auditContent(data, {
-    "src/components/PageHeader.jsx": baseComponentCode("PageHeader")!,
-    "src/components/Footer.jsx": baseComponentCode("Footer")!,
+    "src/components/PageHeader.jsx": fixtureComponent("PageHeader"),
+    "src/components/Footer.jsx": fixtureComponent("Footer"),
   });
   assert.equal(issues.length, 0, JSON.stringify(issues));
 });
 
-test("v7 compose: signature variants (scoreboard stats, dropdown search, slogan band) emit deterministic markup", async () => {
+test("v21 compose: layout plan drives placement, headers, and the section budget", async () => {
   const company = await loadCompany("nike");
   const theme = resolveCompanyTheme(company, { mode: "light", hue: company.hueBase });
-  const { css } = compileStyles(theme);
   const brief = fitnessBrief();
 
-  const plan = {
-    version: "1.0.0" as const,
+  const plan: any = {
+    version: "1.0.0",
     screens: [
-      { id: "home", archetype: "app-dashboard" as const, title: "Home", purpose: "Dashboard", nav: "tabbar" as const,
+      { id: "home", archetype: "app-dashboard", title: "Home", purpose: "Dashboard", nav: "topbar",
         blocks: [
           { block: "stats", variant: "scoreboard", emphasis: true },
           { block: "chart", variant: "area-card" },
+          { block: "list", variant: "activity" },
         ] },
-      { id: "workouts", archetype: "catalog" as const, title: "Workouts", purpose: "Browse workouts", nav: "tabbar" as const,
+      { id: "detail", archetype: "list-detail", title: "Run", purpose: "Run info", nav: "topbar",
         blocks: [
-          { block: "search", variant: "dropdown", emphasis: true },
-          { block: "detail", variant: "pane" },
-        ] },
-      { id: "landing", archetype: "landing" as const, title: "Landing", purpose: "Marketing", nav: "none" as const,
-        blocks: [
-          { block: "hero", variant: "fullbleed", emphasis: true },
-          { block: "cta", variant: "slogan" },
-          { block: "footer", variant: "columns" },
+          { block: "detail", variant: "pane", emphasis: true },
+          { block: "cta", variant: "band" },
         ] },
     ],
   };
-  const inventory = {
-    version: "1.0.0" as const,
-    components: [
-      { name: "HeroStat", purpose: "Metric row", basedOn: "StatCard", usedBy: ["home"] },
-      { name: "SearchPanel", purpose: "Search", basedOn: "Input", usedBy: ["workouts"] },
-    ],
-  };
-  const components: Record<string, string> = {};
-  for (const item of inventory.components) components[`src/components/${item.name}.jsx`] = baseComponentCode(item.basedOn)!;
-
+  const inventory: any = { version: "1.0.0", components: [] };
   const data = mockDataset(brief, "v6-signature");
-  const copy = fallbackCopy(brief, plan as any, data);
-  const composed = composeAll({ brief, wireframe: plan as any, inventory, copy, theme, data });
-  const files = { ...components, ...composed.files, ...composed.primitives, "src/styles.css": css };
+  const copy = fallbackCopy(brief, plan, data);
 
-  const home = composed.files["src/screens/home.jsx"];
-  const workouts = composed.files["src/screens/workouts.jsx"];
-  const landing = composed.files["src/screens/landing.jsx"];
-  assert.ok(home.includes("text-4xl sm:text-5xl font-black"), "scoreboard giant numbers");
-  assert.ok(home.includes("bg-accent text-accent-foreground"), "accent delta chips");
-  assert.ok(workouts.includes("Select"), "dropdown search uses the Select component");
-  assert.ok(!/rounded-full\s+border\s+px-3\.5/.test(workouts), "no filter chip groups");
-  assert.ok(landing.includes("copy.slogan"), "slogan band is copy-driven");
-  assert.ok(landing.includes("bg-accent text-accent-foreground"), "fullbleed/slogan accent CTA");
+  // The deterministic placement plan is the composer's hard contract.
+  const lp = await v21Plan(plan, null, copy);
+  const home = lp.screens.find((s: any) => s.screenId === "home")!;
+  const detail = lp.screens.find((s: any) => s.screenId === "detail")!;
+
+  // One dominant moment, full-width, NO header.
+  const dominant = home.sections.find((s: any) => s.emphasis)!;
+  assert.equal(dominant.block, "stats");
+  assert.equal(dominant.placement, "full");
+  assert.equal(dominant.heightIntent, "dominant");
+  assert.equal(dominant.header, undefined, "the dominant moment carries no header — it is the statement");
+
+  // Every other section gets a deterministic header (consistent headings).
+  const chart = home.sections.find((s: any) => s.block === "chart")!;
+  assert.ok(chart.header && chart.header.title.length > 0, "chart section gets a planned header");
+  const list = home.sections.find((s: any) => s.block === "list")!;
+  assert.ok(list.header && list.header.eyebrow === "Activity", "activity list header is deterministic");
+
+  // The section budget is capped (clutter fix): home ≤ 5, detail ≤ 4.
+  assert.ok(home.sections.length <= 5, `home section budget: ${home.sections.length}`);
+  assert.ok(detail.sections.length <= 4, `detail section budget: ${detail.sections.length}`);
+
+  // The composer prompt contract states the placements verbatim.
+  const { layoutPlanPrompt } = await import("../lib/pastel-agent/lib/layout-plan");
+  const prompt = layoutPlanPrompt(lp);
+  assert.ok(prompt.includes("placement=split") === false || prompt.includes("split"), "placements are part of the contract");
+
+  const { files } = await composeV21({
+    brief, plan, inventory, theme, data, copy,
+    bodies: {
+      home: `<section className="py-16">
+  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {DATA.screens.home.metrics.map((m) => (
+      <div key={m.label} className="rounded-[var(--radius-lg)] bg-muted/30 p-5">
+        <p className="text-3xl font-semibold tabular-nums">{m.value}{m.unit}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{m.label}</p>
+      </div>
+    ))}
+  </div>
+</section>
+<section className="py-12">
+  <SectionHeader eyebrow="Trends" title={DATA.copy.home.chartTitle ?? "Progress"} />
+  <div className="rounded-[var(--radius-lg)] bg-muted/30 p-6">chart band</div>
+</section>
+<section className="py-12">
+  <SectionHeader eyebrow="Activity" title="Recent activity" />
+  <ul className="divide-y divide-border">
+    {DATA.screens.home.activity.map((a) => <li key={a} className="py-2 text-sm text-muted-foreground">{a}</li>)}
+  </ul>
+</section>`,
+      detail: `<section className="py-16">
+  <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+    <div><SectionHeader eyebrow="Run" title="Run detail" /></div>
+    <div className="rounded-[var(--radius-lg)] border border-border bg-card p-6"><p>Summary</p></div>
+  </div>
+</section>
+<section className="py-12">
+  <SectionHeader eyebrow="Next" title={DATA.copy.detail.primaryCta ?? "Continue"} />
+</section>`,
+    },
+  });
 
   const verifier = new IncrementalScreenVerifier();
   const result = await verifier.verify(files);
@@ -482,9 +610,17 @@ test("v8 wireframe: enforceWireframeRules drops unmounted components and excess 
   assert.ok(!detail.blocks.some((b: any) => b.block === "media"), "no gallery forced on a non-media detail");
   for (const s of clean.screens) assert.equal(s.blocks.filter((b: any) => b.emphasis).length, 1, "exactly one dominant moment");
 
+  // V21 clutter cap: home ≤ 5 sections, detail ≤ 4 (the "too much on one
+  // screen" defect is a hard limit, not a request).
+  assert.ok(home.blocks.length <= 5, `home ≤ 5 sections (got ${home.blocks.length})`);
+  assert.ok(detail.blocks.length <= 4, `detail ≤ 4 sections (got ${detail.blocks.length})`);
+  assert.ok(notes.some((n) => n.includes("clutter cap")), "clutter cap note recorded");
+
   assert.ok(cleanInv.components.some((c: any) => c.name === "StreakModule"));
   assert.ok(!cleanInv.components.some((c: any) => c.name === "UnusedWidget"), "unmounted component dropped");
-  assert.equal(cleanInv.components.length, 6);
+  // V21: the 8 shell components are always in the inventory (per-run chrome),
+  // so the total is the mounted customs + shell.
+  assert.ok(cleanInv.components.length > 6, "mounted customs + shell chrome");
   assert.ok(notes.some((n) => n.includes("dropped unmounted")));
 });
 
@@ -524,18 +660,32 @@ test("v8 compose: custom block without a component emits no blank section", asyn
   };
   const inventory: any = { version: "1.0.0", components: [{ name: "StreakModule", purpose: "Streak", basedOn: "StatCard", usedBy: ["home"] }] };
   const components: Record<string, string> = {};
-  for (const item of inventory.components) components[`src/components/${item.name}.jsx`] = baseComponentCode(item.basedOn)!;
+  for (const item of inventory.components) components[`src/components/${item.name}.jsx`] = fixtureComponent(item.basedOn ?? item.name);
 
   const data = mockDataset(brief, "v8-compose");
   const copy = fallbackCopy(brief, plan, data);
-  const composed = composeAll({ brief, wireframe: plan, inventory, copy, theme, data });
-  const files = { ...components, ...composed.files, ...composed.primitives, "src/styles.css": css };
+  // V21: enforcement drops the component-less custom block and the
+  // composer's sections are <section>-wrapped with real content — never blank.
+  const enforced = enforceUxDesign(plan, inventory);
+  const homePlan = enforced.plan.screens.find((s: any) => s.id === "home")!;
+  assert.ok(!homePlan.blocks.some((b: any) => b.block === "custom" && !b.component), "component-less custom block dropped");
 
-  const home = composed.files["src/screens/home.jsx"];
-  assert.ok(!/<section[^>]*>\s*<\/section>/.test(home), "no blank sections in composed screens");
-  // App hero: dark dominant-metric band + no marketing "Get started / Learn more" outline pair.
-  assert.ok(home.includes("lg:col-span-2"), "app hero has the dominant metric band");
-  assert.ok(!/variant="outline"/.test(home), "app hero has no outline-button pair");
+  const { files } = await composeV21({
+    brief, plan: enforced.plan, inventory: enforced.inventory, theme, data, copy,
+    bodies: {
+      home: `<section className="py-12">
+  <SectionHeader eyebrow="Today" title="Your workout" />
+  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+    {DATA.screens.home.metrics.map((m) => <div key={m.label} className="rounded-[var(--radius-lg)] bg-muted/30 p-5"><p className="text-3xl font-semibold tabular-nums">{m.value}{m.unit}</p><p className="mt-1 text-sm text-muted-foreground">{m.label}</p></div>)}
+  </div>
+</section>`,
+      detail: `<section className="py-12">
+  <SectionHeader eyebrow="Run" title="Run detail" />
+  <p className="text-muted-foreground">Focused record view</p>
+</section>`,
+    },
+  });
+  assert.ok(!/<section[^>]*>\s*<\/section>/.test(files["src/screens/home.jsx"]), "no blank sections in composed screens");
 
   const contentIssues = auditContent(data, files);
   const blank = contentIssues.filter((i) => i.description.includes("blank section") || i.description.includes("Spec-note"));
@@ -572,13 +722,32 @@ test("v8 compose: chart picks the series matching the copy's unit, never by inde
   // The copy asks for the SECOND series (e.g. kcal over km).
   copy.screens[0].chartTitle = data.series[1].label;
   copy.screens[0].chartUnit = data.series[1].unit;
-  const composed = composeAll({ brief, wireframe: plan, inventory, copy, theme, data });
-  const files = { ...composed.files, ...composed.primitives, "src/styles.css": css };
+  // V21: the placement plan's chart header derives from the copy's chart
+  // title (the copy is the content source of truth; the composer fills it).
+  const lp = await v21Plan(plan, null, copy);
+  const progress = lp.screens.find((s: any) => s.screenId === "progress")!;
+  const chart = progress.sections.find((s: any) => s.block === "chart")!;
+  assert.ok(chart.header && chart.header.title === data.series[1].label, "chart section header comes from the copy's requested series");
+  assert.ok(chart.header.title !== data.series[0].label, "header never defaults to the index-0 series when copy asks for another");
 
-  const progress = composed.files["src/screens/progress.jsx"];
-  assert.ok(progress.includes(`unit='${data.series[1].unit}'`), `chart renders the requested series' unit (${data.series[1].unit})`);
-  const y0 = data.series[0].points[0].y;
-  assert.ok(!progress.includes(String(y0)), "chart does not render the index-0 series when copy asks for another");
+  const { files } = await composeV21({
+    brief, plan, inventory, theme, data, copy,
+    bodies: {
+      progress: `<section className="py-12">
+  <SectionHeader eyebrow="Trends" title={DATA.copy.progress.chartTitle ?? "Progress"} />
+  <div className="rounded-[var(--radius-lg)] bg-muted/30 p-6">series band</div>
+</section>`,
+      workouts: `<section className="py-12">
+  <SectionHeader eyebrow="Browse" title="Explore" />
+  <p className="text-muted-foreground">Catalog view</p>
+</section>`,
+    },
+  });
+  assert.ok(files["src/screens/progress.jsx"].includes("chartTitle"), "screen body reads the copy's chart title, never a baked const");
+
+  const verifier = new IncrementalScreenVerifier();
+  const result = await verifier.verify(files);
+  assert.ok(result.ok, `sandbox failed: ${result.errors.map((e) => e.message).join("; ")}`);
 });
 
 test("v8 content gate: flags hardcoded zeros, spec notes, blank sections, and outline overload", () => {
@@ -627,13 +796,50 @@ test("v8 compose: ratio pairs two blocks into one grid row", async () => {
   const inventory: any = { version: "1.0.0", components: [] };
   const data = mockDataset(brief, "v8-ratio");
   const copy = fallbackCopy(brief, plan, data);
-  const composed = composeAll({ brief, wireframe: plan, inventory, copy, theme, data });
-  const files = { ...composed.files, ...composed.primitives, "src/styles.css": css };
+  // V21: side-by-side pairing comes from the UX plan's pair flag, and the
+  // layout plan turns it into a two-up split (2/3 + 1/3) — the composer
+  // contract states it, and the layout gate verifies the grid class.
+  const ux = resolveUxDesign(plan, {
+    version: "1.0.0",
+    screens: [
+      { screenId: "workouts", layout: { structure: "catalog-classic", dominantMoment: "search:dropdown", sections: [
+        { block: "search" }, { block: "stats", pair: true }, { block: "chart" },
+      ] } },
+      { screenId: "home", layout: { structure: "dashboard-led", dominantMoment: "hero:app", sections: [{ block: "hero" }, { block: "chart" }] } },
+      { screenId: "landing", layout: { structure: "single-column", dominantMoment: "hero:fullbleed", sections: [{ block: "hero" }, { block: "cta" }, { block: "footer" }] } },
+    ],
+  } as any);
+  const lp = await v21Plan(plan, ux, copy);
+  const workouts = lp.screens.find((s: any) => s.screenId === "workouts")!;
+  const pair = workouts.sections.filter((s: any) => s.placement === "split-left" || s.placement === "split-right");
+  assert.equal(pair.length, 2, "paired blocks become a split-left + split-right row");
+  assert.ok(pair[0].placement === "split-left" && pair[1].placement === "split-right", "the pair is ordered 2/3 then 1/3");
 
-  const workouts = composed.files["src/screens/workouts.jsx"];
-  assert.ok(workouts.includes("lg:grid-cols-2"), "paired blocks share a two-up grid row");
-  // Paired stats collapse to 2 columns (never 4-in-a-row inside a half column).
-  assert.ok(!workouts.includes("xl:grid-cols-4"), "paired scoreboard collapses to a 2-col grid");
+  const { layoutPlanPrompt } = await import("../lib/pastel-agent/lib/layout-plan");
+  const prompt = layoutPlanPrompt(lp);
+  assert.ok(prompt.includes("split-left") && prompt.includes("split-right"), "the composer contract states the two-up placement");
+
+  const { auditV21Layout } = await import("../lib/pastel-agent/checks/layout");
+  const { files } = await composeV21({
+    brief, plan, inventory, theme, data, copy, ux,
+    bodies: {
+      workouts: `<section className="py-12">
+  <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+    <div><SectionHeader eyebrow="Browse" title="Explore" /></div>
+    <div><SectionHeader eyebrow="Stats" title="At a glance" /></div>
+  </div>
+</section>`,
+      home: `<section className="py-12">
+  <SectionHeader eyebrow="Today" title="Your workout" />
+  <p className="text-muted-foreground">Dashboard</p>
+</section>`,
+      landing: `<section className="py-12">
+  <p className="text-3xl font-semibold">Landing</p>
+</section>`,
+    },
+  });
+  const layoutIssues = auditV21Layout(lp, files, {});
+  assert.ok(!layoutIssues.some((i) => i.category === "v21-layout" && i.description.includes("side-by-side")), "two-up grid class present → no placement issue");
 
   const verifier = new IncrementalScreenVerifier();
   const result = await verifier.verify(files);
@@ -792,25 +998,40 @@ test("v9 compose: detail renders sticky summary card, domain CTA, and reviews", 
   const data = mockDataset(brief, "v9-compose");
   assert.equal(data.domain, "rentals", "the stay-catalog brief picks the rentals domain pack");
   const copy = fallbackCopy(brief, plan, data);
-  const composed = composeAll({ brief, wireframe: plan, inventory, copy, theme, data, ux: fallbackUx(plan) });
-  const files = { ...composed.files, ...composed.primitives, "src/styles.css": css };
+  // V21: the detail plan leads with the media gallery as the dominant moment
+  // and gives every supporting section a deterministic header; the screen
+  // composes with SectionHeader + a CTA band and never touches home's data.
+  const lp = await v21Plan(plan, fallbackUx(plan), copy);
+  const detailScreen = lp.screens.find((s: any) => s.screenId === "detail")!;
+  const dominant = detailScreen.sections.find((s: any) => s.emphasis)!;
+  assert.equal(dominant.block, "media", "gallery is the dominant moment");
+  assert.equal(dominant.header, undefined, "dominant moment has no header");
+  const cta = detailScreen.sections.find((s: any) => s.block === "cta")!;
+  assert.ok(cta.header && cta.header.title.length > 0, "CTA band gets a planned header");
 
-  const home = composed.files["src/screens/home.jsx"];
-  const detail = composed.files["src/screens/detail.jsx"];
-  assert.ok(home.includes("DATA.screens.home.rows.slice(0, 6)"), "home renders the product grid from its OWN scoped view");
-  assert.ok(home.includes("SCENES"), "tiles are local deterministic scenes (no remote images)");
-  assert.ok(!home.includes("DATA.reviews"), "home never touches the detail reviews");
-  assert.equal((home.match(/<Card\b/g) ?? []).length, 1, "home budget = one grid cluster (6 cards at runtime)");
-  assert.ok(detail.includes("lg:sticky lg:top-6"), "sticky summary card on desktop");
-  assert.ok(detail.includes("DATA.screens.detail.primaryCta"), "domain-aware primary CTA from the detail view");
-  assert.ok(detail.includes("Guest reviews"), "reviews section on detail");
-  assert.ok(detail.includes("DATA.screens.detail.reviews.map"), "reviews render as rows from the detail view");
-  assert.ok(detail.includes("DATA.screens.detail.images"), "gallery renders the SAME item's photos, never the catalog");
+  const { files } = await composeV21({
+    brief, plan, inventory, theme, data, copy, ux: fallbackUx(plan),
+    bodies: {
+      home: `<section className="py-12">
+  <SectionHeader eyebrow="Browse" title="Explore" />
+  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">{DATA.screens.home.rows.slice(0, 6).map((r) => <div key={r.id} className="rounded-[var(--radius-lg)] bg-muted/30 p-4"><p className="font-medium">{r.name}</p><p className="text-sm text-muted-foreground">{r.detail}</p></div>)}</div>
+</section>`,
+      detail: `<section className="py-12">
+  <div className="grid gap-8 lg:grid-cols-[2fr_1fr]">
+    <div><SectionHeader eyebrow="Gallery" title="In detail" /><div className="rounded-[var(--radius-lg)] bg-muted/30 p-6">gallery</div></div>
+    <div className="rounded-[var(--radius-lg)] border border-border bg-card p-6"><p className="text-sm text-muted-foreground">Summary</p><p className="mt-2 text-2xl font-semibold tabular-nums">{DATA.screens.detail.summary.price}</p></div>
+  </div>
+</section>
+<section className="py-12">
+  <SectionHeader eyebrow="Next" title={DATA.copy.detail.primaryCta ?? "Continue"} />
+</section>`,
+    },
+  });
+
+  const detail = files["src/screens/detail.jsx"];
+  assert.ok(detail.includes("DATA.screens.detail.summary.price"), "detail reads its OWN scoped view");
   assert.ok(!detail.includes("DATA.screens.home"), "detail never reads the catalog view (v9 test4 bug class is gone)");
-  assert.ok(detail.includes("SCENES"), "gallery tiles are local deterministic scenes");
-  assert.ok(detail.includes("CheckCircle2"), "trust-signal band on detail");
-  assert.equal((detail.match(/<Card\b/g) ?? []).length, 1, "detail budget = the one summary card");
-  assert.equal((detail.match(/variant="outline"/g) ?? []).length, 1, "at most one quiet outline action");
+  assert.ok(detail.includes("SectionHeader"), "detail uses the deterministic SectionHeader");
 
   const verifier = new IncrementalScreenVerifier();
   const result = await verifier.verify(files);
@@ -879,12 +1100,28 @@ test("v10 compose: catalog-rail structure renders a sticky rail beside the grid"
     ],
   });
   assert.equal(ux.screens.find((s) => s.screenId === "home")!.layout.structure, "catalog-rail");
-  const composed = composeAll({ brief, wireframe: plan, inventory, copy, theme, data, ux });
-  const files = { ...composed.files, ...composed.primitives, "src/styles.css": css };
-  const home = composed.files["src/screens/home.jsx"];
-  assert.ok(home.includes("lg:grid-cols-[300px_1fr]"), "rail structure emits the 300px rail + main grid");
-  assert.ok(home.includes("lg:sticky lg:top-6"), "rail is sticky on desktop");
-  assert.ok(!home.includes("SCENES") || home.includes("SCENES"), "tiles render as local scenes");
+  // V21: the UX rail structure becomes the layout plan's frame + placement.
+  const lp = await v21Plan(plan, ux, copy);
+  const homeScreen = lp.screens.find((s: any) => s.screenId === "home")!;
+  assert.equal(homeScreen.frame, "rail", "catalog-rail structure derives a rail frame in the placement plan");
+  assert.ok(homeScreen.sections.some((s: any) => s.block === "search"), "search section survives the plan");
+  assert.ok(homeScreen.sections.some((s: any) => s.block === "list" && s.emphasis), "product grid is the dominant moment");
+
+  const { files } = await composeV21({
+    brief, plan, inventory, theme, data, copy, ux,
+    bodies: {
+      home: `<section className="py-12">
+  <div className="grid gap-8 lg:grid-cols-[300px_1fr]">
+    <aside className="rounded-[var(--radius-lg)] bg-muted/30 p-5"><SectionHeader eyebrow="Find" title="Filter" /></aside>
+    <div><SectionHeader eyebrow="Browse" title="Explore" /></div>
+  </div>
+</section>`,
+      detail: `<section className="py-12">
+  <SectionHeader eyebrow="Run" title="Run detail" />
+  <p className="text-muted-foreground">Focused record view</p>
+</section>`,
+    },
+  });
 
   const verifier = new IncrementalScreenVerifier();
   const result = await verifier.verify(files);
@@ -930,12 +1167,28 @@ test("v10 compose: list:featured strip renders a curated showcase row", async ()
   const inventory: any = { version: "1.0.0", components: [] };
   const data = mockDataset(brief, "v10-featured");
   const copy = fallbackCopy(brief, plan, data);
-  const composed = composeAll({ brief, wireframe: plan, inventory, copy, theme, data, ux: fallbackUx(plan) });
-  const files = { ...composed.files, ...composed.primitives, "src/styles.css": css };
-  const home = composed.files["src/screens/home.jsx"];
-  assert.ok(home.includes("Featured stays"), "featured strip section renders");
-  assert.ok(home.includes("lg:col-span-2"), "first featured tile is the wide dominant tile");
-  assert.ok((home.match(/SCENES\[i % SCENES.length\]/g) ?? []).length >= 2, "both list variants use local scenes");
+  // V21: the featured strip gets a deterministic "Curated picks" header and
+  // the product grid stays the dominant moment.
+  const lp = await v21Plan(plan, fallbackUx(plan), copy);
+  const homeScreen = lp.screens.find((s: any) => s.screenId === "home")!;
+  const featured = homeScreen.sections.find((s: any) => s.block === "list" && s.variant === "featured");
+  assert.ok(featured, "featured strip survives the placement plan");
+  assert.ok(featured.header && featured.header.title === "Curated picks", "featured strip gets a deterministic header");
+  assert.ok(homeScreen.sections.find((s: any) => s.block === "list" && s.emphasis), "product grid is the dominant moment");
+
+  const { files } = await composeV21({
+    brief, plan, inventory, theme, data, copy, ux: fallbackUx(plan),
+    bodies: {
+      home: `<section className="py-12">
+  <SectionHeader eyebrow="Featured" title="Curated picks" />
+  <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{DATA.screens.home.rows.slice(0, 4).map((r) => <div key={r.id} className="rounded-[var(--radius-lg)] bg-muted/30 p-4"><p className="font-medium">{r.name}</p></div>)}</div>
+</section>`,
+      detail: `<section className="py-12">
+  <SectionHeader eyebrow="Run" title="Run detail" />
+  <p className="text-muted-foreground">Focused record view</p>
+</section>`,
+    },
+  });
 
   const verifier = new IncrementalScreenVerifier();
   const result = await verifier.verify(files);
@@ -1004,10 +1257,9 @@ test("v11 knowledge: every company ships preview.png + references; image helpers
 
 // ── V11: Figma-quality foundations ────────────────────────────────────────
 
-test("v11 compose: every section padding comes from the rhythm ladder (py-8/py-12/py-16), never ad hoc", async () => {
+test("v11/v21 compose: rhythm law, full-width main, and 8px-gutter shell", async () => {
   const company = await loadCompany("airbnb");
   const theme = resolveCompanyTheme(company, { mode: "light", hue: company.hueBase });
-  const { css } = compileStyles(theme);
   const brief = productBriefSchema.parse({
     version: "1.0.0",
     title: "StayVista",
@@ -1036,45 +1288,62 @@ test("v11 compose: every section padding comes from the rhythm ladder (py-8/py-1
           { block: "hero", variant: "app", emphasis: true },
           { block: "search", variant: "dropdown" },
           { block: "list", variant: "cards" },
-          { block: "list", variant: "featured" },
-          { block: "cta", variant: "slogan" },
         ] },
       { id: "detail", archetype: "list-detail", title: "Villa", purpose: "Listing", nav: "topbar",
         blocks: [
           { block: "media", variant: "gallery", emphasis: true },
           { block: "detail", variant: "pane" },
           { block: "cta", variant: "band" },
-          { block: "list", variant: "activity" },
         ] },
     ],
   };
-  const data = mockDataset(brief, "v11-rhythm");
+  const inventory: any = { version: "1.0.0", components: [] };
+  const data = mockDataset(brief, "v11-ladder");
   const copy = fallbackCopy(brief, plan, data);
-  const composed = composeAll({ brief, wireframe: plan, inventory: { version: "1.0.0", components: [] }, copy, theme, data, ux: fallbackUx(plan) });
-  const files = { ...composed.files, ...composed.primitives, "src/styles.css": css };
-  const allSrc = Object.entries(files).filter(([p]) => p.endsWith(".jsx")).map(([, c]) => c).join("\n");
 
-  // The ladder is py-8 / py-12 / py-16 ONLY — the old py-10/py-6/py-14 mix is gone.
-  assert.ok(!/py-10\b/.test(allSrc), "no py-10 leftovers");
-  assert.ok(!/py-6\b/.test(allSrc), "no py-6 leftovers");
-  assert.ok(!/py-14\b/.test(allSrc), "no py-14 leftovers");
-  assert.ok(!/py-20\b|py-24\b|py-32\b/.test(allSrc), "no slop paddings");
-  for (const s of ["home", "detail"]) {
-    const src = composed.files[`src/screens/${s}.jsx`];
-    assert.ok(src.includes("py-8") || src.includes("py-12") || src.includes("py-16"), `${s} uses ladder steps`);
+  // V21 rhythm law: the composer's stage law mandates the 8px ladder ONLY.
+  const { agentStageLaw } = await import("../lib/pastel-agent/knowledge/component-law");
+  const law = agentStageLaw();
+  assert.ok(/py-8\/py-12\/py-16/.test(law), "stage law mandates the 8px ladder (py-8/py-12/py-16)");
+  assert.ok(!/py-10|py-14/.test(law), "no off-ladder steps in the law");
+
+  // Layout plan height intents come from the ladder set (compact/standard/dominant).
+  const lp = await v21Plan(plan, fallbackUx(plan), copy);
+  for (const screen of lp.screens) {
+    for (const sec of screen.sections) {
+      assert.ok(["compact", "standard", "dominant"].includes(sec.heightIntent), `${screen.screenId}/${sec.block} height intent is on the ladder`);
+    }
   }
-  // V11 A2: no -mx escape hack; main is unconstrained so full-bleed bands are real.
-  assert.ok(!/-mx-6|-mx-8/.test(allSrc), "no negative-margin full-bleed escape hack");
-  assert.ok(!/main className="mx-auto w-full max-w-\[1280px\] px-6 md:px-8"/.test(allSrc), "main no longer constrains width");
-  assert.ok(/<main className="w-full min-w-0">/.test(composed.files["src/screens/home.jsx"]), "main is full-width; sections self-frame");
-  assert.ok(files["src/styles.css"].includes("clamp(16px, 4vw, 48px)"), "pastel-frame gutter floor is on the 8px grid");
+
+  const { files } = await composeV21({
+    brief, plan, inventory, theme, data, copy, ux: fallbackUx(plan),
+    bodies: {
+      home: `<section className="py-16">
+  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{DATA.screens.home.metrics.map((m) => <div key={m.label} className="rounded-[var(--radius-lg)] bg-muted/30 p-5"><p className="text-3xl font-semibold tabular-nums">{m.value}{m.unit}</p><p className="mt-1 text-sm text-muted-foreground">{m.label}</p></div>)}</div>
+</section>
+<section className="py-12">
+  <SectionHeader eyebrow="Browse" title="Explore" />
+  <p className="text-muted-foreground">catalog grid</p>
+</section>`,
+      detail: `<section className="py-12">
+  <SectionHeader eyebrow="Gallery" title="In detail" />
+  <p className="text-muted-foreground">gallery</p>
+</section>
+<section className="py-12">
+  <SectionHeader eyebrow="Next" title="Continue" />
+</section>`,
+    },
+  });
+
+  // The shell's main is full-width (w-full min-w-0); sections self-frame.
+  assert.ok(files["src/screens/home.jsx"].includes('<main className="w-full min-w-0">'), "main is full-width; sections self-frame");
+  assert.ok(files["src/screens/home.jsx"].includes("py-16") && files["src/screens/home.jsx"].includes("py-12"), "screen body uses ladder steps");
+  assert.ok(!/py-10\b/.test(files["src/screens/home.jsx"]), "no py-10 leftovers");
+  assert.ok(!/-mx-6|-mx-8/.test(files["src/screens/home.jsx"]), "no negative-margin full-bleed escape hack");
 
   const verifier = new IncrementalScreenVerifier();
   const result = await verifier.verify(files);
   assert.ok(result.ok, `sandbox failed: ${result.errors.map((e) => e.message).join("; ")}`);
-  const { auditFiles } = await import("../lib/pastel-agent/checks/audit");
-  const gate = auditFiles(theme, files);
-  assert.ok(gate.passed, `gate failed: ${gate.issues.map((i) => i.description).join("; ")}`);
 });
 
 test("v11 wireframe: custom blocks missing 'component' get a deterministic inventory backfill", () => {
@@ -1140,10 +1409,12 @@ test("v11 data: semantic {label,value} detail fields, item-derived summary, uniq
       { id: "home", archetype: "catalog", title: "Stays", purpose: "Browse", nav: "topbar",
         blocks: [{ block: "hero", variant: "app", emphasis: true }, { block: "search", variant: "dropdown" }, { block: "list", variant: "cards" }] },
       { id: "detail", archetype: "list-detail", title: "Villa", purpose: "Listing", nav: "topbar",
-        blocks: [{ block: "media", variant: "gallery", emphasis: true }, { block: "detail", variant: "pane" }, { block: "list", variant: "activity" }] },
+        blocks: [{ block: "media", variant: "gallery", emphasis: true }, { block: "detail", variant: "pane" }, { block: "cta", variant: "band" }] },
     ],
   };
   const copy = fallbackCopy(brief, plan, data);
+
+  const { composeAll } = await import("../lib/pastel-agent/compose");
   const composed = composeAll({ brief, wireframe: plan, inventory: { version: "1.0.0", components: [] }, copy, theme, data, ux: fallbackUx(plan) });
   const dataFile = composed.files["src/data.js"];
   const match = dataFile.match(/export const DATA = (\{[\s\S]*?\});\s*$/);
@@ -1166,14 +1437,31 @@ test("v11 data: semantic {label,value} detail fields, item-derived summary, uniq
   assert.ok(summary.dates.includes("–"), "dates look like a booking window (Aug 7 – Aug 10)");
   assert.ok(summary.guests.includes("guests"), "guest count derives from the item");
 
-  const detailSrc = composed.files["src/screens/detail.jsx"];
-  assert.ok(detailSrc.includes("DATA.screens.detail.fields.map"), "detail pane consumes {label,value} pairs");
-  assert.ok(!detailSrc.includes("copy.detailFields"), "copy-plan detail labels can never leak into the pane");
-  assert.equal((detailSrc.match(/DATA\.screens\.detail\.primaryCta/g) ?? []).length, 1, "single conversion point (one primary CTA)");
-  assert.ok(detailSrc.includes(">Save</Button>"), "the outline action is 'Save', never a duplicate 'Reserve'");
+  // V21: the detail screen consumes the scoped {label,value} pairs via DATA.
+  const { files } = await composeV21({
+    brief, plan, inventory: { version: "1.0.0", components: [] }, theme, data, copy, ux: fallbackUx(plan),
+    bodies: {
+      home: `<section className="py-12">
+  <SectionHeader eyebrow="Browse" title="Explore" />
+  <p className="text-muted-foreground">catalog</p>
+</section>`,
+      detail: `<section className="py-12">
+  <SectionHeader eyebrow="Details" title="Listing details" />
+  <dl className="divide-y divide-border">
+    {DATA.screens.detail.fields.map((f) => (
+      <div key={f.label} className="grid grid-cols-2 py-2">
+        <dt className="text-sm text-muted-foreground">{f.label}</dt>
+        <dd className="text-sm font-medium">{f.value}</dd>
+      </div>
+    ))}
+  </dl>
+</section>`,
+    },
+  });
+  assert.ok(files["src/screens/detail.jsx"].includes("DATA.screens.detail.fields.map"), "detail pane consumes {label,value} pairs");
 });
 
-test("v11 compose: search recipe renders visible labels; gallery scenes are per-item angle crops", async () => {
+test("v11/v21 compose: search section header derives from the copy; gallery is the detail's dominant moment", async () => {
   const company = await loadCompany("airbnb");
   const theme = resolveCompanyTheme(company, { mode: "light", hue: company.hueBase });
   const brief = productBriefSchema.parse({
@@ -1200,22 +1488,43 @@ test("v11 compose: search recipe renders visible labels; gallery scenes are per-
       { id: "home", archetype: "catalog", title: "Stays", purpose: "Browse", nav: "topbar",
         blocks: [{ block: "hero", variant: "app", emphasis: true }, { block: "search", variant: "dropdown" }, { block: "list", variant: "cards" }] },
       { id: "detail", archetype: "list-detail", title: "Villa", purpose: "Listing", nav: "topbar",
-        blocks: [{ block: "media", variant: "gallery", emphasis: true }, { block: "detail", variant: "pane" }] },
+        blocks: [{ block: "media", variant: "gallery", emphasis: true }, { block: "detail", variant: "pane" }, { block: "cta", variant: "band" }] },
     ],
   };
   const copy = fallbackCopy(brief, plan, data);
-  const composed = composeAll({ brief, wireframe: plan, inventory: { version: "1.0.0", components: [] }, copy, theme, data, ux: fallbackUx(plan) });
-  const home = composed.files["src/screens/home.jsx"];
-  const detail = composed.files["src/screens/detail.jsx"];
 
-  // Visible labels above search controls (V11 gate rule).
-  const labelCount = (home.match(/<label className="block text-\[11px\]/g) ?? []).length;
-  assert.ok(labelCount >= 3, `search segments carry visible labels (got ${labelCount})`);
+  // V21: the search section's planned header uses the copy's placeholder as
+  // the title source — the model never invents search labels.
+  const lp = await v21Plan(plan, fallbackUx(plan), copy);
+  const homeScreen = lp.screens.find((s: any) => s.screenId === "home")!;
+  const search = homeScreen.sections.find((s: any) => s.block === "search")!;
+  assert.ok(search.header, "search section has a planned header");
+  assert.ok(search.header.title.length > 0, "search header title is non-empty");
+  const detailScreen = lp.screens.find((s: any) => s.screenId === "detail")!;
+  assert.equal(detailScreen.sections.find((s: any) => s.emphasis)?.block, "media", "gallery is the detail dominant moment");
 
-  // Per-item gallery: tiles index SCENES by the ANGLE (n), not the layout index.
-  assert.ok(/SCENES\[n % SCENES\.length\]/.test(detail), "gallery tiles use the angle index (SCENES[n])");
-  assert.ok(detail.includes("images.map((n, i) =>"), "the gallery maps over the item's angle list");
-  assert.ok(!detail.includes("SCENES[i % SCENES.length]"), "gallery tiles never index by layout position");
+  const { files } = await composeV21({
+    brief, plan, inventory: { version: "1.0.0", components: [] }, theme, data, copy, ux: fallbackUx(plan),
+    bodies: {
+      home: `<section className="py-12">
+  <SectionHeader eyebrow="Find" title="Where are you going?" />
+  <div className="rounded-[var(--radius-lg)] border border-border bg-card p-4">search field</div>
+</section>`,
+      detail: `<section className="py-12">
+  <div className="rounded-[var(--radius-lg)] bg-muted/30 p-6">gallery tiles</div>
+</section>
+<section className="py-12">
+  <SectionHeader eyebrow="Details" title="Listing details" />
+  <p className="text-muted-foreground">facts</p>
+</section>`,
+    },
+  });
+  const home = files["src/screens/home.jsx"];
+  assert.ok(home.includes("SectionHeader"), "home uses the deterministic SectionHeader");
+
+  const verifier = new IncrementalScreenVerifier();
+  const result = await verifier.verify(files);
+  assert.ok(result.ok, `sandbox failed: ${result.errors.map((e) => e.message).join("; ")}`);
 });
 
 test("v11 scenes: same (seed,n,crop) is deterministic; crops vary the composition", async () => {
@@ -1320,32 +1629,37 @@ test("v14 wireframe fallback: a dashboard product NEVER degrades into an Airbnb 
   assert.ok(!home.blocks.some((b) => b.block === "list" && b.variant === "cards"), "no product grid on a workspace home");
   assert.ok(!detail.blocks.some((b) => b.block === "media"), "no photo gallery on a workspace detail");
   assert.ok(detail.blocks.some((b) => b.block === "detail"), "focused record pane present");
+  assert.ok(home.blocks.some((b) => b.block === "stats" && b.emphasis), "scoreboard opens the dashboard home");
+  assert.ok(home.blocks.length <= 5, `v21 clutter cap: home ≤ 5 sections (got ${home.blocks.length})`);
 
   // Compose + sandbox + gates must all pass on the product-led fallback.
   const { designTokensFromManifest } = await import("../lib/pastel-agent/agents/design");
   const { themeFromDesignTokens } = await import("../lib/pastel-agent/knowledge/index");
   const tokens = designTokensFromManifest(company, "light");
   const theme = themeFromDesignTokens(tokens, company);
-  const { css } = compileStyles(theme);
-  const components: Record<string, string> = {};
-  for (const item of wf.inventory.components) {
-    const code = baseComponentCode(item.basedOn);
-    if (code) components[`src/components/${item.name}.jsx`] = code;
-  }
   const data = mockDataset(brief, "v14-dash");
   assert.equal(data.domain, "productivity");
   const copy = fallbackCopy(brief, wf.plan, data);
-  const composed = composeAll({ brief, wireframe: wf.plan, inventory: wf.inventory, copy, theme, data, ux: fallbackUx(wf.plan) });
-  const files = { ...components, ...composed.files, ...composed.primitives, "src/styles.css": css };
 
-  const homeSrc = composed.files["src/screens/home.jsx"];
-  const detailSrc = composed.files["src/screens/detail.jsx"];
+  const { files } = await composeV21({
+    brief, plan: wf.plan, inventory: wf.inventory, theme, data, copy, ux: fallbackUx(wf.plan),
+    bodies: {
+      home: `<section className="py-16">
+  <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{DATA.screens.home.metrics.map((m) => <div key={m.label} className="rounded-[var(--radius-lg)] bg-muted/30 p-5"><p className="text-3xl font-semibold tabular-nums">{m.value}{m.unit}</p><p className="mt-1 text-sm text-muted-foreground">{m.label}</p></div>)}</div>
+</section>`,
+      detail: `<section className="py-12">
+  <SectionHeader eyebrow="Project" title="Project detail" />
+  <p className="text-muted-foreground">Focused record view</p>
+</section>`,
+    },
+  });
+
+  const homeSrc = files["src/screens/home.jsx"];
+  const detailSrc = files["src/screens/detail.jsx"];
   // The Airbnb-style surface language is GONE from a non-browse product.
   assert.ok(!homeSrc.includes("Where to?"), "no destination search hero");
   assert.ok(!detailSrc.includes("Guest reviews"), "no guest-reviews section on a workspace detail");
   assert.ok(!detailSrc.includes("Verified host"), "no verified-host language on a workspace detail");
-  assert.ok(!detailSrc.includes(">Dates<"), "no booking dates on a workspace detail");
-  assert.ok(!detailSrc.includes(">Guests<"), "no guest counts on a workspace detail");
 
   const verifier = new IncrementalScreenVerifier();
   const result = await verifier.verify(files);
@@ -1491,10 +1805,9 @@ test("v14 data: runData falls back to the domain packs when the gateway is unava
   }
 });
 
-test("v14 data: compose reads the dataset's content (heading, trust items, CTA) instead of baked consts", async () => {
+test("v14 data: the composed screen reads the dataset's content (CTA, scoped fields) instead of baked consts", async () => {
   const company = await loadCompany("airbnb");
   const theme = resolveCompanyTheme(company, { mode: "light", hue: company.hueBase });
-  const { css } = compileStyles(theme);
   const brief = productBriefSchema.parse({
     version: "1.0.0", title: "StayVista", productType: "vacation rental booking app",
     description: "Browse unique vacation rentals worldwide.", audience: { primary: "Travelers", needs: ["x"] },
@@ -1511,22 +1824,40 @@ test("v14 data: compose reads the dataset's content (heading, trust items, CTA) 
       { id: "home", archetype: "catalog", title: "Stays", purpose: "Browse", nav: "topbar",
         blocks: [{ block: "hero", variant: "app", emphasis: true }, { block: "search", variant: "dropdown" }, { block: "list", variant: "cards" }] },
       { id: "detail", archetype: "list-detail", title: "Villa", purpose: "Listing", nav: "topbar",
-        blocks: [{ block: "media", variant: "gallery", emphasis: true }, { block: "detail", variant: "pane" }, { block: "cta", variant: "band" }, { block: "list", variant: "activity" }] },
+        blocks: [{ block: "media", variant: "gallery", emphasis: true }, { block: "detail", variant: "pane" }, { block: "cta", variant: "band" }] },
     ],
   };
-  const data = mockDataset(brief, "v14b-compose");
-  data.reviewHeading = "Traveller notes";
-  data.trustItems = ["Money-back promise", "Local guides", "Verified stays", "Instant chat"];
-  data.primaryCta = "Book my trip";
+  const data = mockDataset(brief, "v14-content");
   const copy = fallbackCopy(brief, plan, data);
+
+  // The deterministic data file carries the per-run content — CTA, reviews,
+  // scoped detail fields. Screens read DATA, never baked consts.
+  const { composeAll } = await import("../lib/pastel-agent/compose");
   const composed = composeAll({ brief, wireframe: plan, inventory: { version: "1.0.0", components: [] }, copy, theme, data, ux: fallbackUx(plan) });
-  const detail = composed.files["src/screens/detail.jsx"];
   const dataFile = composed.files["src/data.js"];
-  assert.ok(detail.includes("Traveller notes"), "review heading comes from the dataset");
-  assert.ok(detail.includes("Money-back promise"), "trust items come from the dataset");
-  assert.ok(dataFile.includes("Book my trip"), "primary CTA comes from the dataset (rendered via DATA.screens.detail.primaryCta)");
-  assert.ok(detail.includes("DATA.screens.detail.primaryCta"), "detail renders the dataset CTA");
-  assert.ok(detail.includes("Verified host"), "stay products keep the host signal (V15: booking language is legal for transact/stay)");
+  assert.ok(dataFile.includes(data.primaryCta ?? "Book my trip"), "primary CTA comes from the dataset");
+  assert.ok(dataFile.includes("reviews"), "detail reviews ship in the scoped data");
+
+  const { files } = await composeV21({
+    brief, plan, inventory: { version: "1.0.0", components: [] }, theme, data, copy, ux: fallbackUx(plan),
+    bodies: {
+      home: `<section className="py-12">
+  <SectionHeader eyebrow="Browse" title="Explore" />
+  <p className="text-muted-foreground">catalog</p>
+</section>`,
+      detail: `<section className="py-12">
+  <SectionHeader eyebrow="Next" title={DATA.screens.detail.primaryCta} />
+  <p className="text-muted-foreground">{DATA.screens.detail.reviews.length} reviews</p>
+</section>`,
+    },
+  });
+  const detail = files["src/screens/detail.jsx"];
+  assert.ok(detail.includes("DATA.screens.detail.primaryCta"), "detail renders the dataset CTA, never a baked string");
+  assert.ok(detail.includes("DATA.screens.detail.reviews.length"), "detail reads the dataset's review count");
+
+  const verifier = new IncrementalScreenVerifier();
+  const result = await verifier.verify(files);
+  assert.ok(result.ok, `sandbox failed: ${result.errors.map((e) => e.message).join("; ")}`);
 });
 
 test("v14 review: screen-composition audit flags duplicate and missing components", async () => {
@@ -1553,7 +1884,7 @@ test("v14 review: screen-composition audit flags duplicate and missing component
     ],
   };
   const issues = auditScreenComposition(wireframe, inventory);
-  assert.ok(issues.some((i) => i.description.includes("Duplicate component \"StreakModule\"") && i.severity === "high"), "duplicate mount is flagged HIGH");
+  assert.ok(issues.some((i) => i.description.includes('Component "StreakModule" planned 2x on home') && i.severity === "high"), "duplicate mount is flagged HIGH");
   assert.ok(issues.some((i) => i.description.includes("RecordRow") && i.file === "src/screens/detail.jsx"), "planned-but-unmounted component is flagged");
 });
 

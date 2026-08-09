@@ -1,7 +1,6 @@
 import { chatJSON, MAX_TOKENS_PER_CALL, type OnUsage } from "../gateway";
 import { wireframePlanSchema, componentInventorySchema, type WireframePlan, type ComponentInventory, type ProductBrief, type BlockInstance } from "../schemas";
 import { loadCompany, compileCompanyBlock, megadesignBlock } from "../knowledge/index";
-import { baseComponentCode, baseComponentNames } from "../base-components/index";
 import { enforceUxDesign, classifyMode } from "../lib/ux-design";
 import { pickDomain, briefText } from "../lib/domains";
 import type { VisualReference } from "../types";
@@ -75,7 +74,14 @@ V18 COMPOSITION RULES (hard):
 - Cards are SCARCE: only the detail summary card uses the "card" surface. Everything else uses soft-wash, divided-list, or tonal-band.
 - Prefer side-by-side pairings (stats+custom or chart+custom as a two-up row) for layout variety.
 - EXACTLY ONE screen gets a search block (the home screen, browse/transact modes only).
-- Inventory: 6-8 product-specific components. At least one that ONLY this product would have. Every component must be distinct — no two components based on the same base.`;
+- Inventory: 4-6 product-specific components. At least one that ONLY this product would have. Every component must be distinct — no two components may share a purpose.
+
+V19 DISTINCTIVENESS (hard — this is how the product avoids the "every output is the same template" defect):
+- The TWO screens must NOT read as a generic SaaS template. A fitness app home reads as a TRAINING dashboard, a travel app home as a DESTINATION marketplace, a dev tool home as an ENGINEERING workspace. Choose blocks, variants, and custom components that make the product's own job obvious.
+- Custom components are the signature. At least TWO inventory components must be so product-specific they could not ship in a different product: an amenity grid for a stay, a stat ring for a runner, a commit graph for a dev tool, a playlist strip for a music app. Generic primitives (Button/Card/Input) listed as "custom" are a FAILURE.
+- Vary the block sequence per product. Do NOT reuse the same block order for different products — the mode rules are a minimum, not a uniform recipe.
+- The shell (Topbar, Sidebar, Button, Avatar, Badge, Input, Select, Separator) is ALWAYS in the inventory — the builder adapts each per run, so no two products share a header or sidebar.
+- Never include a hero block on track/create/operate/learn/social products (the DASHBOARD ANTIPATTERN above).`;
 
 export const SCREEN_ARCHETYPES = `SCREEN ARCHETYPES (only two are used):
 - home screen: "catalog" (browse: search + product grid — ONLY for genuine browse/marketplace products) or "app-dashboard" (metrics/feed/workspace-led home — the default for most products). V17: app-dashboard screens use sidebar (desktop, preferred) or topbar. NEVER "none" or "tabbar" for app-dashboard.
@@ -100,7 +106,6 @@ export async function runWireframe(input: WireframeInput): Promise<WireframeOutp
   const company = await loadCompany(input.brief.inspiration.primary);
   const companyBlock = await compileCompanyBlock(input.brief.inspiration.primary);
   const megadesign = await megadesignBlock();
-  const names = baseComponentNames().sort().join(", ");
 
   const briefBlock = [
     `PRODUCT: ${input.brief.title} — ${input.brief.productType}`,
@@ -137,7 +142,7 @@ export async function runWireframe(input: WireframeInput): Promise<WireframeOutp
     refText += `\n\n### USER FIGMA/BANANI PRODUCT TARGET\nThe attached image is the product's visual source of truth. Match its composition, hierarchy, spacing, surface treatment, density, and responsive intent. Do not copy its domain, text, brand, or page archetype. Product requirements outrank inspiration-company patterns.`;
   }
 
-  const userText = `${briefBlock}\n\n${companyBlock}\n\n${megadesign}\n\n${recipeBlock}\n\nAvailable base components to adapt from: ${names}\n\n${refText}\n\nEmit the wireframe plan and component inventory as JSON.`;
+  const userText = `${briefBlock}\n\n${companyBlock}\n\n${megadesign}\n\n${recipeBlock}\n\n${refText}\n\nEmit the wireframe plan and component inventory as JSON.`;
 
   try {
     const output = await chatJSON<{ plan: WireframePlan; inventory: ComponentInventory }>(
@@ -155,7 +160,7 @@ OUTPUT as ONE JSON object:
   },
   "inventory": {
     "version": "1.0.0",
-    "components": [{ "name" (PascalCase), "purpose", "basedOn" (ONE of the available names), "usedBy": [screen ids] }] (6-8)
+    "components": [{ "name" (PascalCase), "purpose", "usedBy": [screen ids] }] (4-6)
   }
 }` },
         {
@@ -203,7 +208,39 @@ export function enforceWireframeRules(
   mode?: ProductBrief["mode"],
 ): { plan: WireframePlan; inventory: ComponentInventory; notes: string[] } {
   const { plan: enforced, inventory: enforcedInv, notes } = enforceUxDesign(plan, inventory, mode);
-  return { plan: enforced, inventory: enforcedInv, notes };
+  return { plan: enforced, inventory: withShellComponents(enforcedInv), notes };
+}
+
+/**
+ * V19: every run's inventory includes the SHELL + common primitives so the
+ * builder produces a per-run, product-specific version of each — never the
+ * generic base component shipped verbatim. The composer mounts these by name.
+ *
+ * v18 shipped the fixed base Topbar/Sidebar/Button/Avatar files as the
+ * silent safety net whenever the custom pipeline failed — the "same header
+ * and sidebar every time" the users saw. Routing them through planner +
+ * builder makes each run's chrome bespoke, and the screen composer mounts
+ * the BUILT versions.
+ */
+const SHELL_COMPONENTS: Array<{ name: string; purpose: string; usedBy: string[] }> = [
+  { name: "Topbar", purpose: "Product header with brand, page title, and user context", usedBy: ["home", "detail"] },
+  { name: "Sidebar", purpose: "Product navigation rail with brand and destinations", usedBy: ["home", "detail"] },
+  { name: "Button", purpose: "Product action button with primary/secondary/ghost variants", usedBy: ["home", "detail"] },
+  { name: "Avatar", purpose: "User avatar with initials and brand hue", usedBy: ["home", "detail"] },
+  { name: "Badge", purpose: "Status and notification badges", usedBy: ["home", "detail"] },
+  { name: "Input", purpose: "Text and search inputs", usedBy: ["home", "detail"] },
+  { name: "Select", purpose: "Dropdown select controls", usedBy: ["home", "detail"] },
+  { name: "Separator", purpose: "Section and row dividers", usedBy: ["home", "detail"] },
+];
+
+export function withShellComponents(inventory: ComponentInventory): ComponentInventory {
+  const names = new Set(inventory.components.map((c) => c.name));
+  const added = SHELL_COMPONENTS.filter((s) => !names.has(s.name));
+  if (added.length === 0) return inventory;
+  return {
+    version: inventory.version,
+    components: [...inventory.components, ...added],
+  };
 }
 
 export function fallbackWireframe(
@@ -255,7 +292,7 @@ function fitnessFallback(brief: ProductBrief): WireframeOutput {
       purpose: "Start today's adaptive training session and review readiness",
       nav: "topbar",
       blocks: [
-        { block: "hero", variant: "app", emphasis: true },
+        { block: "stats", variant: "scoreboard", emphasis: true },
         { block: "custom", variant: "default", component: "ReadinessMeter", content: "Readiness" },
         { block: "custom", variant: "default", component: "CoachInsight", content: "Coach insight" },
         { block: "list", variant: "sequence", content: "Today's sequence" },
@@ -281,12 +318,12 @@ function fitnessFallback(brief: ProductBrief): WireframeOutput {
   const inventory: ComponentInventory = {
     version: "1.0.0",
     components: [
-      { name: "CoachInsight", purpose: "Adaptive coaching recommendation and rationale", basedOn: "StatCard", usedBy: ["home"] },
-      { name: "RecoveryBlock", purpose: "Post-session recovery and check-in summary", basedOn: "Card", usedBy: ["home"] },
-      { name: "FormCues", purpose: "Exercise setup, execution, and common mistakes", basedOn: "MediaStrip", usedBy: ["detail"] },
-      { name: "ReadinessMeter", purpose: "Readiness and training-load signal", basedOn: "Meter", usedBy: ["home"] },
-      { name: "ExerciseTarget", purpose: "Sets, reps, load, and rest target", basedOn: "StatCard", usedBy: ["detail"] },
-      { name: "SessionHistory", purpose: "Recent strength progression rows", basedOn: "ScheduleList", usedBy: ["detail"] },
+      { name: "CoachInsight", purpose: "Adaptive coaching recommendation and rationale", usedBy: ["home"] },
+      { name: "RecoveryBlock", purpose: "Post-session recovery and check-in summary", usedBy: ["home"] },
+      { name: "FormCues", purpose: "Exercise setup, execution, and common mistakes", usedBy: ["detail"] },
+      { name: "ReadinessMeter", purpose: "Readiness and training-load signal", usedBy: ["home"] },
+      { name: "ExerciseTarget", purpose: "Sets, reps, load, and rest target", usedBy: ["detail"] },
+      { name: "SessionHistory", purpose: "Recent strength progression rows", usedBy: ["detail"] },
     ],
   };
   return enforced({ version: "1.0.0", screens }, inventory);
@@ -329,10 +366,10 @@ function catalogFallback(brief: ProductBrief): WireframeOutput {
   const inventory: ComponentInventory = {
     version: "1.0.0",
     components: [
-      { name: "CatalogHighlights", purpose: "Curated showcase of featured items", basedOn: "MediaStrip", usedBy: ["home"] },
-      { name: "ItemCard", purpose: "Photo-first product card for editorial picks", basedOn: "Card", usedBy: ["home"] },
-      { name: "HostTrustLegend", purpose: "Trust and quality badges for an item", basedOn: "Badge", usedBy: ["detail"] },
-      { name: "AmenityGrid", purpose: "Grid of an item's features and amenities", basedOn: "AmenityGrid", usedBy: ["detail"] },
+      { name: "CatalogHighlights", purpose: "Curated showcase of featured items", usedBy: ["home"] },
+      { name: "ItemCard", purpose: "Photo-first product card for editorial picks", usedBy: ["home"] },
+      { name: "HostTrustLegend", purpose: "Trust and quality badges for an item", usedBy: ["detail"] },
+      { name: "AmenityGrid", purpose: "Grid of an item's features and amenities", usedBy: ["detail"] },
     ],
   };
   return enforced({ version: "1.0.0", screens }, inventory);
@@ -373,10 +410,10 @@ function mediaFallback(brief: ProductBrief): WireframeOutput {
   const inventory: ComponentInventory = {
     version: "1.0.0",
     components: [
-      { name: "QueuePanel", purpose: "Up-next queue with reorder controls", basedOn: "ScheduleList", usedBy: ["home"] },
-      { name: "ReleaseCard", purpose: "Artwork-first card for a release", basedOn: "Card", usedBy: ["home"] },
-      { name: "TrackList", purpose: "Track/segment rows with durations", basedOn: "ScheduleList", usedBy: ["detail"] },
-      { name: "CreditsPanel", purpose: "Credits and release facts", basedOn: "Card", usedBy: ["detail"] },
+      { name: "QueuePanel", purpose: "Up-next queue with reorder controls", usedBy: ["home"] },
+      { name: "ReleaseCard", purpose: "Artwork-first card for a release", usedBy: ["home"] },
+      { name: "TrackList", purpose: "Track/segment rows with durations", usedBy: ["detail"] },
+      { name: "CreditsPanel", purpose: "Credits and release facts", usedBy: ["detail"] },
     ],
   };
   return enforced({ version: "1.0.0", screens }, inventory);
@@ -392,9 +429,8 @@ function socialFallback(brief: ProductBrief): WireframeOutput {
       purpose: brief.screenPurposes.find((p) => p.id === "home")?.purpose ?? "The community feed — posts, activity, and connections",
       nav: "topbar",
       blocks: [
-        { block: "hero", variant: "app", emphasis: true },
+        { block: "list", variant: "activity", emphasis: true, content: "Community activity" },
         { block: "stats", variant: "scoreboard" },
-        { block: "list", variant: "activity", content: "Community activity" },
         { block: "custom", variant: "default", component: "PostCard", content: "Latest posts" },
         { block: "custom", variant: "default", component: "CommunityStats", content: "Community pulse" },
         { block: "custom", variant: "default", component: "TopicRow", content: "Trending topics" },
@@ -419,19 +455,20 @@ function socialFallback(brief: ProductBrief): WireframeOutput {
   const inventory: ComponentInventory = {
     version: "1.0.0",
     components: [
-      { name: "PostCard", purpose: "Community post with engagement counts", basedOn: "Card", usedBy: ["home"] },
-      { name: "CommunityStats", purpose: "Members, posts, and activity metrics", basedOn: "StatCard", usedBy: ["home"] },
-      { name: "TopicRow", purpose: "Trending topic rows", basedOn: "ScheduleList", usedBy: ["home"] },
-      { name: "ReplyRow", purpose: "Reply rows with author avatars", basedOn: "Avatar", usedBy: ["detail"] },
-      { name: "EngagementBar", purpose: "Like/share/reply action row", basedOn: "Button", usedBy: ["detail"] },
-      { name: "ProfileBadge", purpose: "Author identity chip", basedOn: "Badge", usedBy: ["detail"] },
+      { name: "PostCard", purpose: "Community post with engagement counts", usedBy: ["home"] },
+      { name: "CommunityStats", purpose: "Members, posts, and activity metrics", usedBy: ["home"] },
+      { name: "TopicRow", purpose: "Trending topic rows", usedBy: ["home"] },
+      { name: "ReplyRow", purpose: "Reply rows with author avatars", usedBy: ["detail"] },
+      { name: "EngagementBar", purpose: "Like/share/reply action row", usedBy: ["detail"] },
+      { name: "ProfileBadge", purpose: "Author identity chip", usedBy: ["detail"] },
     ],
   };
   return enforced({ version: "1.0.0", screens }, inventory);
 }
 
 /** V14 dashboard fallback — the default for non-browse products: metrics-led
- * home + focused record view. No search toolbar, no gallery, no reviews. */
+ * home + focused record view. No hero (the V18 dashboard antipattern), no
+ * search toolbar, no gallery, no reviews. The scoreboard opens the home. */
 function dashboardFallback(brief: ProductBrief): WireframeOutput {
   const screens: WireframePlan["screens"] = [
     {
@@ -441,8 +478,7 @@ function dashboardFallback(brief: ProductBrief): WireframeOutput {
       purpose: brief.screenPurposes.find((p) => p.id === "home")?.purpose ?? "The primary dashboard — today's metrics and the main workflow",
       nav: "topbar",
       blocks: [
-        { block: "hero", variant: "app", emphasis: true },
-        { block: "stats", variant: "scoreboard" },
+        { block: "stats", variant: "scoreboard", emphasis: true },
         { block: "chart", variant: "band" },
         { block: "list", variant: "rows", content: "Recent records" },
         { block: "custom", variant: "default", component: "GoalProgress", content: "Goals" },
@@ -468,12 +504,12 @@ function dashboardFallback(brief: ProductBrief): WireframeOutput {
   const inventory: ComponentInventory = {
     version: "1.0.0",
     components: [
-      { name: "GoalProgress", purpose: "Goal targets with progress meters", basedOn: "Progress", usedBy: ["home"] },
-      { name: "InsightPanel", purpose: "Insight card with the key metric and trend", basedOn: "StatCard", usedBy: ["home"] },
-      { name: "RecordRow", purpose: "Recent record rows with values", basedOn: "ScheduleList", usedBy: ["home"] },
-      { name: "ActionPanel", purpose: "Primary and secondary actions for the record", basedOn: "Card", usedBy: ["detail"] },
-      { name: "SummaryBar", purpose: "Record summary metrics", basedOn: "StatCard", usedBy: ["detail"] },
-      { name: "HistoryStrip", purpose: "Recent history for the record", basedOn: "ScheduleList", usedBy: ["detail"] },
+      { name: "GoalProgress", purpose: "Goal targets with progress meters", usedBy: ["home"] },
+      { name: "InsightPanel", purpose: "Insight card with the key metric and trend", usedBy: ["home"] },
+      { name: "RecordRow", purpose: "Recent record rows with values", usedBy: ["home"] },
+      { name: "ActionPanel", purpose: "Primary and secondary actions for the record", usedBy: ["detail"] },
+      { name: "SummaryBar", purpose: "Record summary metrics", usedBy: ["detail"] },
+      { name: "HistoryStrip", purpose: "Recent history for the record", usedBy: ["detail"] },
     ],
   };
   return enforced({ version: "1.0.0", screens }, inventory);

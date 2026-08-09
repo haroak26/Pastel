@@ -330,6 +330,11 @@ function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[], screen: { pu
     // V17: sidebar and topbar are nav metadata — always keep them through
     // enforcement; compose handles nav separately.
     if (b.block === "sidebar" || b.block === "topbar") return true;
+    // V18/V21 DASHBOARD ANTIPATTERN: hero blocks are ONLY legal on genuine
+    // browse/transact homes. Dashboard/workspace/feed/track/learn homes must
+    // NEVER open with a marketing-shaped hero — they open with stats or the
+    // product's own moment.
+    if (role === "home" && b.block === "hero" && !catalogHome) return false;
     // V15 hard gate: off-mode blocks are DROPPED, not just left out — a
     // track/create/operate/learn detail can never keep a gallery the model
     // added, and a non-browse home can never keep a search toolbar.
@@ -461,6 +466,26 @@ function normalizeBlocks(role: ScreenRole, blocks: BlockInstance[], screen: { pu
     });
   }
 
+  // V21 clutter cap: a screen is ONE story — at most 5 CONTENT sections on
+  // home and 4 on detail (nav metadata — sidebar/topbar — is shell chrome,
+  // not a section). Excess custom blocks (the "too much on the screen"
+  // defect) are dropped from the TAIL, keeping the required + dominant ones.
+  const contentBlocks = ordered.filter((b) => b.block !== "sidebar" && b.block !== "topbar");
+  const navBlocks = ordered.filter((b) => b.block === "sidebar" || b.block === "topbar");
+  const cap = role === "home" ? 5 : 4;
+  if (contentBlocks.length > cap) {
+    const droppedTail = contentBlocks.slice(cap);
+    for (const b of droppedTail) {
+      const idx = ordered.indexOf(b);
+      if (idx !== -1) ordered.splice(idx, 1);
+    }
+    notes.push(`v21 clutter cap: dropped ${droppedTail.length} trailing section(s) on ${role} (${droppedTail.map((b) => b.block).join(", ")}) — max ${cap} per screen`);
+  }
+  const finalContent = ordered.filter((b) => b.block !== "sidebar" && b.block !== "topbar");
+  const finalNav = ordered.filter((b) => b.block === "sidebar" || b.block === "topbar");
+  ordered.length = 0;
+  ordered.push(...finalContent, ...finalNav);
+
   return { blocks: ordered, notes };
 }
 
@@ -573,8 +598,12 @@ export function enforceUxDesign(
       blocks: s.blocks.map((b) => backfill(screenRoleOf(s), b)),
     }));
 
+    // V21: the mount contract counts `component` on ANY block — the
+    // wireframe legitimately hints a component behind a stats/chart/detail
+    // block (stats:scoreboard → SprintHealthSummary). v20 only counted
+    // custom blocks, silently dropping every hinted component.
     const mounted = new Set<string>(
-      normalizedPlan.screens.flatMap((s) => s.blocks.filter((b) => b.block === "custom" && b.component).map((b) => b.component as string)),
+      normalizedPlan.screens.flatMap((s) => s.blocks.filter((b) => b.component).map((b) => b.component as string)),
     );
     const kept = mapped.filter((c) => mounted.has(c.name)).slice(0, 8);
     const unmounted = mapped.filter((c) => !kept.includes(c));

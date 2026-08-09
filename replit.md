@@ -78,7 +78,7 @@ company design references that carries the visual quality:
 - `STRIPE_PRICE_STARTER_ANNUAL`, `STRIPE_PRICE_PRO_ANNUAL`, `STRIPE_PRICE_MAX_ANNUAL` — Stripe Price IDs for annual billing (20% discount)
 - `PADDLE_API_KEY` — Paddle billing (optional)
 - `MERGE_GATEWAY_API_KEY` — AI gateway for the Pastel Agent + assistant features
-- `PASTEL_MODEL_<ROLE>` — override Pastel models per role (v6 roles: CLARIFY, BRIEF, WIREFRAME, PLANNER, BUILDER, COPY, ASSEMBLE, REVIEW, VISUAL_REVIEW, REPAIR); `PASTEL_MAX_TOKENS_<ROLE>`, `PASTEL_THINKING_BUDGET`
+- `PASTEL_MODEL_<ROLE>` — override Pastel models per role (v21 roles: CLARIFY, DESIGN, DATA, BRIEF, WIREFRAME, PLANNER, BUILDER, BUILDER_CUSTOM, COPY, ASSEMBLE, COMPOSE, REVIEW, VISUAL_REVIEW, REPAIR); `PASTEL_MAX_TOKENS_<ROLE>`, `PASTEL_THINKING_BUDGET`
 - `PASTEL_MERGE_GATEWAY_TAG_<ROLE>` / `PASTEL_MERGE_GATEWAY_TAG_KEY` / `PASTEL_MERGE_GATEWAY_TAG_VALUE` — gateway analytics tags (default key `betatesterid`; values must be org-registered)
 - `PASTEL_MAX_RUN_CREDITS` — per-run repair/guard budget ceiling (default 25)
 - `PASTEL_MAX_REPAIR_CYCLES` — bounded repair loop iterations (default 2, range 1–5)

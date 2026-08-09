@@ -87,7 +87,7 @@ RULES:
 
 - Colors: every pair listed in the contrast requirements must pass WCAG AA (≥4.5:1 body text on its surface, ≥4.5:1 for primary/accent foreground pairs). Choose 3-6 chart colors that harmonize with the palette and are visually distinct from each other.
 - Light mode: background near-white/off-white, foreground near-black, muted backgrounds slightly tinted. Dark mode (only when the request or answers ask for it): background near-black, foreground near-white.
-- Radius: match the brand's character (sharp 2-4px for engineering tools, 8-12px medium for friendly products, generous 12-20px for consumer/lifestyle brands). full is always 9999.
+- Radius: match the brand's character (sharp 2-4px for engineering tools, 8-12px medium for friendly products, generous 12-20px for consumer/lifestyle brands). full is always 9999. V21 floors (enforced): cornerLanguage soft → radius.lg ≥ 8px and radius.xl ≥ 12px; pill → radius.lg ≥ 16px and radius.xl ≥ 20px. Products aimed at consumers read as "unfinished" with sub-8px corners.
 - Type scale: display font for headings, body font for text. Pick real fonts from Google Fonts (e.g. Inter, Archivo, Space Grotesk, DM Sans, Sora, Manrope, Lexend, IBM Plex Sans, JetBrains Mono). Never use "system-ui" as display.
 - Control sizes: the 8px ladder — sm 28-36, md 40-44, lg 48-56 (interactive elements must stay ≥32px).
 - Section rhythm: sectionPaddingY 48-88, sectionGap 24-48. Tie these to spacingMood — compact gets lower values, generous gets higher.
@@ -141,6 +141,23 @@ export function validateDesignTokens(tokens: DesignTokens): { ok: boolean; error
     errors.push("type scale must be strictly increasing");
   }
   return { ok: errors.length === 0, errors };
+}
+
+/** V21 radius floor — components read as "not rounded" when the theme's
+ * corner radius is tiny. The corner language sets the floor; tokens below
+ * the floor are bumped up deterministically (never rejected). */
+export function enforceRadiusFloor(tokens: DesignTokens, visual: VisualIntent): DesignTokens {
+  const floor = visual.cornerLanguage === "pill" ? { lg: 16, xl: 20 }
+    : visual.cornerLanguage === "soft" ? { lg: 8, xl: 12 }
+    : { lg: 2, xl: 4 };
+  const radius = { ...tokens.radius };
+  let changed = false;
+  if (radius.lg < floor.lg) { radius.lg = floor.lg; changed = true; }
+  if (radius.xl < floor.xl) { radius.xl = floor.xl; changed = true; }
+  if (radius.md >= radius.lg) { radius.md = Math.max(4, radius.lg - 2); changed = true; }
+  if (radius.sm >= radius.md) { radius.sm = Math.max(2, radius.md - 2); changed = true; }
+  if (!changed) return tokens;
+  return { ...tokens, radius, rationale: `${tokens.rationale ?? ""} Radius raised to the ${visual.cornerLanguage} corner floor (lg ≥ ${floor.lg}px).`.trim() };
 }
 
 /** Deterministic fallback: derive a token system from a company manifest
@@ -268,10 +285,12 @@ export async function runDesign(input: DesignInput): Promise<DesignOutput> {
       throw new Error(`Design tokens failed WCAG validation: ${errors.join("; ")}`);
     }
     const visual = out.visual ?? visualIntentFromTokens(out.tokens, input.hintManifest.slug);
-    const brandKit = buildBrandKit(out.tokens, visual, input.hintManifest.slug);
+    const floored = enforceRadiusFloor(out.tokens, visual);
+    if (floored !== out.tokens) notes.push("radius raised to the corner-language floor (components read as rounded)");
+    const brandKit = buildBrandKit(floored, visual, input.hintManifest.slug);
     return {
-      tokens: out.tokens,
-      theme: themeFromDesignTokens(out.tokens, input.hintManifest),
+      tokens: floored,
+      theme: themeFromDesignTokens(floored, input.hintManifest),
       visual,
       brandKit,
       usedFallback: false,
@@ -281,11 +300,13 @@ export async function runDesign(input: DesignInput): Promise<DesignOutput> {
     console.warn("[pastel v15] design agent failed, using manifest-derived tokens:", err instanceof Error ? err.message : err);
     const fallback = designTokensFromManifest(input.hintManifest, mode);
     const fallbackVisual = visualIntentFromTokens(fallback, input.hintManifest.slug);
+    const floored = enforceRadiusFloor(fallback, fallbackVisual);
+    if (floored !== fallback) notes.push("radius raised to the corner-language floor (components read as rounded)");
     return {
-      tokens: fallback,
-      theme: themeFromDesignTokens(fallback, input.hintManifest),
+      tokens: floored,
+      theme: themeFromDesignTokens(floored, input.hintManifest),
       visual: fallbackVisual,
-      brandKit: buildBrandKit(fallback, fallbackVisual, input.hintManifest.slug),
+      brandKit: buildBrandKit(floored, fallbackVisual, input.hintManifest.slug),
       usedFallback: true,
       notes: [...notes, "deterministic token + visual-intent + brand-kit fallback used (design model unavailable/invalid)"],
     };

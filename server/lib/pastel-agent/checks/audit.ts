@@ -39,6 +39,20 @@ const OFF_RHYTHM_CONTROL = /\bh-9\b|\bh-11\b/;
 const GRADIENT = /bg-gradient|from-[a-z]+-|via-[a-z]+-|to-[a-z]+-/;
 const BLURB = /lorem ipsum|placeholder text/i;
 const AI_SLOP_COPY = /unlock (your |the )?potential|enterprise-grade|game[- ]changer|seamless(ly)? (integration|experience)|revolutioniz|cutting[- ]edge|supercharge/i;
+/** V19: hardcoded radius values off the token scale — the theme law. */
+const RAW_RADIUS = /\brounded-(?:sm|md|lg|xl|2xl|3xl)\b/;
+
+/** Detect a generated component file that reads as an UNMODIFIED generic
+ * template. V21 removed the base-component library, so there is no source
+ * file to diff against — instead the signature of "copied template" is
+ * detected structurally: a component that uses NO theme token and NO radius
+ * token renders as the bare-bones generic skeleton. */
+function isVerbatimBaseCopy(path: string, content: string): boolean {
+  if (!path.startsWith("src/components/")) return false;
+  if (content.includes("var(--")) return false;
+  if (/rounded-\[var\(--radius/.test(content)) return false;
+  return content.trim().length > 60;
+}
 
 function contrastIssues(theme: ResolvedTheme): GateIssue[] {
   const t = theme.tokens;
@@ -127,6 +141,30 @@ export function auditFiles(theme: ResolvedTheme, files: Record<string, string>):
         severity: "medium",
         category: "tokens",
         description: `Off-rhythm raw sizing utilities ${hits} — use the --control-* scale (h-[var(--control-md)]) and the 8px rhythm.`,
+      });
+    }
+
+    // V19: hardcoded radius values off the token scale — the theme law.
+    // Raw rounded-md/xl etc. override the run's radius tokens.
+    if (RAW_RADIUS.test(content)) {
+      const hits = [...new Set(content.match(RAW_RADIUS) ?? [])].slice(0, 3).join(", ");
+      issues.push({
+        file: path,
+        severity: "medium",
+        category: "tokens",
+        description: `Hardcoded radius ${hits} — use rounded-[var(--radius-md)]/var(--radius-lg) so corners follow the run's token scale.`,
+      });
+    }
+
+    // V19: a component shipped as an UNMODIFIED base component copy is the
+    // "everything looks the same" defect. Every component must be adapted
+    // per-run by the builder.
+    if (isVerbatimBaseCopy(path, content)) {
+      issues.push({
+        file: path,
+        severity: "medium",
+        category: "anti-slop",
+        description: `Component is an unmodified copy of the base "${path.replace(/^src\/components\//, "").replace(/\.jsx$/, "")}" — every component must be a per-run adaptation (the builder's job).`,
       });
     }
 

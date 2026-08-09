@@ -21,9 +21,11 @@ export function auditScreenComposition(
   const issues: GateIssue[] = [];
 
   for (const screen of wireframe.screens) {
-    const customs = screen.blocks.filter((b) => b.block === "custom" && b.component);
+    // V21: `component` on ANY block is a mount (the wireframe hints
+    // components behind stats/chart/detail blocks, not only custom blocks).
+    const mounts = screen.blocks.filter((b) => b.component);
     const seen = new Map<string, number>();
-    for (const b of customs) {
+    for (const b of mounts) {
       const name = b.component!;
       seen.set(name, (seen.get(name) ?? 0) + 1);
     }
@@ -33,22 +35,22 @@ export function auditScreenComposition(
           file: `src/screens/${screen.id}.jsx`,
           severity: "high",
           category: "composition",
-          description: `Duplicate component "${name}" mounted ${count}x on ${screen.id} — every inventory component renders exactly once per screen (identical sections read as a template).`,
+          description: `Component "${name}" planned ${count}x on ${screen.id} — every inventory component renders exactly once per screen (identical sections read as a template).`,
         });
       }
     }
 
     // Defense in depth: an inventory component listed for a screen must be
-    // mounted by a custom block there (the mount contract enforces this at
+    // mounted by a block there (the mount contract enforces this at
     // wireframe time; this catches anything that slipped through).
-    const mounted = new Set(customs.map((b) => b.component));
+    const mounted = new Set(mounts.map((b) => b.component));
     for (const c of inventory.components) {
       if (c.usedBy.includes(screen.id) && !mounted.has(c.name)) {
         issues.push({
           file: `src/screens/${screen.id}.jsx`,
           severity: "medium",
           category: "composition",
-          description: `Component "${c.name}" is planned for ${screen.id} but no custom block mounts it — the screen will miss it.`,
+          description: `Component "${c.name}" is planned for ${screen.id} but no block mounts it — the screen will miss it.`,
         });
       }
     }

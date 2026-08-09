@@ -200,8 +200,21 @@ export function enforceV17Plan(brief: ProductBrief, plan: WireframePlan, invento
       blocks: blocks.map((b) => ({ ...b, emphasis: b === dominant ? true : undefined })),
     } as WireframePlan["screens"][number];
   });
-  const mounted = new Set(screens.flatMap((s) => s.blocks.filter((b) => b.block === "custom" && b.component).map((b) => b.component!)));
-  const cleanInventory = { ...inventory, components: inventory.components.filter((c) => mounted.has(c.name)) };
+  // V21: `component` on ANY block is a mount (stats:scoreboard →
+  // SprintHealthSummary), not just custom blocks — v20 dropped every
+  // component the wireframe hinted behind a non-custom block.
+  const mounted = new Set(screens.flatMap((s) => s.blocks.filter((b) => b.component).map((b) => b.component!)));
+  // V20: the deterministic composer shell + prompt ALWAYS reference the
+  // structural shell and primitives (Topbar/Sidebar/Avatar/Input for the shell,
+  // Card/Table/Button/Badge/Select/Separator/Progress as composer primitives).
+  // They are never mounted via "custom" blocks, so dropping them here would
+  // starve the builder and hard-fail every app run at compose. Keep them and
+  // drop only genuinely unused product components.
+  const STRUCTURAL_KEEP = new Set([
+    "Topbar", "Sidebar", "Button", "Avatar", "Badge", "Input", "Select", "Separator",
+    "Card", "Table", "Progress",
+  ]);
+  const cleanInventory = { ...inventory, components: inventory.components.filter((c) => mounted.has(c.name) || STRUCTURAL_KEEP.has(c.name)) };
   if (cleanInventory.components.length !== inventory.components.length) notes.push("v17 dropped unmounted components");
   return { plan: { version: "1.0.0" as const, screens }, inventory: cleanInventory, design, notes };
 }

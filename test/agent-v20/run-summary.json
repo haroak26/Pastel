@@ -1,0 +1,731 @@
+{
+  "runId": "1750216b-12fd-4343-98ad-297c45ccf3b7",
+  "prompt": "Design a project management dashboard for software teams — track tasks across sprints, see team velocity metrics, organize work by priority and status, and drill into individual tasks for details and comments. Make it clean, fast, and professional.",
+  "answers": {
+    "primary_platform": "Desktop-first",
+    "color_scheme": "Light mode only",
+    "key_screen_priority": "Sprint board (Kanban/list view)",
+    "team_size_context": "Small (3–8 people)"
+  },
+  "status": "done",
+  "error": null,
+  "title": "Sprint workspace for software teams",
+  "screens": [
+    "detail",
+    "home"
+  ],
+  "failedScreens": [],
+  "quality": {
+    "score": 43,
+    "passed": false,
+    "repairs": 1
+  },
+  "reviewResult": {
+    "score": 43,
+    "issues": [
+      {
+        "target": "src/screens/detail.jsx",
+        "category": "cross-screen integrity",
+        "severity": "high",
+        "description": "The detail screen renders “Task ENG-239” / “OAuth error copy”, while the brief and scoped detail data require the single task SPR-248, “Add saved filter shortcuts”. OAuth-specific content is not present in the provided productivity dataset and makes the screen the wrong task detail."
+      },
+      {
+        "target": "src/screens/detail.jsx",
+        "category": "missing primary action",
+        "severity": "high",
+        "description": "The detail Topbar is passed an empty actions fragment, and the rendered detail workflow does not expose the required clear next-state action “Move to In review”. The deterministic V17 gate also reports the detail screen as missing its primary action."
+      },
+      {
+        "target": "src/screens/home.jsx",
+        "category": "missing primary action",
+        "severity": "high",
+        "description": "The deterministic V17 gate reports the home render as missing its primary action, despite the source passing a New task button through Topbar. Verify the actual composed Topbar render and place a visibly prominent New task affordance in the sprint workspace."
+      },
+      {
+        "target": "src/screens/home.jsx",
+        "category": "spacing-density",
+        "severity": "medium",
+        "description": "The V17 density gate reports approximately 40% empty viewport on the home dashboard, exceeding the 20% dashboard limit. The sprint board, workload context, velocity context, and recent activity need to occupy the available workspace more deliberately."
+      },
+      {
+        "target": "src/screens/detail.jsx",
+        "category": "spacing-density",
+        "severity": "medium",
+        "description": "The V17 density gate reports approximately 40% empty viewport on the detail screen. Add the required task-specific acceptance criteria, linked pull request, and activity/comment content in the intended flow rather than leaving the focused record visually sparse."
+      },
+      {
+        "target": "src/screens/home.jsx",
+        "category": "content-integrity",
+        "severity": "medium",
+        "description": "The home screen labels the active sprint as “Sprint 24 · Jun 10–21”, while the supplied active task set and velocity series are centered on S25/Sprint 25. Align the sprint selector, dates, metrics, and task rows to one consistent active sprint."
+      },
+      {
+        "target": "home",
+        "category": "spacing",
+        "severity": "high",
+        "description": "The screenshot shows a very large empty vertical region between the Sidebar/navigation and the Topbar/main workspace, roughly 900px tall. This is not intentional breathing room: it disconnects the navigation from the sprint workflow and violates the blocking rule against large empty gaps."
+      },
+      {
+        "target": "home",
+        "category": "missing content",
+        "severity": "high",
+        "description": "The Completed points chart renders as an almost empty plot with values sitting on the baseline and no visible bars or meaningful marks. The home intent requires a compact velocity context across the last five sprints, and this reads as sparse or broken data rendering."
+      },
+      {
+        "target": "home",
+        "category": "flow",
+        "severity": "high",
+        "description": "The bottom of the home screen contains a task-specific comment composer, chronological activity thread, and selected task metadata for Priya Nair. This makes the sprint workspace read like a second task-detail view and conflicts with the requirement that focused task discussion and one-task context belong on detail."
+      },
+      {
+        "target": "detail",
+        "category": "action",
+        "severity": "high",
+        "description": "The detail screen displays Status = In review while the sole primary CTA says Move to In review. The required clear next-state action is therefore ambiguous and appears self-contradictory; it should offer the actual next workflow state, such as Done, or otherwise explain the available transition."
+      },
+      {
+        "target": "home",
+        "category": "density",
+        "severity": "medium",
+        "description": "The Kanban surface contains only one task in each of four columns while the page occupies a very large vertical canvas. Although the task data is specific, the board feels unusually sparse for an active sprint and the empty space amplifies that impression. Add realistic task coverage or tighten the workspace composition."
+      },
+      {
+        "target": "detail",
+        "category": "hierarchy",
+        "severity": "medium",
+        "description": "The task description is presented as an unlabeled subtitle beneath the title rather than as a distinct description section before Acceptance criteria. The content is present, but the intended detail flow would be clearer with an explicit Description label and document-style body treatment."
+      }
+    ],
+    "passed": false,
+    "summary": "The screens compile and use the appropriate desktop dashboard shell, board, workload, metadata, and activity components, but approval is blocked by a fundamentally incorrect detail record, missing visible primary workflow action, and excessive empty space on both screens. The detail content must be scoped to SPR-248 and the home sprint context must be made internally consistent.",
+    "decision": "RETURN_TO_BUILDER",
+    "requiredFixes": [
+      "Update src/screens/detail.jsx to render the scoped SPR-248 task data: “Add saved filter shortcuts”, its correct metadata, description, acceptance criteria, pull request, and activity.",
+      "Add a visible primary workflow action to src/screens/detail.jsx, such as “Move to In review”, and ensure it is rendered in the detail CTA band.",
+      "Increase useful content density in src/screens/home.jsx and src/screens/detail.jsx so the dashboard does not leave approximately 40% of the viewport empty.",
+      "Ensure the home primary action is visibly rendered in the main sprint workspace, not only assumed through shell or topbar props.",
+      "home: remove the approximately 900px empty region above the workspace header and align the Topbar and main content directly beside the Sidebar.",
+      "home: replace the empty-looking Completed points chart with visible bars or another data-rich visualization for Sprint 20–24.",
+      "home: remove the task-specific activity, comment composer, and selected-task metadata from the sprint home, or reduce them to a compact board interaction; keep focused task discussion scoped to detail.",
+      "detail: make the bottom primary action reflect the task's actual next workflow state; the task is already marked In review but the CTA says Move to In review."
+    ]
+  },
+  "costs": {
+    "entries": [
+      {
+        "stage": "design",
+        "credits": 0.49,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 24043,
+        "outputChars": 1834
+      },
+      {
+        "stage": "design",
+        "credits": 0.46,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 26256,
+        "outputChars": 1834
+      },
+      {
+        "stage": "brief",
+        "credits": 0.5,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 23859,
+        "outputChars": 6305
+      },
+      {
+        "stage": "brief",
+        "credits": 0.55,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 30648,
+        "outputChars": 5943
+      },
+      {
+        "stage": "data",
+        "credits": 0.53,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 5771,
+        "outputChars": 9048
+      },
+      {
+        "stage": "data",
+        "credits": 0.68,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 21470,
+        "outputChars": 8541
+      },
+      {
+        "stage": "wireframe",
+        "credits": 1.67,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 1296981,
+        "outputChars": 12586
+      },
+      {
+        "stage": "wireframe",
+        "credits": 1.75,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 1313148,
+        "outputChars": 7782
+      },
+      {
+        "stage": "wireframe",
+        "credits": 1.3,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 1296046,
+        "outputChars": 2803
+      },
+      {
+        "stage": "wireframe",
+        "credits": 1.38,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 1303935,
+        "outputChars": 2595
+      },
+      {
+        "stage": "copy",
+        "credits": 0.29,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 7726,
+        "outputChars": 3571
+      },
+      {
+        "stage": "copy",
+        "credits": 0.29,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 12398,
+        "outputChars": 3771
+      },
+      {
+        "stage": "planner",
+        "credits": 0.62,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 845925,
+        "outputChars": 2827
+      },
+      {
+        "stage": "planner",
+        "credits": 0.71,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 845956,
+        "outputChars": 3450
+      },
+      {
+        "stage": "planner",
+        "credits": 0.7,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 845611,
+        "outputChars": 3444
+      },
+      {
+        "stage": "planner",
+        "credits": 0.7,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 845948,
+        "outputChars": 3231
+      },
+      {
+        "stage": "planner",
+        "credits": 0.71,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 846027,
+        "outputChars": 3389
+      },
+      {
+        "stage": "planner",
+        "credits": 0.78,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 845603,
+        "outputChars": 3924
+      },
+      {
+        "stage": "planner",
+        "credits": 0.76,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 845942,
+        "outputChars": 3982
+      },
+      {
+        "stage": "planner",
+        "credits": 0.83,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 846024,
+        "outputChars": 4489
+      },
+      {
+        "stage": "planner",
+        "credits": 0.75,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 846069,
+        "outputChars": 3677
+      },
+      {
+        "stage": "planner",
+        "credits": 0.83,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 845678,
+        "outputChars": 4525
+      },
+      {
+        "stage": "planner",
+        "credits": 0.78,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 845974,
+        "outputChars": 4212
+      },
+      {
+        "stage": "planner",
+        "credits": 0.61,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 849218,
+        "outputChars": 1974
+      },
+      {
+        "stage": "planner",
+        "credits": 0.84,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 845644,
+        "outputChars": 4630
+      },
+      {
+        "stage": "planner",
+        "credits": 0.67,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 850270,
+        "outputChars": 2068
+      },
+      {
+        "stage": "planner",
+        "credits": 0.78,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 849645,
+        "outputChars": 3138
+      },
+      {
+        "stage": "planner",
+        "credits": 0.73,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 850510,
+        "outputChars": 2464
+      },
+      {
+        "stage": "planner",
+        "credits": 0.75,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 849521,
+        "outputChars": 2992
+      },
+      {
+        "stage": "planner",
+        "credits": 0.76,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 850195,
+        "outputChars": 2708
+      },
+      {
+        "stage": "planner",
+        "credits": 0.82,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 851004,
+        "outputChars": 3411
+      },
+      {
+        "stage": "planner",
+        "credits": 0.75,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 850940,
+        "outputChars": 2583
+      },
+      {
+        "stage": "planner",
+        "credits": 0.87,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 850669,
+        "outputChars": 3666
+      },
+      {
+        "stage": "planner",
+        "credits": 0.88,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 850979,
+        "outputChars": 3881
+      },
+      {
+        "stage": "planner",
+        "credits": 0.79,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 851639,
+        "outputChars": 2848
+      },
+      {
+        "stage": "planner",
+        "credits": 0.77,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 851596,
+        "outputChars": 2667
+      },
+      {
+        "stage": "builder",
+        "credits": 1.09,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 855031,
+        "outputChars": 4312
+      },
+      {
+        "stage": "builder",
+        "credits": 1.1,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 853970,
+        "outputChars": 4692
+      },
+      {
+        "stage": "builder",
+        "credits": 1.32,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 855524,
+        "outputChars": 6140
+      },
+      {
+        "stage": "builder",
+        "credits": 1.06,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 853879,
+        "outputChars": 4019
+      },
+      {
+        "stage": "builder",
+        "credits": 1.52,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 854018,
+        "outputChars": 8744
+      },
+      {
+        "stage": "builder",
+        "credits": 0.84,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 18312,
+        "outputChars": 3820
+      },
+      {
+        "stage": "builder",
+        "credits": 0.96,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 17197,
+        "outputChars": 4687
+      },
+      {
+        "stage": "builder",
+        "credits": 0.85,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 856971,
+        "outputChars": 2029
+      },
+      {
+        "stage": "builder",
+        "credits": 1.23,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 17280,
+        "outputChars": 6773
+      },
+      {
+        "stage": "builder",
+        "credits": 1.27,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 18794,
+        "outputChars": 6499
+      },
+      {
+        "stage": "builder",
+        "credits": 0.77,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 855599,
+        "outputChars": 1562
+      },
+      {
+        "stage": "builder",
+        "credits": 0.7,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 20073,
+        "outputChars": 1791
+      },
+      {
+        "stage": "builder",
+        "credits": 2.76,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 855982,
+        "outputChars": 19272
+      },
+      {
+        "stage": "builder",
+        "credits": 0.82,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 855205,
+        "outputChars": 2198
+      },
+      {
+        "stage": "builder",
+        "credits": 0.82,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 854419,
+        "outputChars": 2181
+      },
+      {
+        "stage": "builder",
+        "credits": 1.47,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 17331,
+        "outputChars": 9285
+      },
+      {
+        "stage": "builder",
+        "credits": 0.78,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 854463,
+        "outputChars": 1984
+      },
+      {
+        "stage": "builder",
+        "credits": 0.86,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 854158,
+        "outputChars": 2864
+      },
+      {
+        "stage": "builder",
+        "credits": 0.65,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 17724,
+        "outputChars": 1948
+      },
+      {
+        "stage": "builder",
+        "credits": 0.8,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 17472,
+        "outputChars": 3665
+      },
+      {
+        "stage": "compose",
+        "credits": 2.16,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 889005,
+        "outputChars": 16739
+      },
+      {
+        "stage": "compose",
+        "credits": 1.78,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 886208,
+        "outputChars": 7884
+      },
+      {
+        "stage": "review",
+        "credits": 1.19,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 77554,
+        "outputChars": 4724
+      },
+      {
+        "stage": "visualReview",
+        "credits": 1.86,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 1983124,
+        "outputChars": 6203
+      },
+      {
+        "stage": "visualReview",
+        "credits": 1.9,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 1992434,
+        "outputChars": 6203
+      },
+      {
+        "stage": "repair",
+        "credits": 1.05,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 15546,
+        "outputChars": 6856
+      },
+      {
+        "stage": "repair",
+        "credits": 3.2,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 27043,
+        "outputChars": 24843
+      },
+      {
+        "stage": "repair",
+        "credits": 0.6,
+        "modelId": "anthropic/claude-haiku-4-5",
+        "inputChars": 5611,
+        "outputChars": 4136
+      },
+      {
+        "stage": "review",
+        "credits": 1.23,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 77504,
+        "outputChars": 3722
+      },
+      {
+        "stage": "visualReview",
+        "credits": 1.72,
+        "modelId": "openai/gpt-5.6-luna",
+        "inputChars": 1882196,
+        "outputChars": 3953
+      }
+    ],
+    "totalCredits": 66.41,
+    "totalDollars": 0.6641
+  },
+  "activity": [
+    "Discovery complete — inspiration selected",
+    "Designing the token system — brand colors, radius, sizing, and fonts…",
+    "Design tokens + visual intent created (hint: Notion) — deterministic fallback",
+    "deterministic token + visual-intent + brand-kit fallback used (design model unavailable/invalid)",
+    "Building the product brief and attaching design references…",
+    "Sprint workspace for software teams — Project management dashboard · inspired by notion · 2 screens",
+    "Writing the product's content and copy — metrics, items, copy data…",
+    "Content written — 8 items · 5 reviews · 4 metrics (productivity domain)",
+    "Producing wireframes and the component inventory…",
+    "v17 omitted unavailable list section on detail",
+    "home/home: dropped off-archetype blocks: stats:grid",
+    "home/home: home is product-led (Active sprint workspace for reviewing velocity, spotting wor) — no forced discovery sections",
+    "home/home: dropped duplicate blocks",
+    "dropped unmounted components: Topbar, Sidebar, TaskStatusBadge, PrimaryActionButton",
+    "2 screens wired · 12 components planned",
+    "Designing UX layout and writing product copy…",
+    "UX home: A left rail frames the sprint scoreboard, velocity chart, task rows, board controls, context, and recent activity.",
+    "UX detail: The selected task stays focused in a sticky context pane with one clear action and quiet discussion rows.",
+    "Copy plan written — 2 screen(s)",
+    "Planning and building components in parallel…",
+    "Planned Separator",
+    "Planned Badge",
+    "Planned Avatar",
+    "Planned Topbar",
+    "Planned ActivityThread",
+    "Planned TaskMetadataEditor",
+    "Planned Select",
+    "Planned WorkloadMatrix",
+    "Planned SprintBoard",
+    "Planned Sidebar",
+    "Planned Input",
+    "Planned Button",
+    "Built src/components/TaskMetadataEditor.jsx",
+    "Built src/components/SprintBoard.jsx",
+    "Built src/components/WorkloadMatrix.jsx",
+    "Built src/components/ActivityThread.jsx",
+    "Built src/components/Topbar.jsx",
+    "Built src/components/Sidebar.jsx",
+    "Built src/components/Button.jsx",
+    "Built src/components/Avatar.jsx",
+    "Built src/components/Badge.jsx",
+    "Built src/components/Input.jsx",
+    "Built src/components/Select.jsx",
+    "Built src/components/Separator.jsx",
+    "Built 12 components",
+    "Composing screens with the layout model…",
+    "Assembled 2 screens from 12 components",
+    "Lint: 4 issue(s) (4 high, 0 auto-fixed)",
+    "Verifying builds in the sandbox…",
+    "2 screen(s) verified",
+    "Presenting your screens — quality review runs next…",
+    "Presented 2 screen(s) — starting quality review",
+    "Running the quality gate and visual review…",
+    "Gate: 0/100 — fixes required (24 issue(s))",
+    "Visual review: 28/100 — RETURN_TO_BUILDER",
+    "Review: 45/100 — RETURN_TO_BUILDER",
+    "Repair 1/2…",
+    "Repairing src/screens/detail.jsx (20 fix(es))",
+    "Repairing src/screens/home.jsx (21 fix(es))",
+    "Repairing src/components/Topbar.jsx (1 fix(es))",
+    "Re-verifying…",
+    "2 screen(s) verified",
+    "Re-running the quality gate…",
+    "Gate: 0/100 — fixes required (22 issue(s))",
+    "Visual review: 38/100 — RETURN_TO_BUILDER",
+    "Review: 43/100 — RETURN_TO_BUILDER",
+    "Budget ceiling reached — skipping repair",
+    "Run cost: $0.6641 (66.41 credits) across 66 model call(s)"
+  ],
+  "phases": {
+    "discovery:done": {
+      "at": 1786221423272
+    },
+    "design:running": {
+      "at": 1786221423273
+    },
+    "design:done": {
+      "at": 1786221437983
+    },
+    "brief:running": {
+      "at": 1786221437983
+    },
+    "brief:done": {
+      "at": 1786221455737
+    },
+    "data:running": {
+      "at": 1786221455737
+    },
+    "data:done": {
+      "at": 1786221484204
+    },
+    "wireframe:running": {
+      "at": 1786221523038
+    },
+    "wireframe:done": {
+      "at": 1786221549153
+    },
+    "build:running": {
+      "at": 1786221705697
+    },
+    "build:done": {
+      "at": 1786221796157
+    },
+    "assemble:running": {
+      "at": 1786221796158
+    },
+    "assemble:done": {
+      "at": 1786221803728
+    },
+    "present:running": {
+      "at": 1786221670586
+    },
+    "present:done": {
+      "at": 1786221671275
+    },
+    "review:running": {
+      "at": 1786221803728
+    }
+  },
+  "wallSeconds": 409.469,
+  "presentAtSeconds": 247.67,
+  "layoutSignature": {
+    "mode": "operate",
+    "typeVoice": "grotesque",
+    "spacingMood": "compact",
+    "surfaceTreatment": "hairline",
+    "mediaStrategy": "flat-illustration",
+    "mediaSubject": "generic",
+    "screens": [
+      {
+        "id": "home",
+        "structure": "workspace-led",
+        "dominant": "stats:scoreboard",
+        "grid": {
+          "cols": "3",
+          "pattern": "featured-first"
+        }
+      },
+      {
+        "id": "detail",
+        "structure": "catalog-classic",
+        "dominant": "detail:pane",
+        "grid": {
+          "cols": "3",
+          "pattern": "uniform"
+        }
+      }
+    ]
+  }
+}

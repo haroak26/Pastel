@@ -24,9 +24,17 @@ export const MODELS = {
   brief:        process.env.PASTEL_MODEL_BRIEF        || MID_DEFAULT,
   wireframe:    process.env.PASTEL_MODEL_WIREFRAME    || MID_DEFAULT,
   planner:      process.env.PASTEL_MODEL_PLANNER      || CHEAP_DEFAULT,
+  /** V21: custom PRODUCT components are built on the MID tier (components
+   * are where most visible design quality lives; v20 built them on the
+   * cheapest model). Shell chrome stays on `builder` (cheap). */
+  builderCustom: process.env.PASTEL_MODEL_BUILDER_CUSTOM || MID_DEFAULT,
   builder:      process.env.PASTEL_MODEL_BUILDER      || CHEAP_DEFAULT,
   copy:         process.env.PASTEL_MODEL_COPY         || MID_DEFAULT,
   assemble:     process.env.PASTEL_MODEL_ASSEMBLE     || CHEAP_DEFAULT,
+  /** V19: the screen composer writes each screen's layout body with full
+   * creative control (anti-slop guided). Mid model — layout is the single
+   * biggest lever on visual quality. */
+  compose:      process.env.PASTEL_MODEL_COMPOSE       || MID_DEFAULT,
   review:       process.env.PASTEL_MODEL_REVIEW       || MID_DEFAULT,
   visualReview: process.env.PASTEL_MODEL_VISUAL_REVIEW || MID_DEFAULT,
   repair:       process.env.PASTEL_MODEL_REPAIR       || CHEAP_DEFAULT,
@@ -39,11 +47,13 @@ export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
   design:       Number(process.env.PASTEL_MAX_TOKENS_DESIGN)       || 5000,
   data:         Number(process.env.PASTEL_MAX_TOKENS_DATA)         || 6000,
   brief:        Number(process.env.PASTEL_MAX_TOKENS_BRIEF)        || 4000,
-  wireframe:    Number(process.env.PASTEL_MAX_TOKENS_WIREFRAME)    || 9000,
-  planner:      Number(process.env.PASTEL_MAX_TOKENS_PLANNER)      || 4000,
+  wireframe:    Number(process.env.PASTEL_MAX_TOKENS_WIREFRAME)    || 16000,
+  planner:      Number(process.env.PASTEL_MAX_TOKENS_PLANNER)      || 6000,
+  builderCustom: Number(process.env.PASTEL_MAX_TOKENS_BUILDER_CUSTOM) || 9000,
   builder:      Number(process.env.PASTEL_MAX_TOKENS_BUILDER)      || 6500,
   copy:         Number(process.env.PASTEL_MAX_TOKENS_COPY)         || 3000,
   assemble:     Number(process.env.PASTEL_MAX_TOKENS_ASSEMBLE)     || 5000,
+  compose:      Number(process.env.PASTEL_MAX_TOKENS_COMPOSE)      || 10000,
   review:       Number(process.env.PASTEL_MAX_TOKENS_REVIEW)       || 4000,
   visualReview: Number(process.env.PASTEL_MAX_TOKENS_VISUAL_REVIEW) || 4000,
   repair:       Number(process.env.PASTEL_MAX_TOKENS_REPAIR)       || 5000,
@@ -88,7 +98,7 @@ function thinkingConfig(role?: ModelRole): ThinkingConfig | Record<string, unkno
  * v6 defaults ALL roles to thinking-off (cheap + fast); set PASTEL_THINKING_BUDGET
  * to a number to enable it. */
 export const LIGHT_ROLES: ReadonlySet<ModelRole> = new Set<ModelRole>([
-  "clarify", "design", "data", "brief", "wireframe", "planner", "builder", "copy", "assemble", "review", "visualReview", "repair",
+  "clarify", "design", "data", "brief", "wireframe", "planner", "builder", "builderCustom", "copy", "assemble", "compose", "review", "visualReview", "repair",
 ]);
 
 let cachedClient: MergeGateway | null = null;

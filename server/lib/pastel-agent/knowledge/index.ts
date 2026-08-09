@@ -150,24 +150,36 @@ export function readCompanyImage(slug: string, file: string): Buffer | null {
  * effort: returns [] when a company ships no imagery. `references/*` are
  * preferred over the gallery `preview.png`.
  * V17: skips images where any dimension exceeds maxDimension (Anthropic
- * rejects images larger than 8000px in either axis). */
+ * rejects images larger than 8000px in either axis).
+ * V21: the smallest files are selected FIRST so per-call image context stays
+ * bounded (a 1.4MB JPEG ≈ 350K input chars of base64 — the dominant token
+ * cost of every prompt). If nothing fits the cap, the single smallest file
+ * is used so every company keeps a style cue. Mechanical stages (planner/
+ * builder/compose) no longer attach company imagery at all. */
 export async function companyRefImageBlocks(
   slug: string,
   max = 2,
-  maxBytes = 1_500_000,
+  maxBytes = 500_000,
   maxDimension = 7000,
 ): Promise<Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }>> {
   const out: Array<{ type: "image"; source: { type: "base64"; media_type: string; data: string } }> = [];
   try {
     const files = companyImageFiles(slug);
     const ordered = [...files.filter((f) => f !== "preview.png"), ...files.filter((f) => f === "preview.png")];
-    for (const file of ordered.slice(0, max)) {
-      const buf = readCompanyImage(slug, file);
-      if (!buf || buf.byteLength <= 0 || buf.byteLength > maxBytes) continue;
-      const dims = imageDimensions(buf, file);
+    // V21: smallest-first — bounded context per call.
+    const sized = ordered
+      .map((f) => ({ f, size: readCompanyImage(slug, f)?.byteLength ?? 0 }))
+      .sort((a, b) => a.size - b.size);
+    const pool = sized.filter((s) => s.size > 0 && s.size <= maxBytes);
+    const chosen = (pool.length > 0 ? pool : sized.filter((s) => s.size > 0).slice(0, 1));
+    for (const { f, size } of chosen.slice(0, max)) {
+      const buf = readCompanyImage(slug, f);
+      if (!buf || buf.byteLength <= 0) continue;
+      if (buf.byteLength !== size) continue;
+      const dims = imageDimensions(buf, f);
       if (dims && (dims.w > maxDimension || dims.h > maxDimension)) continue;
-      const media_type = file.endsWith(".webp") ? "image/webp"
-        : file.endsWith(".jpg") || file.endsWith(".jpeg") ? "image/jpeg"
+      const media_type = f.endsWith(".webp") ? "image/webp"
+        : f.endsWith(".jpg") || f.endsWith(".jpeg") ? "image/jpeg"
         : "image/png";
       out.push({ type: "image", source: { type: "base64", media_type, data: buf.toString("base64") } });
     }
