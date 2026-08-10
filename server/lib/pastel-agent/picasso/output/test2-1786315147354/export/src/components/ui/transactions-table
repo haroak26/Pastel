@@ -1,0 +1,267 @@
+// TransactionsTable.tsx — Full transaction history with sortable columns, loading feedback, and an empty state. Use on budgeting and spending history screens.
+import { cva, type VariantProps } from "class-variance-authority";
+import type { KeyboardEvent, ReactNode } from "react";
+import { cn } from "../lib/cn";
+
+const transactionsTableVariants = cva(
+  "overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]",
+  {
+    variants: {
+      sortBy: {
+        date: "",
+        merchant: "",
+        category: "",
+        amount: "",
+      },
+      sortOrder: {
+        asc: "",
+        desc: "",
+      },
+    },
+    defaultVariants: {
+      sortBy: "date",
+      sortOrder: "asc",
+    },
+  }
+);
+
+type Transaction = {
+  id: string;
+  date: string;
+  merchant: string;
+  category: string;
+  amount: number;
+  type: "expense" | "income";
+  status: "pending" | "completed";
+};
+
+type SortableColumn = "date" | "merchant" | "category" | "amount";
+
+export interface TransactionsTableProps
+  extends VariantProps<typeof transactionsTableVariants> {
+  transactions: Transaction[];
+  onRowClick?: (transactionId: string) => void;
+  onSort?: (column: string, order: "asc" | "desc") => void;
+  isLoading?: boolean;
+  emptyMessage?: ReactNode;
+}
+
+const columns: Array<{ key: SortableColumn; label: string }> = [
+  { key: "date", label: "Date" },
+  { key: "merchant", label: "Merchant" },
+  { key: "category", label: "Category" },
+  { key: "amount", label: "Amount" },
+];
+
+function getAriaSort(
+  column: SortableColumn,
+  sortBy: SortableColumn | null | undefined,
+  sortOrder: "asc" | "desc" | null | undefined
+): "ascending" | "descending" | "none" {
+  if (column !== sortBy) {
+    return "none";
+  }
+
+  return sortOrder === "desc" ? "descending" : "ascending";
+}
+
+export default function TransactionsTable({
+  className,
+  sortBy = "date",
+  sortOrder = "asc",
+  transactions,
+  onRowClick,
+  onSort,
+  isLoading = false,
+  emptyMessage = "No transactions recorded yet.",
+}: TransactionsTableProps) {
+  const handleSort = (column: SortableColumn) => {
+    if (!onSort || isLoading) {
+      return;
+    }
+
+    const nextOrder =
+      sortBy === column && sortOrder === "asc" ? "desc" : "asc";
+
+    onSort(column, nextOrder);
+  };
+
+  const handleRowKeyDown = (
+    event: KeyboardEvent<HTMLTableRowElement>,
+    transactionId: string
+  ) => {
+    if (!onRowClick || isLoading) {
+      return;
+    }
+
+    if (event.key === "Enter" || event.key === " ") {
+      event.preventDefault();
+      onRowClick(transactionId);
+    }
+  };
+
+  return (
+    <section
+      className={cn(
+        transactionsTableVariants({ sortBy, sortOrder }),
+        className
+      )}
+      aria-busy={isLoading}
+    >
+      <table className="w-full border-collapse text-left font-[var(--font-body)]">
+        <caption className="sr-only">Transaction history</caption>
+        <thead className="bg-[var(--color-surface-overlay)]">
+          <tr className="border-b border-[var(--color-border-default)]">
+            {columns.map((column) => {
+              const ariaSort = getAriaSort(column.key, sortBy, sortOrder);
+
+              return (
+                <th
+                  key={column.key}
+                  scope="col"
+                  aria-sort={ariaSort}
+                  className={cn(
+                    "px-[var(--space-4)] py-[var(--space-3)] text-[length:var(--text-xs)] font-[var(--weight-semibold)] text-[var(--color-text-secondary)]",
+                    column.key === "amount" && "text-right"
+                  )}
+                >
+                  <button
+                    type="button"
+                    className={cn(
+                      "inline-flex h-[var(--control-sm)] items-center gap-[var(--space-1)] rounded-[var(--radius-sm)] px-[var(--space-2)] font-[var(--weight-semibold)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-neutral-200)] hover:text-[var(--color-text-primary)] active:bg-[var(--color-neutral-300)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+                      column.key === "amount" && "ml-auto"
+                    )}
+                    type="button"
+                    onClick={() => handleSort(column.key)}
+                    disabled={!onSort || isLoading}
+                    aria-label={`Sort by ${column.label}`}
+                  >
+                    <span>{column.label}</span>
+                    <span
+                      className="font-[var(--font-mono)] text-[length:var(--text-xs)] text-[var(--color-text-muted)]"
+                      aria-hidden="true"
+                    >
+                      {sortBy === column.key
+                        ? sortOrder === "asc"
+                          ? "↑"
+                          : "↓"
+                        : "↕"}
+                    </span>
+                  </button>
+                </th>
+              );
+            })}
+            <th
+              scope="col"
+              className="px-[var(--space-4)] py-[var(--space-3)] text-[length:var(--text-xs)] font-[var(--weight-semibold)] text-[var(--color-text-secondary)]"
+            >
+              Status
+            </th>
+          </tr>
+        </thead>
+
+        <tbody className="divide-y divide-[var(--color-border-subtle)]">
+          {isLoading ? (
+            <tr>
+              <td
+                colSpan={5}
+                className="px-[var(--space-4)] py-[var(--space-8)] text-center text-[length:var(--text-sm)] text-[var(--color-text-muted)]"
+              >
+                <span className="inline-flex items-center gap-[var(--space-2)]">
+                  <svg
+                    className="h-[var(--space-4)] w-[var(--space-4)] animate-spin text-[var(--color-accent-500)]"
+                    xmlns="http://www.w3.org/2000/svg"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                    />
+                  </svg>
+                  <span>Loading transactions</span>
+                </span>
+              </td>
+            </tr>
+          ) : transactions.length === 0 ? (
+            <tr>
+              <td
+                colSpan={5}
+                className="px-[var(--space-4)] py-[var(--space-8)] text-center text-[length:var(--text-sm)] text-[var(--color-text-muted)]"
+              >
+                {emptyMessage}
+              </td>
+            </tr>
+          ) : (
+            transactions.map((transaction) => {
+              const isInteractive = Boolean(onRowClick);
+              const amountLabel = `${transaction.type === "income" ? "+" : "-"}${Math.abs(
+                transaction.amount
+              ).toLocaleString()}`;
+
+              return (
+                <tr
+                  key={transaction.id}
+                  className={cn(
+                    "transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)]",
+                    isInteractive &&
+                      "cursor-pointer hover:bg-[var(--color-neutral-50)] active:bg-[var(--color-neutral-100)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-border-focus)]"
+                  )}
+                  onClick={() => onRowClick?.(transaction.id)}
+                  onKeyDown={(event) =>
+                    handleRowKeyDown(event, transaction.id)
+                  }
+                  tabIndex={isInteractive && !isLoading ? 0 : undefined}
+                  role={isInteractive ? "button" : undefined}
+                  aria-disabled={isInteractive && isLoading ? true : undefined}
+                >
+                  <td className="whitespace-nowrap px-[var(--space-4)] py-[var(--space-4)] text-[length:var(--text-sm)] text-[var(--color-text-secondary)]">
+                    {transaction.date}
+                  </td>
+                  <td className="px-[var(--space-4)] py-[var(--space-4)] text-[length:var(--text-base)] font-[var(--weight-medium)] text-[var(--color-text-primary)]">
+                    {transaction.merchant}
+                  </td>
+                  <td className="px-[var(--space-4)] py-[var(--space-4)] text-[length:var(--text-sm)] text-[var(--color-text-secondary)]">
+                    {transaction.category}
+                  </td>
+                  <td
+                    className={cn(
+                      "whitespace-nowrap px-[var(--space-4)] py-[var(--space-4)] text-right font-[var(--font-mono)] text-[length:var(--text-sm)] font-[var(--weight-medium)] tabular-nums",
+                      transaction.type === "income"
+                        ? "text-[var(--color-success-500)]"
+                        : "text-[var(--color-text-primary)]"
+                    )}
+                  >
+                    {amountLabel}
+                  </td>
+                  <td className="px-[var(--space-4)] py-[var(--space-4)]">
+                    <span
+                      className={cn(
+                        "inline-flex items-center rounded-[var(--radius-full)] px-[var(--space-2)] py-[var(--space-1)] text-[length:var(--text-xs)] font-[var(--weight-medium)]",
+                        transaction.status === "completed"
+                          ? "bg-[var(--color-success-50)] text-[var(--color-success-900)]"
+                          : "bg-[var(--color-warning-50)] text-[var(--color-warning-900)]"
+                      )}
+                    >
+                      {transaction.status}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })
+          )}
+        </tbody>
+      </table>
+    </section>
+  );
+}

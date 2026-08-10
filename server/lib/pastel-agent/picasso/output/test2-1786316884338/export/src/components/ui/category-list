@@ -1,0 +1,286 @@
+// CategoryList.tsx — Sortable spending categories with budget progress. Use on budgeting dashboards to compare spend against limits.
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const categoryListVariants = cva(
+  "w-full overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] font-[var(--font-body)] text-[var(--color-text-primary)]",
+  {
+    variants: {
+      sortBy: {
+        name: "",
+        spent: "",
+        remaining: "",
+      },
+      sortOrder: {
+        asc: "",
+        desc: "",
+      },
+    },
+    defaultVariants: {
+      sortBy: "name",
+      sortOrder: "asc",
+    },
+  }
+);
+
+export interface CategoryListCategory {
+  id: string;
+  name: string;
+  spent: number;
+  limit: number;
+  color: string;
+}
+
+export interface CategoryListProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof categoryListVariants> {
+  categories: CategoryListCategory[];
+  onSortChange?: (sortBy: string, order: "asc" | "desc") => void;
+  onCategoryClick?: (categoryId: string) => void;
+  isLoading?: boolean;
+}
+
+type SortBy = "name" | "spent" | "remaining";
+type SortOrder = "asc" | "desc";
+
+const sortLabels: Record<SortBy, string> = {
+  name: "Category",
+  spent: "Spent",
+  remaining: "Remaining",
+};
+
+function formatAmount(amount: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function getRemaining(category: CategoryListCategory) {
+  return category.limit - category.spent;
+}
+
+function getProgress(category: CategoryListCategory) {
+  if (category.limit <= 0) {
+    return category.spent > 0 ? 100 : 0;
+  }
+
+  return Math.min(Math.max((category.spent / category.limit) * 100, 0), 100);
+}
+
+export default function CategoryList({
+  className,
+  categories,
+  sortBy: initialSortBy = "name",
+  sortOrder: initialSortOrder = "asc",
+  onSortChange,
+  onCategoryClick,
+  isLoading = false,
+  ...props
+}: CategoryListProps) {
+  const [sortBy, setSortBy] = React.useState<SortBy>(initialSortBy);
+  const [sortOrder, setSortOrder] =
+    React.useState<SortOrder>(initialSortOrder);
+
+  const sortedCategories = React.useMemo(() => {
+    return [...categories].sort((first, second) => {
+      let comparison = 0;
+
+      if (sortBy === "name") {
+        comparison = first.name.localeCompare(second.name);
+      } else if (sortBy === "spent") {
+        comparison = first.spent - second.spent;
+      } else {
+        comparison = getRemaining(first) - getRemaining(second);
+      }
+
+      return sortOrder === "asc" ? comparison : -comparison;
+    });
+  }, [categories, sortBy, sortOrder]);
+
+  const handleSort = (nextSortBy: SortBy) => {
+    const nextOrder =
+      nextSortBy === sortBy
+        ? sortOrder === "asc"
+          ? "desc"
+          : "asc"
+        : "asc";
+
+    setSortBy(nextSortBy);
+    setSortOrder(nextOrder);
+    onSortChange?.(nextSortBy, nextOrder);
+  };
+
+  const sortButtonClass = (
+    option: SortBy
+  ) =>
+    cn(
+      "inline-flex h-[var(--control-sm)] items-center gap-[var(--space-1)] rounded-[var(--radius-sm)] px-[var(--space-2)] font-[var(--weight-medium)] text-[length:var(--text-xs)] text-[var(--color-text-secondary)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-neutral-100)] hover:text-[var(--color-text-primary)] active:bg-[var(--color-neutral-200)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+      option === sortBy &&
+        "bg-[var(--color-accent-50)] text-[var(--color-accent-900)] hover:bg-[var(--color-accent-100)]"
+    );
+
+  return (
+    <div
+      className={cn(
+        categoryListVariants({ sortBy, sortOrder }),
+        className
+      )}
+      aria-busy={isLoading}
+      {...props}
+    >
+      <div className="flex flex-wrap items-center justify-between gap-[var(--space-4)] border-b border-[var(--color-border-subtle)] px-[var(--space-4)] py-[var(--space-3)]">
+        <div>
+          <h2 className="font-[var(--font-display)] text-[length:var(--text-lg)] font-[var(--weight-semibold)]">
+            Spending categories
+          </h2>
+          <p className="mt-[var(--space-1)] text-[length:var(--text-sm)] text-[var(--color-text-muted)]">
+            See where this month&apos;s budget is moving.
+          </p>
+        </div>
+
+        <div
+          className="flex items-center gap-[var(--space-1)]"
+          aria-label="Sort spending categories"
+          role="group"
+        >
+          {(Object.keys(sortLabels) as SortBy[]).map((option) => (
+            <button
+              key={option}
+              type="button"
+              className={sortButtonClass(option)}
+              onClick={() => handleSort(option)}
+              disabled={isLoading}
+              aria-pressed={sortBy === option}
+              aria-label={`Sort by ${sortLabels[option]}${
+                sortBy === option
+                  ? `, currently ${sortOrder === "asc" ? "ascending" : "descending"}`
+                  : ""
+              }`}
+            >
+              {sortLabels[option]}
+              {sortBy === option && (
+                <span aria-hidden="true">{sortOrder === "asc" ? "↑" : "↓"}</span>
+              )}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {isLoading ? (
+        <div className="divide-y divide-[var(--color-border-subtle)]" role="status">
+          <span className="sr-only">Loading spending categories</span>
+          {[0, 1, 2, 3].map((item) => (
+            <div
+              key={item}
+              className="flex items-center gap-[var(--space-3)] px-[var(--space-4)] py-[var(--space-4)]"
+            >
+              <div className="h-[var(--space-3)] w-[var(--space-3)] rounded-[var(--radius-full)] bg-[var(--color-neutral-200)]" />
+              <div className="flex-1 space-y-[var(--space-2)]">
+                <div className="h-[var(--space-3)] w-1/3 rounded-[var(--radius-sm)] bg-[var(--color-neutral-200)]" />
+                <div className="h-[var(--space-2)] w-full rounded-[var(--radius-full)] bg-[var(--color-neutral-100)]" />
+              </div>
+              <div className="h-[var(--space-4)] w-[var(--space-8)] rounded-[var(--radius-sm)] bg-[var(--color-neutral-200)]" />
+            </div>
+          ))}
+        </div>
+      ) : sortedCategories.length === 0 ? (
+        <div className="px-[var(--space-4)] py-[var(--space-8)]">
+          <p className="font-[var(--font-display)] text-[length:var(--text-base)] font-[var(--weight-semibold)]">
+            No spending categories yet
+          </p>
+          <p className="mt-[var(--space-1)] max-w-prose text-[length:var(--text-sm)] text-[var(--color-text-muted)]">
+            Add a category to start seeing how your budget is being used.
+          </p>
+        </div>
+      ) : (
+        <div className="divide-y divide-[var(--color-border-subtle)]">
+          {sortedCategories.map((category) => {
+            const progress = getProgress(category);
+            const remaining = getRemaining(category);
+            const rowClassName = cn(
+              "flex w-full items-center gap-[var(--space-3)] px-[var(--space-4)] py-[var(--space-4)] text-left transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-neutral-50)] active:bg-[var(--color-neutral-100)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-[var(--color-border-focus)]",
+              !onCategoryClick && "cursor-default"
+            );
+
+            const content = (
+              <>
+                <span
+                  className="mt-[var(--space-1)] h-[var(--space-3)] w-[var(--space-3)] shrink-0 rounded-[var(--radius-full)] bg-[var(--category-color)]"
+                  style={
+                    {
+                      "--category-color": category.color,
+                    } as React.CSSProperties
+                  }
+                  aria-hidden="true"
+                />
+
+                <span className="min-w-0 flex-1">
+                  <span className="flex items-baseline justify-between gap-[var(--space-4)]">
+                    <span className="truncate font-[var(--weight-medium)] text-[length:var(--text-base)]">
+                      {category.name}
+                    </span>
+                    <span className="shrink-0 font-[var(--font-mono)] text-[length:var(--text-sm)] font-[var(--weight-medium)] tabular-nums">
+                      {formatAmount(category.spent)}
+                    </span>
+                  </span>
+
+                  <span className="mt-[var(--space-2)] flex items-center gap-[var(--space-3)]">
+                    <span
+                      className="h-[var(--space-2)] flex-1 overflow-hidden rounded-[var(--radius-full)] bg-[var(--color-neutral-100)]"
+                      role="progressbar"
+                      aria-label={`${category.name} budget used`}
+                      aria-valuemin={0}
+                      aria-valuemax={category.limit}
+                      aria-valuenow={Math.min(category.spent, category.limit)}
+                    >
+                      <span
+                        className="block h-full rounded-[var(--radius-full)] bg-[var(--category-color)] transition-[width] duration-[var(--duration-base)] ease-[var(--easing-standard)]"
+                        style={
+                          {
+                            "--category-color": category.color,
+                            width: `${progress}%`,
+                          } as React.CSSProperties
+                        }
+                      />
+                    </span>
+                    <span
+                      className={cn(
+                        "shrink-0 font-[var(--font-mono)] text-[length:var(--text-xs)] tabular-nums",
+                        remaining < 0
+                          ? "text-[var(--color-danger-500)]"
+                          : "text-[var(--color-text-muted)]"
+                      )}
+                    >
+                      {formatAmount(Math.abs(remaining))}{" "}
+                      {remaining < 0 ? "over" : "left"}
+                    </span>
+                  </span>
+                </span>
+              </>
+            );
+
+            return onCategoryClick ? (
+              <button
+                key={category.id}
+                type="button"
+                className={rowClassName}
+                onClick={() => onCategoryClick(category.id)}
+                disabled={isLoading}
+                aria-label={`Open ${category.name} spending`}
+              >
+                {content}
+              </button>
+            ) : (
+              <div key={category.id} className={rowClassName}>
+                {content}
+              </div>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}

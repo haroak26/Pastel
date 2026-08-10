@@ -1,0 +1,264 @@
+// TopbarHeader.tsx — Horizontal Wavelength app header with branding, notifications, and account actions. Use at the top of authenticated app screens.
+import React, { useEffect, useRef, useState } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const topbarHeaderVariants = cva(
+  "flex w-full items-center justify-between border-b border-[var(--color-border-subtle)] bg-[var(--color-surface-background)] font-[var(--font-body)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)]",
+  {
+    variants: {
+      layout: {
+        compact: "min-h-[var(--control-md)] gap-[var(--space-3)] px-[var(--space-4)]",
+        standard: "min-h-[var(--control-lg)] gap-[var(--space-4)] px-[var(--space-6)]",
+      },
+    },
+    defaultVariants: {
+      layout: "standard",
+    },
+  }
+);
+
+export interface TopbarHeaderProps
+  extends React.HTMLAttributes<HTMLElement>,
+    VariantProps<typeof topbarHeaderVariants> {
+  onNotificationClick?: () => void;
+  notificationCount?: number;
+  userMenuItems: Array<{
+    label: string;
+    action: () => void;
+    isDangerous?: boolean;
+  }>;
+  loading?: boolean;
+}
+
+export default function TopbarHeader({
+  className,
+  layout,
+  onNotificationClick,
+  notificationCount = 0,
+  userMenuItems,
+  loading = false,
+  ...props
+}: TopbarHeaderProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handlePointerDown(event: MouseEvent) {
+      if (!menuRef.current?.contains(event.target as Node)) {
+        setMenuOpen(false);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setMenuOpen(false);
+      }
+    }
+
+    document.addEventListener("mousedown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      document.removeEventListener("mousedown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
+
+  function handleMenuItemClick(action: () => void) {
+    setMenuOpen(false);
+    action();
+  }
+
+  return (
+    <header
+      className={cn(topbarHeaderVariants({ layout }), className)}
+      aria-busy={loading}
+      {...props}
+    >
+      <div className="flex items-center gap-[var(--space-3)]">
+        <svg
+          className="size-[var(--space-6)] text-[var(--color-accent-500)]"
+          viewBox="0 0 24 24"
+          fill="none"
+          aria-hidden="true"
+        >
+          <path
+            d="M3 12c2.2-4.5 4.4-4.5 6.6 0s4.4 4.5 6.6 0 4.4-4.5 6.8 0"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+          />
+          <path
+            d="M3 17c2.2-4.5 4.4-4.5 6.6 0s4.4 4.5 6.6 0 4.4-4.5 6.8 0"
+            stroke="currentColor"
+            strokeWidth="2.5"
+            strokeLinecap="round"
+            opacity="0.45"
+          />
+        </svg>
+
+        <span className="font-[var(--font-display)] text-[var(--text-lg)] font-[var(--weight-semibold)] tracking-[-0.02em] text-[var(--color-text-primary)]">
+          Wavelength
+        </span>
+      </div>
+
+      <div className="flex items-center gap-[var(--space-2)]">
+        <button
+          type="button"
+          className="relative inline-flex h-[var(--control-md)] w-[var(--control-md)] items-center justify-center rounded-[var(--radius-md)] text-[var(--color-text-secondary)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-neutral-100)] hover:text-[var(--color-text-primary)] active:bg-[var(--color-neutral-200)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+          onClick={onNotificationClick}
+          disabled={loading}
+          aria-label="Notifications"
+          aria-busy={loading}
+        >
+          {loading ? (
+            <svg
+              className="size-[var(--space-4)] animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+          ) : (
+            <svg
+              className="size-[var(--space-5)]"
+              viewBox="0 0 24 24"
+              fill="none"
+              aria-hidden="true"
+            >
+              <path
+                d="M18 9a6 6 0 0 0-12 0c0 7-3 7-3 9h18c0-2-3-2-3-9M10 21h4"
+                stroke="currentColor"
+                strokeWidth="1.8"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          )}
+
+          {notificationCount > 0 && !loading && (
+            <span className="absolute right-[-var(--space-1)] top-[-var(--space-1)] inline-flex min-h-[var(--space-4)] min-w-[var(--space-4)] items-center justify-center rounded-[var(--radius-full)] bg-[var(--color-danger-500)] px-[var(--space-1)] font-[var(--font-mono)] text-[var(--text-xs)] font-[var(--weight-semibold)] leading-none text-[var(--color-text-inverse)]">
+              {notificationCount > 99 ? "99+" : notificationCount}
+            </span>
+          )}
+        </button>
+
+        <div className="relative" ref={menuRef}>
+          <button
+            type="button"
+            className="inline-flex h-[var(--control-md)] items-center gap-[var(--space-2)] rounded-[var(--radius-md)] px-[var(--space-2)] text-[var(--color-text-secondary)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-neutral-100)] hover:text-[var(--color-text-primary)] active:bg-[var(--color-neutral-200)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+            onClick={() => setMenuOpen((open) => !open)}
+            disabled={loading}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+            aria-label="Open account menu"
+            aria-busy={loading}
+          >
+            {loading ? (
+              <svg
+                className="size-[var(--space-4)] animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+            ) : (
+              <>
+                <span className="inline-flex size-[var(--space-6)] items-center justify-center rounded-[var(--radius-full)] bg-[var(--color-neutral-200)] text-[var(--color-text-secondary)]">
+                  <svg
+                    className="size-[var(--space-4)]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    aria-hidden="true"
+                  >
+                    <circle
+                      cx="12"
+                      cy="8"
+                      r="3.2"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                    />
+                    <path
+                      d="M5.5 19c.8-3 3.1-4.5 6.5-4.5s5.7 1.5 6.5 4.5"
+                      stroke="currentColor"
+                      strokeWidth="1.8"
+                      strokeLinecap="round"
+                    />
+                  </svg>
+                </span>
+                <svg
+                  className="size-[var(--space-4)]"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  aria-hidden="true"
+                >
+                  <path
+                    d="m7 10 5 5 5-5"
+                    stroke="currentColor"
+                    strokeWidth="1.8"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </>
+            )}
+          </button>
+
+          {menuOpen && !loading && (
+            <div
+              className="absolute right-0 top-[calc(100%+var(--space-2))] z-10 w-[calc(var(--space-16)*4)] rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] p-[var(--space-2)] shadow-[var(--shadow-md)]"
+              role="menu"
+              aria-label="Account menu"
+            >
+              {userMenuItems.map((item) => (
+                <button
+                  key={item.label}
+                  type="button"
+                  className={cn(
+                    "flex h-[var(--control-md)] w-full items-center rounded-[var(--radius-md)] px-[var(--space-3)] text-left font-[var(--font-body)] text-[var(--text-base)] font-[var(--weight-medium)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-neutral-100)] active:bg-[var(--color-neutral-200)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2",
+                    item.isDangerous
+                      ? "text-[var(--color-danger-500)] hover:bg-[var(--color-danger-50)] active:bg-[var(--color-danger-50)]"
+                      : "text-[var(--color-text-primary)]"
+                  )}
+                  onClick={() => handleMenuItemClick(item.action)}
+                  role="menuitem"
+                >
+                  {item.label}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
+  );
+}

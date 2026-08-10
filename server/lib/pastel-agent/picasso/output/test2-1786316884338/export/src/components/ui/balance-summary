@@ -1,0 +1,115 @@
+// BalanceSummary.tsx — Summarizes available funds, monthly spending, and remaining budget. Use on the Wavelength dashboard for a quick money snapshot.
+import * as React from "react";
+import { cva } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const balanceSummaryVariants = cva(
+  "w-full rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] p-[var(--space-6)] font-[var(--font-body)] text-[var(--color-text-primary)] shadow-[var(--shadow-sm)] transition-all duration-[var(--duration-base)] ease-[var(--easing-standard)] hover:border-[var(--color-border-default)]"
+);
+
+export interface BalanceSummaryProps
+  extends React.HTMLAttributes<HTMLElement> {
+  totalBalance: number;
+  spentThisMonth: number;
+  budgetLimit: number;
+  isLoading?: boolean;
+}
+
+function formatCurrency(value: number) {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 2,
+  }).format(value);
+}
+
+export default function BalanceSummary({
+  className,
+  totalBalance,
+  spentThisMonth,
+  budgetLimit,
+  isLoading = false,
+  ...props
+}: BalanceSummaryProps) {
+  const amountRemaining = budgetLimit - spentThisMonth;
+  const remainingColor =
+    amountRemaining >= 0
+      ? "text-[var(--color-success-500)]"
+      : "text-[var(--color-danger-500)]";
+
+  return (
+    <section
+      className={cn(balanceSummaryVariants(), className)}
+      aria-busy={isLoading}
+      aria-label={props["aria-label"] ?? "Balance summary"}
+      {...props}
+      aria-busy={isLoading}
+    >
+      <div className="flex items-start justify-between gap-[var(--space-4)]">
+        <div className="min-w-0">
+          <p className="text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
+            Available balance
+          </p>
+
+          {isLoading ? (
+            <div
+              className="mt-[var(--space-2)] h-[var(--text-4xl)] w-[var(--space-16)] animate-pulse rounded-[var(--radius-sm)] bg-[var(--color-neutral-100)]"
+              aria-hidden="true"
+            />
+          ) : (
+            <p className="mt-[var(--space-2)] font-[var(--font-display)] text-[var(--text-4xl)] font-[var(--weight-semibold)] tabular-nums text-[var(--color-accent-500)]">
+              {formatCurrency(totalBalance)}
+            </p>
+          )}
+        </div>
+
+        {isLoading && (
+          <div
+            className="mt-[var(--space-1)] h-[var(--space-4)] w-[var(--space-4)] animate-spin rounded-[var(--radius-full)] border-2 border-[var(--color-neutral-200)] border-t-[var(--color-accent-500)]"
+            role="status"
+            aria-label="Updating balance"
+          />
+        )}
+      </div>
+
+      <div className="mt-[var(--space-6)] divide-y divide-[var(--color-border-subtle)] border-t border-[var(--color-border-subtle)]">
+        <div className="flex items-center justify-between gap-[var(--space-4)] py-[var(--space-3)]">
+          <span className="text-[var(--text-sm)] text-[var(--color-text-secondary)]">
+            Spent this month
+          </span>
+          {isLoading ? (
+            <span
+              className="h-[var(--text-base)] w-[var(--space-12)] animate-pulse rounded-[var(--radius-sm)] bg-[var(--color-neutral-100)]"
+              aria-hidden="true"
+            />
+          ) : (
+            <span className="font-[var(--font-mono)] text-[var(--text-base)] font-[var(--weight-medium)] tabular-nums text-[var(--color-text-primary)]">
+              {formatCurrency(spentThisMonth)}
+            </span>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-[var(--space-4)] py-[var(--space-3)]">
+          <span className="text-[var(--text-sm)] text-[var(--color-text-secondary)]">
+            Remaining budget
+          </span>
+          {isLoading ? (
+            <span
+              className="h-[var(--text-base)] w-[var(--space-12)] animate-pulse rounded-[var(--radius-sm)] bg-[var(--color-neutral-100)]"
+              aria-hidden="true"
+            />
+          ) : (
+            <span
+              className={cn(
+                "font-[var(--font-mono)] text-[var(--text-base)] font-[var(--weight-medium)] tabular-nums",
+                remainingColor
+              )}
+            >
+              {formatCurrency(amountRemaining)}
+            </span>
+          )}
+        </div>
+      </div>
+    </section>
+  );
+}

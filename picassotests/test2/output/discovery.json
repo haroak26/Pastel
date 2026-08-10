@@ -1,0 +1,16 @@
+{
+  "productContext": "app",
+  "validationPassed": true,
+  "reasonIfFailed": null,
+  "selectedReferences": [
+    {
+      "name": "stripe",
+      "rationale": "User-selected reference for fintech product"
+    },
+    {
+      "name": "duolingo",
+      "rationale": "User-selected reference for fintech product"
+    }
+  ],
+  "contextDescription": "Wavelength is a light-mode budgeting workspace for Gen Z and younger millennials. It helps users understand spending, set savings goals, stay within budgets, and earn streak rewards through clear, playful financial feedback.\n\n**Screens/views needed:**\n- **Dashboard:** budget health summary, spending breakdown by category, remaining balance, active streak, recent transactions, and quick actions to add a budget or goal.\n- **Goals:** savings-goal cards with progress bars, target dates, contribution history, streak bonuses, and “Create goal” action.\n- Supporting views: transaction list/detail, budget/category management, rewards history, and account/settings.\n\nUse a persistent desktop sidebar, dense but approachable cards, bold accent colors, clear currency formatting, and encouraging microcopy. Keep gamification secondary to financial clarity.\n\n**Do not:** use a marketing hero, testimonial content, footer, signup/get-started CTAs, desktop bottom tab navigation, giant illustrations, or overly flashy game mechanics. Avoid hiding balances behind decorative charts, ambiguous colors for gains/losses, shame-based messaging, or cluttered financial data."
+}

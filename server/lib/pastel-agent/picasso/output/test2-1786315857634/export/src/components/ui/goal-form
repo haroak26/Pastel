@@ -1,0 +1,281 @@
+// GoalForm.tsx — Creates a Wavelength savings goal with a target, date, optional auto-save plan, and playful icon. Use in the goals view when adding or editing a goal.
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const goalFormVariants = cva(
+  "w-full rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] p-[var(--space-6)] shadow-[var(--shadow-sm)]",
+  {}
+);
+
+const submitButtonVariants = cva(
+  "inline-flex h-[var(--control-lg)] items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] px-[var(--space-6)] font-[var(--font-body)] text-[var(--text-base)] font-[var(--weight-semibold)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        primary:
+          "bg-[var(--color-accent-500)] text-[var(--color-text-inverse)] hover:bg-[var(--color-accent-600)] active:bg-[var(--color-accent-600)]",
+      },
+      size: {
+        lg: "min-w-[var(--control-lg)]",
+      },
+    },
+    defaultVariants: {
+      variant: "primary",
+      size: "lg",
+    },
+  }
+);
+
+export interface GoalFormProps
+  extends VariantProps<typeof goalFormVariants> {
+  goalName: string;
+  onGoalNameChange: (name: string) => void;
+  targetAmount: number;
+  onTargetAmountChange: (amount: number) => void;
+  targetDate: Date;
+  onTargetDateChange: (date: Date) => void;
+  monthlyAutoSave?: number | null;
+  onMonthlyAutoSaveChange?: (amount: number | null) => void;
+  emoji?: string;
+  onEmojiChange?: (emoji: string) => void;
+  availableEmojis?: string[];
+  onSubmit: () => void;
+  isLoading?: boolean;
+  error?: string | null;
+}
+
+function formatDateValue(date: Date): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+export default function GoalForm({
+  className,
+  goalName,
+  onGoalNameChange,
+  targetAmount,
+  onTargetAmountChange,
+  targetDate,
+  onTargetDateChange,
+  monthlyAutoSave = null,
+  onMonthlyAutoSaveChange,
+  emoji,
+  onEmojiChange,
+  availableEmojis = [],
+  onSubmit,
+  isLoading = false,
+  error = null,
+}: GoalFormProps) {
+  const errorId = "goal-form-error";
+
+  return (
+    <form
+      className={cn(goalFormVariants(), className)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+      aria-busy={isLoading}
+      noValidate
+    >
+      <div className="mb-[var(--space-6)] border-b border-[var(--color-border-subtle)] pb-[var(--space-4)]">
+        <h2 className="font-[var(--font-display)] text-[var(--text-xl)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
+          Set a money goal
+        </h2>
+        <p className="mt-[var(--space-1)] font-[var(--font-body)] text-[var(--text-base)] text-[var(--color-text-secondary)]">
+          Give your next milestone a name, number, and finish line.
+        </p>
+      </div>
+
+      <div className="space-y-[var(--space-4)]">
+        <div>
+          <label
+            htmlFor="goal-name"
+            className="mb-[var(--space-2)] block font-[var(--font-body)] text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-primary)]"
+          >
+            Goal name
+          </label>
+          <input
+            id="goal-name"
+            type="text"
+            value={goalName}
+            onChange={(event) => onGoalNameChange(event.target.value)}
+            disabled={isLoading}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? errorId : undefined}
+            className="h-[var(--control-lg)] w-full rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-surface-overlay)] px-[var(--space-3)] font-[var(--font-body)] text-[var(--text-base)] text-[var(--color-text-primary)] outline-none transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:border-[var(--color-neutral-500)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 active:border-[var(--color-border-focus)] disabled:pointer-events-none disabled:opacity-50"
+          />
+        </div>
+
+        <div className="grid grid-cols-1 gap-[var(--space-4)] md:grid-cols-2">
+          <div>
+            <label
+              htmlFor="target-amount"
+              className="mb-[var(--space-2)] block font-[var(--font-body)] text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-primary)]"
+            >
+              Target amount
+            </label>
+            <div className="relative">
+              <span
+                className="pointer-events-none absolute left-[var(--space-3)] top-1/2 -translate-y-1/2 font-[var(--font-body)] text-[var(--text-base)] text-[var(--color-text-muted)]"
+                aria-hidden="true"
+              >
+                $
+              </span>
+              <input
+                id="target-amount"
+                type="number"
+                min="0"
+                step="0.01"
+                value={targetAmount}
+                onChange={(event) =>
+                  onTargetAmountChange(Number(event.target.value))
+                }
+                disabled={isLoading}
+                className="h-[var(--control-lg)] w-full rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-surface-overlay)] pl-[var(--space-8)] pr-[var(--space-3)] font-[var(--font-mono)] text-[var(--text-base)] text-[var(--color-text-primary)] outline-none transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:border-[var(--color-neutral-500)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 active:border-[var(--color-border-focus)] disabled:pointer-events-none disabled:opacity-50"
+              />
+            </div>
+          </div>
+
+          <div>
+            <label
+              htmlFor="target-date"
+              className="mb-[var(--space-2)] block font-[var(--font-body)] text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-primary)]"
+            >
+              Target date
+            </label>
+            <input
+              id="target-date"
+              type="date"
+              value={formatDateValue(targetDate)}
+              onChange={(event) => {
+                const [year, month, day] = event.target.value
+                  .split("-")
+                  .map(Number);
+
+                if (year && month && day) {
+                  onTargetDateChange(new Date(year, month - 1, day));
+                }
+              }}
+              disabled={isLoading}
+              className="h-[var(--control-lg)] w-full rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-surface-overlay)] px-[var(--space-3)] font-[var(--font-body)] text-[var(--text-base)] text-[var(--color-text-primary)] outline-none transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:border-[var(--color-neutral-500)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 active:border-[var(--color-border-focus)] disabled:pointer-events-none disabled:opacity-50"
+            />
+          </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor="monthly-auto-save"
+            className="mb-[var(--space-2)] block font-[var(--font-body)] text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-primary)]"
+          >
+            Monthly auto-save
+            <span className="ml-[var(--space-1)] font-[var(--weight-regular)] text-[var(--color-text-muted)]">
+              optional
+            </span>
+          </label>
+          <div className="relative">
+            <span
+              className="pointer-events-none absolute left-[var(--space-3)] top-1/2 -translate-y-1/2 font-[var(--font-body)] text-[var(--text-base)] text-[var(--color-text-muted)]"
+              aria-hidden="true"
+            >
+              $
+            </span>
+            <input
+              id="monthly-auto-save"
+              type="number"
+              min="0"
+              step="0.01"
+              value={monthlyAutoSave ?? ""}
+              onChange={(event) => {
+                const value = event.target.value;
+                onMonthlyAutoSaveChange?.(
+                  value === "" ? null : Number(value)
+                );
+              }}
+              disabled={isLoading || !onMonthlyAutoSaveChange}
+              className="h-[var(--control-lg)] w-full rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-surface-overlay)] pl-[var(--space-8)] pr-[var(--space-3)] font-[var(--font-mono)] text-[var(--text-base)] text-[var(--color-text-primary)] outline-none transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:border-[var(--color-neutral-500)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 active:border-[var(--color-border-focus)] disabled:pointer-events-none disabled:opacity-50"
+            />
+          </div>
+        </div>
+
+        {availableEmojis.length > 0 && onEmojiChange && (
+          <fieldset>
+            <legend className="mb-[var(--space-2)] block font-[var(--font-body)] text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-primary)]">
+              Goal icon
+            </legend>
+            <div className="flex flex-wrap gap-[var(--space-2)]">
+              {availableEmojis.map((option) => {
+                const isSelected = option === emoji;
+
+                return (
+                  <button
+                    key={option}
+                    type="button"
+                    aria-label={`Choose ${option} as the goal icon`}
+                    aria-pressed={isSelected}
+                    disabled={isLoading}
+                    onClick={() => onEmojiChange(option)}
+                    className={cn(
+                      "inline-flex h-[var(--control-md)] w-[var(--control-md)] items-center justify-center rounded-[var(--radius-md)] border font-[var(--font-body)] text-[var(--text-lg)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:border-[var(--color-accent-500)] hover:bg-[var(--color-accent-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 active:bg-[var(--color-accent-100)] disabled:pointer-events-none disabled:opacity-50",
+                      isSelected
+                        ? "border-[var(--color-accent-500)] bg-[var(--color-accent-50)]"
+                        : "border-[var(--color-border-default)] bg-[var(--color-surface-overlay)]"
+                    )}
+                  >
+                    {option}
+                  </button>
+                );
+              })}
+            </div>
+          </fieldset>
+        )}
+
+        {error && (
+          <p
+            id={errorId}
+            role="alert"
+            className="rounded-[var(--radius-sm)] bg-[var(--color-danger-50)] px-[var(--space-3)] py-[var(--space-2)] font-[var(--font-body)] text-[var(--text-sm)] text-[var(--color-danger-900)]"
+          >
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          className={cn(submitButtonVariants({ variant: "primary", size: "lg" }), "w-full")}
+          disabled={isLoading}
+          aria-busy={isLoading}
+        >
+          {isLoading && (
+            <svg
+              className="h-[var(--space-4)] w-[var(--space-4)] animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+          )}
+          {isLoading ? "Saving goal" : "Save goal"}
+        </button>
+      </div>
+    </form>
+  );
+}

@@ -1,0 +1,272 @@
+import * as React from "react";
+import PageHeaderComponent from "../components/page-header";
+import StreakBandComponent from "../components/streak-band";
+import SpendingBreakdownCardComponent from "../components/spending-breakdown-card";
+import BudgetStatusListComponent from "../components/budget-status-list";
+import RecentTransactionsFeedComponent from "../components/recent-transactions-feed";
+import NavigationMenuComponent from "../components/navigation-menu";
+import QuickActionButtonsComponent from "../components/quick-action-buttons";
+import GoalsListComponent from "../components/goals-list";
+import LogoComponent from "../components/logo";
+import UserProfileComponent from "../components/user-profile";
+
+const PageHeader = PageHeaderComponent as React.ComponentType<any>;
+const StreakBand = StreakBandComponent as React.ComponentType<any>;
+const SpendingBreakdownCard = SpendingBreakdownCardComponent as React.ComponentType<any>;
+const BudgetStatusList = BudgetStatusListComponent as React.ComponentType<any>;
+const RecentTransactionsFeed = RecentTransactionsFeedComponent as React.ComponentType<any>;
+const NavigationMenu = NavigationMenuComponent as React.ComponentType<any>;
+const QuickActionButtons = QuickActionButtonsComponent as React.ComponentType<any>;
+const GoalsList = GoalsListComponent as React.ComponentType<any>;
+const Logo = LogoComponent as React.ComponentType<any>;
+const UserProfile = UserProfileComponent as React.ComponentType<any>;
+
+const navigationItems = [
+  { label: "Spending", href: "/dashboard", active: true },
+  { label: "Goals", href: "/goals" },
+  { label: "Transactions", href: "/transactions" },
+  { label: "Budgets", href: "/budgets" },
+  { label: "Accounts", href: "/accounts" },
+  { label: "Settings", href: "/settings" },
+];
+
+const spendingCategories = [
+  { name: "Food", amount: 486.32, percentage: 42 },
+  { name: "Transport", amount: 218.75, percentage: 19 },
+  { name: "Entertainment", amount: 167.4, percentage: 15 },
+  { name: "Other", amount: 277.53, percentage: 24 },
+];
+
+const budgetItems = [
+  {
+    name: "Food",
+    spent: 486.32,
+    budget: 650,
+    remaining: 163.68,
+    percentage: 75,
+    status: "on-track",
+  },
+  {
+    name: "Transport",
+    spent: 218.75,
+    budget: 300,
+    remaining: 81.25,
+    percentage: 73,
+    status: "on-track",
+  },
+  {
+    name: "Entertainment",
+    spent: 167.4,
+    budget: 180,
+    remaining: 12.6,
+    percentage: 93,
+    status: "warning",
+  },
+  {
+    name: "Shopping",
+    spent: 214.9,
+    budget: 200,
+    remaining: -14.9,
+    percentage: 107,
+    status: "over",
+  },
+  {
+    name: "Home",
+    spent: 142.63,
+    budget: 250,
+    remaining: 107.37,
+    percentage: 57,
+    status: "on-track",
+  },
+];
+
+const recentTransactions = [
+  {
+    id: "txn_1",
+    merchant: "Juniper Market",
+    category: "Food",
+    amount: -64.28,
+    date: "Aug 14",
+    timestamp: "Today, 9:42 AM",
+  },
+  {
+    id: "txn_2",
+    merchant: "Metro Transit",
+    category: "Transport",
+    amount: -32.5,
+    date: "Aug 13",
+    timestamp: "Yesterday, 7:18 AM",
+  },
+  {
+    id: "txn_3",
+    merchant: "Northstar Credit Union",
+    category: "Money in",
+    amount: 2450,
+    date: "Aug 12",
+    timestamp: "Aug 12, 8:00 AM",
+  },
+  {
+    id: "txn_4",
+    merchant: "Cedar Cinema",
+    category: "Entertainment",
+    amount: -28,
+    date: "Aug 11",
+    timestamp: "Aug 11, 6:35 PM",
+  },
+  {
+    id: "txn_5",
+    merchant: "Oak & Thread",
+    category: "Shopping",
+    amount: -89.9,
+    date: "Aug 10",
+    timestamp: "Aug 10, 2:21 PM",
+  },
+  {
+    id: "txn_6",
+    merchant: "Harbor Power",
+    category: "Home",
+    amount: -118.4,
+    date: "Aug 9",
+    timestamp: "Aug 9, 11:05 AM",
+  },
+  {
+    id: "txn_7",
+    merchant: "Moss Coffee",
+    category: "Food",
+    amount: -7.8,
+    date: "Aug 8",
+    timestamp: "Aug 8, 8:16 AM",
+  },
+];
+
+const activeGoals = [
+  {
+    id: "goal_1",
+    name: "Weekend in Portland",
+    target: 1200,
+    saved: 780,
+    progress: 65,
+    dueDate: "Sep 28, 2025",
+  },
+  {
+    id: "goal_2",
+    name: "Emergency cushion",
+    target: 5000,
+    saved: 3100,
+    progress: 62,
+    dueDate: "Dec 31, 2025",
+  },
+  {
+    id: "goal_3",
+    name: "New laptop",
+    target: 1800,
+    saved: 1080,
+    progress: 60,
+    dueDate: "Nov 15, 2025",
+  },
+];
+
+export default function Dashboard() {
+  return (
+    <div className="min-h-screen bg-[var(--color-surface-background)] font-[var(--font-body)] text-[var(--color-text-primary)]">
+      <div className="mx-auto flex min-h-screen max-w-[1280px]">
+        <aside className="flex w-[256px] shrink-0 flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-[var(--space-4)] py-[var(--space-6)]">
+          <Logo href="/dashboard" />
+
+          <div className="mt-[var(--space-8)]">
+            <NavigationMenu items={navigationItems} activeItem="Spending" />
+          </div>
+
+          <div className="mt-auto space-y-[var(--space-6)]">
+            <div className="border-t border-[var(--color-border-subtle)] pt-[var(--space-6)]">
+              <QuickActionButtons
+                layout="vertical"
+                actions={[
+                  { label: "Log Expense", href: "/transactions/new", variant: "primary" },
+                  { label: "Add Goal", href: "/goals/new", variant: "secondary" },
+                ]}
+              />
+            </div>
+
+            <UserProfile
+              name="Maya Thompson"
+              email="maya.thompson@wavelength.money"
+              role="Budget owner"
+              avatar="https://ui-avatars.com/api/?name=Maya+Thompson&background=0f766e&color=f7f3ed"
+            />
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex-1 px-[var(--space-8)] py-[var(--space-6)]">
+          <PageHeader
+            title="August money check-in"
+            heading="August money check-in"
+            subtitle="See what came in, what went out, and how your money is tracking this month."
+            description="See what came in, what went out, and how your money is tracking this month."
+            greeting="Good morning, Maya"
+            date="Wednesday, August 14, 2025"
+            month="August 2025"
+            currentMonth="August 2025"
+            primaryAction={{ label: "Add transaction", href: "/transactions/new" }}
+            secondaryAction={{ label: "Review budgets", href: "/budgets" }}
+            ghostAction={{ label: "View all transactions", href: "/transactions" }}
+          />
+
+          <div className="mt-[var(--space-6)]">
+            <StreakBand
+              title="You're on a 7-day streak"
+              streakDays={7}
+              daysRemaining={17}
+              progress={45}
+              month="August"
+              description="Keep checking in to stay on track through the end of the month."
+            />
+          </div>
+
+          <section className="mt-[var(--space-6)] grid grid-cols-12 gap-[var(--space-6)]">
+            <div className="col-span-7">
+              <SpendingBreakdownCard
+                title="August spending"
+                label="Total spent"
+                total={1150}
+                currency="USD"
+                categories={spendingCategories}
+                period="Aug 1–14, 2025"
+              />
+            </div>
+
+            <div className="col-span-5">
+              <BudgetStatusList
+                title="Budget status"
+                items={budgetItems}
+                currency="USD"
+              />
+            </div>
+
+            <div className="col-span-7">
+              <RecentTransactionsFeed
+                title="Recent transactions"
+                transactions={recentTransactions}
+                currency="USD"
+                viewAllLabel="View all transactions"
+                viewAllHref="/transactions"
+              />
+            </div>
+
+            <div className="col-span-5">
+              <GoalsList
+                title="Active goals"
+                goals={activeGoals}
+                sortBy="progress"
+                showActions={false}
+                currency="USD"
+                viewAllLabel="View all goals"
+                viewAllHref="/goals"
+              />
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  );
+}

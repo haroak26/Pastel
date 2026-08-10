@@ -1,0 +1,310 @@
+// ExpenseForm.tsx — Expense entry form for recording a Wavelength purchase with category, merchant, date, and an optional note.
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const expenseFormVariants = cva(
+  "w-full max-w-2xl rounded-[var(--radius-xl)] border bg-[var(--color-surface-raised)] p-[var(--space-6)] font-[var(--font-body)] shadow-[var(--shadow-md)]",
+  {
+    variants: {
+      validation: {
+        default: "border-[var(--color-border-default)]",
+        error: "border-[var(--color-danger-500)]",
+      },
+    },
+    defaultVariants: {
+      validation: "default",
+    },
+  }
+);
+
+const fieldVariants = cva(
+  "w-full rounded-[var(--radius-md)] border bg-[var(--color-surface-overlay)] px-[var(--space-3)] text-[var(--color-text-primary)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] outline-none hover:border-[var(--color-neutral-500)] focus-visible:border-[var(--color-border-focus)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      size: {
+        md: "h-[var(--control-md)]",
+        lg: "h-[var(--control-lg)]",
+      },
+      invalid: {
+        true: "border-[var(--color-danger-500)] focus-visible:border-[var(--color-danger-500)] focus-visible:ring-[var(--color-danger-500)]",
+        false: "border-[var(--color-border-default)]",
+      },
+    },
+    defaultVariants: {
+      size: "md",
+      invalid: false,
+    },
+  }
+);
+
+const submitButtonVariants = cva(
+  "inline-flex w-full items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] border border-transparent bg-[var(--color-accent-500)] px-[var(--space-4)] font-[var(--font-body)] font-[var(--weight-medium)] text-[var(--color-text-inverse)] transition-all duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-accent-600)] active:bg-[var(--color-accent-900)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      size: {
+        md: "h-[var(--control-md)]",
+        lg: "h-[var(--control-lg)]",
+      },
+    },
+    defaultVariants: {
+      size: "lg",
+    },
+  }
+);
+
+export interface ExpenseFormProps
+  extends VariantProps<typeof expenseFormVariants> {
+  amount: number;
+  onAmountChange: (amount: number) => void;
+  category: string;
+  onCategoryChange: (categoryId: string) => void;
+  availableCategories: Array<{
+    id: string;
+    name: string;
+    icon: string;
+  }>;
+  merchant: string;
+  onMerchantChange: (merchant: string) => void;
+  date: Date;
+  onDateChange: (date: Date) => void;
+  note?: string;
+  onNoteChange?: (note: string) => void;
+  onSubmit: () => void;
+  isLoading?: boolean;
+  error?: string | null;
+  className?: string;
+}
+
+function formatDateForInput(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+
+  return `${year}-${month}-${day}`;
+}
+
+export default function ExpenseForm({
+  amount,
+  onAmountChange,
+  category,
+  onCategoryChange,
+  availableCategories,
+  merchant,
+  onMerchantChange,
+  date,
+  onDateChange,
+  note = "",
+  onNoteChange,
+  onSubmit,
+  isLoading = false,
+  error = null,
+  validation,
+  className,
+}: ExpenseFormProps) {
+  const formValidation = error ? "error" : validation ?? "default";
+  const errorId = "expense-form-error";
+  const amountId = "expense-amount";
+  const categoryId = "expense-category";
+  const merchantId = "expense-merchant";
+  const dateId = "expense-date";
+  const noteId = "expense-note";
+
+  return (
+    <form
+      className={cn(expenseFormVariants({ validation: formValidation }), className)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+      aria-busy={isLoading}
+      noValidate
+    >
+      <div className="mb-[var(--space-6)] border-b border-[var(--color-border-subtle)] pb-[var(--space-4)]">
+        <h2
+          className="font-[var(--font-display)] text-[length:var(--text-xl)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]"
+          style={{ lineHeight: "var(--text-xl)" }}
+        >
+          Add an expense
+        </h2>
+        <p
+          className="mt-[var(--space-1)] text-[length:var(--text-base)] text-[var(--color-text-secondary)]"
+          style={{ lineHeight: "var(--text-base)" }}
+        >
+          Keep your spending streak moving with a quick check-in.
+        </p>
+      </div>
+
+      <div className="grid gap-[var(--space-4)] md:grid-cols-2">
+        <div className="md:col-span-2">
+          <label
+            htmlFor={amountId}
+            className="mb-[var(--space-2)] block text-[length:var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+            style={{ lineHeight: "var(--text-sm)" }}
+          >
+            Amount
+          </label>
+          <div className="relative">
+            <span
+              className="pointer-events-none absolute left-[var(--space-3)] top-1/2 -translate-y-1/2 font-[var(--font-display)] text-[length:var(--text-2xl)] font-[var(--weight-semibold)] text-[var(--color-text-muted)]"
+              aria-hidden="true"
+              style={{ lineHeight: "var(--text-2xl)" }}
+            >
+              $
+            </span>
+            <input
+              id={amountId}
+              className={cn(
+                fieldVariants({ size: "lg", invalid: Boolean(error) }),
+                "pl-[var(--space-8)]] font-[var(--font-display)] text-[length:var(--text-2xl)] font-[var(--weight-semibold)] tabular-nums"
+              )}
+              type="number"
+              inputMode="decimal"
+              min="0"
+              step="0.01"
+              value={amount}
+              onChange={(event) => onAmountChange(Number(event.target.value))}
+              aria-invalid={Boolean(error)}
+              aria-describedby={error ? errorId : undefined}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
+
+        <div>
+          <label
+            htmlFor={categoryId}
+            className="mb-[var(--space-2)] block text-[length:var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+            style={{ lineHeight: "var(--text-sm)" }}
+          >
+            Category
+          </label>
+          <select
+            id={categoryId}
+            className={cn(fieldVariants({ size: "md", invalid: Boolean(error) }), "pr-[var(--space-8)]")}
+            value={category}
+            onChange={(event) => onCategoryChange(event.target.value)}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? errorId : undefined}
+            disabled={isLoading}
+          >
+            {availableCategories.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.icon} {item.name}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label
+            htmlFor={merchantId}
+            className="mb-[var(--space-2)] block text-[length:var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+            style={{ lineHeight: "var(--text-sm)" }}
+          >
+            Merchant
+          </label>
+          <input
+            id={merchantId}
+            className={fieldVariants({ size: "md", invalid: Boolean(error) })}
+            type="text"
+            value={merchant}
+            onChange={(event) => onMerchantChange(event.target.value)}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? errorId : undefined}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor={dateId}
+            className="mb-[var(--space-2)] block text-[length:var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+            style={{ lineHeight: "var(--text-sm)" }}
+          >
+            Date
+          </label>
+          <input
+            id={dateId}
+            className={fieldVariants({ size: "md", invalid: Boolean(error) })}
+            type="date"
+            value={formatDateForInput(date)}
+            onChange={(event) => {
+              const nextDate = new Date(`${event.target.value}T00:00:00`);
+              if (!Number.isNaN(nextDate.getTime())) {
+                onDateChange(nextDate);
+              }
+            }}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? errorId : undefined}
+            disabled={isLoading}
+          />
+        </div>
+
+        <div>
+          <label
+            htmlFor={noteId}
+            className="mb-[var(--space-2)] block text-[length:var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]"
+            style={{ lineHeight: "var(--text-sm)" }}
+          >
+            Note <span className="font-[var(--weight-regular)] text-[var(--color-text-muted)]">(optional)</span>
+          </label>
+          <textarea
+            id={noteId}
+            className={cn(fieldVariants({ invalid: Boolean(error) }), "min-h-[var(--control-lg)] py-[var(--space-2)]")}
+            value={note}
+            onChange={(event) => onNoteChange?.(event.target.value)}
+            aria-invalid={Boolean(error)}
+            aria-describedby={error ? errorId : undefined}
+            disabled={isLoading || !onNoteChange}
+          />
+        </div>
+      </div>
+
+      {error && (
+        <p
+          id={errorId}
+          className="mt-[var(--space-4)] rounded-[var(--radius-sm)] bg-[var(--color-danger-50)] px-[var(--space-3)] py-[var(--space-2)] text-[length:var(--text-sm)] text-[var(--color-danger-900)]"
+          role="alert"
+          style={{ lineHeight: "var(--text-sm)" }}
+        >
+          {error}
+        </p>
+      )}
+
+      <button
+        type="submit"
+        className="mt-[var(--space-6)]"
+        disabled={isLoading}
+        aria-busy={isLoading}
+      >
+        <span className={submitButtonVariants({ size: "lg" })}>
+          {isLoading && (
+            <svg
+              className="h-[var(--space-4)] w-[var(--space-4)] animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+          )}
+          {isLoading ? "Saving expense" : "Add expense"}
+        </span>
+      </button>
+    </form>
+  );
+}

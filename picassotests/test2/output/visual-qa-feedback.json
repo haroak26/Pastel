@@ -1,0 +1,34 @@
+[
+  {
+    "screen": "dashboard",
+    "strengths": [],
+    "improvements": [
+      "productContext",
+      "brandCoherence",
+      "hierarchy",
+      "composition",
+      "spacingRhythm",
+      "componentConsistency",
+      "navigation",
+      "contentCopy",
+      "responsiveDesign",
+      "accessibilityBaseline"
+    ]
+  },
+  {
+    "screen": "goals",
+    "strengths": [],
+    "improvements": [
+      "productContext",
+      "brandCoherence",
+      "hierarchy",
+      "composition",
+      "spacingRhythm",
+      "componentConsistency",
+      "navigation",
+      "contentCopy",
+      "responsiveDesign",
+      "accessibilityBaseline"
+    ]
+  }
+]

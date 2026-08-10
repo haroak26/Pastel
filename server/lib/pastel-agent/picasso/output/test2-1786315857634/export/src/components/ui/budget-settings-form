@@ -1,0 +1,222 @@
+// BudgetSettingsForm.tsx — Form for updating Wavelength’s monthly budget, default spending categories, and currency preference.
+import { useId } from "react";
+import { cva } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const budgetSettingsFormVariants = cva(
+  "w-full rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] p-[var(--space-6)] font-[var(--font-body)] text-[var(--color-text-primary)] shadow-[var(--shadow-md)]"
+);
+
+export interface BudgetSettingsFormProps {
+  monthlyBudgetLimit: number;
+  onMonthlyBudgetChange: (amount: number) => void;
+  defaultCategories: string[];
+  onDefaultCategoriesChange: (categories: string[]) => void;
+  availableCategories: Array<{
+    id: string;
+    name: string;
+    icon: string;
+  }>;
+  currency: string;
+  onCurrencyChange: (currency: string) => void;
+  onSubmit: () => void;
+  isLoading?: boolean;
+  error?: string | null;
+  className?: string;
+}
+
+export default function BudgetSettingsForm({
+  monthlyBudgetLimit,
+  onMonthlyBudgetChange,
+  defaultCategories,
+  onDefaultCategoriesChange,
+  availableCategories,
+  currency,
+  onCurrencyChange,
+  onSubmit,
+  isLoading = false,
+  error = null,
+  className,
+}: BudgetSettingsFormProps) {
+  const formId = useId();
+  const budgetId = `${formId}-monthly-budget`;
+  const currencyId = `${formId}-currency`;
+  const errorId = `${formId}-error`;
+  const categoriesId = `${formId}-categories`;
+
+  const handleCategoryChange = (categoryId: string, checked: boolean) => {
+    const nextCategories = checked
+      ? [...defaultCategories, categoryId]
+      : defaultCategories.filter((id) => id !== categoryId);
+
+    onDefaultCategoriesChange(nextCategories);
+  };
+
+  return (
+    <form
+      className={cn(budgetSettingsFormVariants(), className)}
+      onSubmit={(event) => {
+        event.preventDefault();
+        onSubmit();
+      }}
+      aria-busy={isLoading}
+      noValidate
+    >
+      <div className="flex flex-col gap-[var(--space-2)] border-b border-[var(--color-border-subtle)] pb-[var(--space-6)]">
+        <h2 className="font-[var(--font-display)] text-[var(--text-xl)] font-[var(--weight-semibold)]">
+          Budget settings
+        </h2>
+        <p className="max-w-[var(--space-24)] text-[var(--text-base)] text-[var(--color-text-secondary)]">
+          Keep your spending plan tuned to the way you use money each month.
+        </p>
+      </div>
+
+      <div className="flex flex-col gap-[var(--space-6)] pt-[var(--space-6)]">
+        <div className="flex flex-col gap-[var(--space-2)]">
+          <label
+            htmlFor={budgetId}
+            className="text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-primary)]"
+          >
+            Monthly budget limit
+          </label>
+          <div className="relative">
+            <input
+              id={budgetId}
+              name="monthlyBudgetLimit"
+              type="number"
+              min="0"
+              step="0.01"
+              value={monthlyBudgetLimit}
+              onChange={(event) =>
+                onMonthlyBudgetChange(Number(event.target.value))
+              }
+              disabled={isLoading}
+              aria-describedby={error ? errorId : undefined}
+              className="h-[var(--control-lg)] w-full rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-surface-background)] px-[var(--space-4)] font-[var(--font-mono)] text-[var(--text-lg)] tabular-nums text-[var(--color-text-primary)] outline-none transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:border-[var(--color-accent-500)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 active:border-[var(--color-accent-600)] disabled:pointer-events-none disabled:opacity-50"
+            />
+          </div>
+          <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
+            Set the ceiling Wavelength uses for your monthly streak.
+          </span>
+        </div>
+
+        <div className="flex flex-col gap-[var(--space-3)]">
+          <div className="flex flex-col gap-[var(--space-1)]">
+            <span
+              id={categoriesId}
+              className="text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-primary)]"
+            >
+              Default categories
+            </span>
+            <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
+              Choose the categories that should appear first when you log a purchase.
+            </span>
+          </div>
+
+          <div
+            className="divide-y divide-[var(--color-border-subtle)] border-y border-[var(--color-border-subtle)]"
+            role="group"
+            aria-labelledby={categoriesId}
+          >
+            {availableCategories.map((category) => {
+              const checkboxId = `${formId}-category-${category.id}`;
+              const isSelected = defaultCategories.includes(category.id);
+
+              return (
+                <label
+                  key={category.id}
+                  htmlFor={checkboxId}
+                  className="flex min-h-[var(--control-lg)] cursor-pointer items-center gap-[var(--space-3)] py-[var(--space-3)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-neutral-50)] active:bg-[var(--color-neutral-100)] has-[:disabled]:pointer-events-none has-[:disabled]:opacity-50"
+                >
+                  <input
+                    id={checkboxId}
+                    name="defaultCategories"
+                    type="checkbox"
+                    value={category.id}
+                    checked={isSelected}
+                    onChange={(event) =>
+                      handleCategoryChange(category.id, event.target.checked)
+                    }
+                    disabled={isLoading}
+                    className="h-[var(--space-4)] w-[var(--space-4)] rounded-[var(--radius-sm)] border border-[var(--color-border-default)] accent-[var(--color-accent-500)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2"
+                  />
+                  <span
+                    className="flex h-[var(--control-sm)] w-[var(--control-sm)] items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-accent-50)] text-[var(--text-lg)]"
+                    aria-hidden="true"
+                  >
+                    {category.icon}
+                  </span>
+                  <span className="text-[var(--text-base)] text-[var(--color-text-primary)]">
+                    {category.name}
+                  </span>
+                </label>
+              );
+            })}
+          </div>
+        </div>
+
+        <div className="flex flex-col gap-[var(--space-2)]">
+          <label
+            htmlFor={currencyId}
+            className="text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-primary)]"
+          >
+            Currency preference
+          </label>
+          <input
+            id={currencyId}
+            name="currency"
+            type="text"
+            value={currency}
+            onChange={(event) => onCurrencyChange(event.target.value)}
+            disabled={isLoading}
+            aria-describedby={error ? errorId : undefined}
+            className="h-[var(--control-md)] w-full rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-surface-background)] px-[var(--space-3)] font-[var(--font-mono)] text-[var(--text-base)] uppercase text-[var(--color-text-primary)] outline-none transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:border-[var(--color-accent-500)] focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 active:border-[var(--color-accent-600)] disabled:pointer-events-none disabled:opacity-50"
+            aria-label="Currency preference"
+          />
+        </div>
+
+        {error && (
+          <p
+            id={errorId}
+            role="alert"
+            className="rounded-[var(--radius-md)] border border-[var(--color-danger-500)] bg-[var(--color-danger-50)] px-[var(--space-3)] py-[var(--space-2)] text-[var(--text-sm)] text-[var(--color-danger-900)]"
+          >
+            {error}
+          </p>
+        )}
+
+        <button
+          type="submit"
+          disabled={isLoading}
+          aria-busy={isLoading}
+          className="inline-flex h-[var(--control-lg)] items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] bg-[var(--color-accent-500)] px-[var(--space-6)] font-[var(--font-body)] text-[var(--text-base)] font-[var(--weight-medium)] text-[var(--color-text-inverse)] transition-all duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-accent-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 active:bg-[var(--color-accent-600)] disabled:pointer-events-none disabled:opacity-50"
+        >
+          {isLoading && (
+            <svg
+              className="h-[var(--space-4)] w-[var(--space-4)] animate-spin"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+          )}
+          Save budget settings
+        </button>
+      </div>
+    </form>
+  );
+}

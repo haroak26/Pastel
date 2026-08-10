@@ -1,0 +1,1324 @@
+{
+  "entries": [
+    {
+      "id": "app-header",
+      "name": "AppHeader",
+      "taxonomy": "organism",
+      "description": "Logo, app title 'Wavelength', user avatar menu, and notification icon",
+      "states": [
+        "default",
+        "hover"
+      ],
+      "variants": {
+        "layout": [
+          "desktop",
+          "mobile"
+        ]
+      },
+      "radixPrimitive": "DropdownMenu",
+      "props": {
+        "logoSrc": {
+          "type": "string",
+          "required": true,
+          "description": "URL to the Wavelength logo image"
+        },
+        "appTitle": {
+          "type": "string",
+          "required": true,
+          "description": "App name displayed in header (typically 'Wavelength')"
+        },
+        "userAvatar": {
+          "type": "string",
+          "required": true,
+          "description": "URL to the current user's avatar image"
+        },
+        "userName": {
+          "type": "string",
+          "required": true,
+          "description": "Current user's display name for accessibility and menu"
+        },
+        "notificationCount": {
+          "type": "number",
+          "required": false,
+          "description": "Number of unread notifications to display as badge"
+        },
+        "onNotificationClick": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when notification bell is clicked"
+        },
+        "onAvatarMenuOpen": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when user avatar dropdown opens"
+        }
+      }
+    },
+    {
+      "id": "main-navigation",
+      "name": "MainNavigation",
+      "taxonomy": "organism",
+      "description": "Navigation links: Dashboard, Goals, Transactions, Settings. Active state indicator on current page.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "variants": {
+        "layout": [
+          "sidebar",
+          "topbar"
+        ],
+        "orientation": [
+          "vertical",
+          "horizontal"
+        ]
+      },
+      "radixPrimitive": "NavigationMenu",
+      "props": {
+        "items": {
+          "type": "Array<{ label: string; href: string; icon: ReactNode }>",
+          "required": true,
+          "description": "Navigation menu items with labels, routes, and icon components"
+        },
+        "currentPath": {
+          "type": "string",
+          "required": true,
+          "description": "Current page route to determine active state"
+        },
+        "onNavigate": {
+          "type": "(path: string) => void",
+          "required": false,
+          "description": "Callback fired when a navigation item is clicked"
+        }
+      }
+    },
+    {
+      "id": "streak-banner",
+      "name": "StreakBanner",
+      "taxonomy": "molecule",
+      "description": "Prominent display of current spending streak (e.g., '12 days on budget') with flame icon and next milestone",
+      "states": [
+        "default",
+        "loading"
+      ],
+      "variants": {
+        "size": [
+          "sm",
+          "md",
+          "lg"
+        ],
+        "emphasis": [
+          "default",
+          "milestone"
+        ]
+      },
+      "props": {
+        "currentStreak": {
+          "type": "number",
+          "required": true,
+          "description": "Number of consecutive days on budget"
+        },
+        "nextMilestone": {
+          "type": "number",
+          "required": true,
+          "description": "Next streak milestone target (e.g., 30, 60, 90 days)"
+        },
+        "daysUntilMilestone": {
+          "type": "number",
+          "required": true,
+          "description": "Days remaining to reach next milestone"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether streak data is currently loading"
+        }
+      }
+    },
+    {
+      "id": "monthly-budget-card",
+      "name": "MonthlyBudgetCard",
+      "taxonomy": "molecule",
+      "description": "Current month budget overview: total budget, spent amount, remaining, and circular progress ring with accent color",
+      "states": [
+        "default",
+        "loading",
+        "error"
+      ],
+      "variants": {
+        "size": [
+          "sm",
+          "md"
+        ],
+        "displayMode": [
+          "compact",
+          "expanded"
+        ]
+      },
+      "props": {
+        "totalBudget": {
+          "type": "number",
+          "required": true,
+          "description": "Total monthly budget amount in cents"
+        },
+        "spent": {
+          "type": "number",
+          "required": true,
+          "description": "Amount spent this month in cents"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Currency code (e.g., 'USD', 'GBP')"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether budget data is currently loading"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if budget data failed to load"
+        }
+      }
+    },
+    {
+      "id": "spending-breakdown-chart",
+      "name": "SpendingBreakdownChart",
+      "taxonomy": "organism",
+      "description": "Horizontal bar chart or donut showing spending by category (Food, Transport, Entertainment, Shopping, Other) with category labels and percentages",
+      "states": [
+        "default",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {
+        "chartType": [
+          "horizontal-bar",
+          "donut"
+        ],
+        "size": [
+          "sm",
+          "md",
+          "lg"
+        ]
+      },
+      "props": {
+        "data": {
+          "type": "Array<{ category: string; amount: number; percentage: number; color: string }>",
+          "required": true,
+          "description": "Spending data by category with amounts, percentages, and display colors"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Currency code for formatting amounts"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether chart data is currently loading"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if data failed to load"
+        },
+        "onCategoryClick": {
+          "type": "(category: string) => void",
+          "required": false,
+          "description": "Callback fired when a category segment is clicked"
+        }
+      }
+    },
+    {
+      "id": "active-goals-list",
+      "name": "ActiveGoalsList",
+      "taxonomy": "organism",
+      "description": "Table of 4+ active savings goals: goal name, target amount, current savings, progress bar, and time remaining. Sortable by progress or deadline.",
+      "states": [
+        "default",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {
+        "sortBy": [
+          "progress",
+          "deadline",
+          "name"
+        ],
+        "sortOrder": [
+          "asc",
+          "desc"
+        ]
+      },
+      "props": {
+        "goals": {
+          "type": "Array<{ id: string; name: string; targetAmount: number; currentAmount: number; deadline: string; category: string }>",
+          "required": true,
+          "description": "Array of active savings goals with progress data"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Currency code for formatting amounts"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether goals data is currently loading"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if goals failed to load"
+        },
+        "onGoalClick": {
+          "type": "(goalId: string) => void",
+          "required": false,
+          "description": "Callback fired when a goal row is clicked"
+        },
+        "onSort": {
+          "type": "(sortBy: string, sortOrder: string) => void",
+          "required": false,
+          "description": "Callback fired when table is sorted"
+        }
+      }
+    },
+    {
+      "id": "recent-transactions-feed",
+      "name": "RecentTransactionsFeed",
+      "taxonomy": "organism",
+      "description": "List of 5-6 most recent transactions: date, merchant, category icon, amount, and running balance. Link to full transaction history.",
+      "states": [
+        "default",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "props": {
+        "transactions": {
+          "type": "Array<{ id: string; date: string; merchant: string; category: string; amount: number; type: 'income' | 'expense'; balance: number }>",
+          "required": true,
+          "description": "Array of recent transactions with merchant, amount, and running balance"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Currency code for formatting amounts"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether transactions are currently loading"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if transactions failed to load"
+        },
+        "onTransactionClick": {
+          "type": "(transactionId: string) => void",
+          "required": false,
+          "description": "Callback fired when a transaction row is clicked"
+        },
+        "onViewAll": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when 'View All' link is clicked"
+        }
+      }
+    },
+    {
+      "id": "page-header",
+      "name": "PageHeader",
+      "taxonomy": "molecule",
+      "description": "Page title 'Savings Goals' and 'Create Goal' button (primary accent color)",
+      "states": [
+        "default"
+      ],
+      "variants": {
+        "size": [
+          "sm",
+          "md",
+          "lg"
+        ]
+      },
+      "props": {
+        "title": {
+          "type": "string",
+          "required": true,
+          "description": "Page title text"
+        },
+        "subtitle": {
+          "type": "string",
+          "required": false,
+          "description": "Optional subtitle or description below title"
+        },
+        "actionLabel": {
+          "type": "string",
+          "required": false,
+          "description": "Label for primary action button (e.g., 'Create Goal')"
+        },
+        "onAction": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when primary action button is clicked"
+        }
+      }
+    },
+    {
+      "id": "goals-filter-bar",
+      "name": "GoalsFilterBar",
+      "taxonomy": "molecule",
+      "description": "Filter tabs: All, Active, Completed. Shows count for each filter state.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "variants": {
+        "layout": [
+          "tabs",
+          "buttons"
+        ]
+      },
+      "radixPrimitive": "Tabs",
+      "props": {
+        "filters": {
+          "type": "Array<{ label: string; value: string; count: number }>",
+          "required": true,
+          "description": "Filter options with labels, values, and item counts"
+        },
+        "activeFilter": {
+          "type": "string",
+          "required": true,
+          "description": "Currently active filter value"
+        },
+        "onFilterChange": {
+          "type": "(filter: string) => void",
+          "required": true,
+          "description": "Callback fired when filter selection changes"
+        }
+      }
+    },
+    {
+      "id": "goals-table",
+      "name": "GoalsTable",
+      "taxonomy": "organism",
+      "description": "Table with 6+ goals: goal name, category icon, target amount, current savings, progress bar (accent color), deadline, and row actions menu (edit, delete, view details)",
+      "states": [
+        "default",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {
+        "density": [
+          "compact",
+          "comfortable"
+        ],
+        "sortBy": [
+          "name",
+          "progress",
+          "deadline"
+        ]
+      },
+      "props": {
+        "goals": {
+          "type": "Array<{ id: string; name: string; category: string; targetAmount: number; currentAmount: number; deadline: string; progress: number }>",
+          "required": true,
+          "description": "Array of goals to display in table"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Currency code for formatting amounts"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether table data is currently loading"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if goals failed to load"
+        },
+        "onEdit": {
+          "type": "(goalId: string) => void",
+          "required": false,
+          "description": "Callback fired when edit action is selected"
+        },
+        "onDelete": {
+          "type": "(goalId: string) => void",
+          "required": false,
+          "description": "Callback fired when delete action is selected"
+        },
+        "onViewDetails": {
+          "type": "(goalId: string) => void",
+          "required": false,
+          "description": "Callback fired when view details action is selected"
+        }
+      }
+    },
+    {
+      "id": "goal-detail-modal",
+      "name": "GoalDetailModal",
+      "taxonomy": "organism",
+      "description": "Modal overlay for viewing/editing goal: name, target amount, current savings, deadline, category, description, and save/cancel buttons",
+      "states": [
+        "default",
+        "loading",
+        "error"
+      ],
+      "radixPrimitive": "Dialog",
+      "props": {
+        "isOpen": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether modal is visible"
+        },
+        "goal": {
+          "type": "{ id: string; name: string; category: string; targetAmount: number; currentAmount: number; deadline: string; description: string }",
+          "required": true,
+          "description": "Goal data to display and edit"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Currency code for formatting amounts"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether form is currently submitting"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if save failed"
+        },
+        "onSave": {
+          "type": "(updatedGoal: object) => void",
+          "required": true,
+          "description": "Callback fired when save button is clicked with updated goal data"
+        },
+        "onCancel": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when cancel button is clicked or modal is closed"
+        }
+      }
+    },
+    {
+      "id": "transaction-search-bar",
+      "name": "TransactionSearchBar",
+      "taxonomy": "molecule",
+      "description": "Search input for merchant name or description",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled"
+      ],
+      "props": {
+        "placeholder": {
+          "type": "string",
+          "required": false,
+          "description": "Placeholder text for search input"
+        },
+        "value": {
+          "type": "string",
+          "required": true,
+          "description": "Current search query value"
+        },
+        "onChange": {
+          "type": "(query: string) => void",
+          "required": true,
+          "description": "Callback fired when search input changes"
+        },
+        "onClear": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when clear button is clicked"
+        },
+        "disabled": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether search input is disabled"
+        }
+      }
+    },
+    {
+      "id": "transaction-filter-panel",
+      "name": "TransactionFilterPanel",
+      "taxonomy": "molecule",
+      "description": "Filters: date range picker, category multi-select, amount range slider, transaction type (income/expense)",
+      "states": [
+        "default",
+        "hover",
+        "focus"
+      ],
+      "radixPrimitive": "Popover",
+      "props": {
+        "dateRange": {
+          "type": "{ start: string; end: string }",
+          "required": true,
+          "description": "Selected date range in ISO format"
+        },
+        "selectedCategories": {
+          "type": "string[]",
+          "required": true,
+          "description": "Array of selected category filters"
+        },
+        "amountRange": {
+          "type": "{ min: number; max: number }",
+          "required": true,
+          "description": "Selected amount range in cents"
+        },
+        "transactionType": {
+          "type": "'all' | 'income' | 'expense'",
+          "required": true,
+          "description": "Filter by transaction type"
+        },
+        "onDateRangeChange": {
+          "type": "(range: { start: string; end: string }) => void",
+          "required": true,
+          "description": "Callback fired when date range is updated"
+        },
+        "onCategoryChange": {
+          "type": "(categories: string[]) => void",
+          "required": true,
+          "description": "Callback fired when category selection changes"
+        },
+        "onAmountRangeChange": {
+          "type": "(range: { min: number; max: number }) => void",
+          "required": true,
+          "description": "Callback fired when amount range is updated"
+        },
+        "onTransactionTypeChange": {
+          "type": "(type: string) => void",
+          "required": true,
+          "description": "Callback fired when transaction type filter changes"
+        }
+      }
+    },
+    {
+      "id": "transactions-list",
+      "name": "TransactionsList",
+      "taxonomy": "organism",
+      "description": "Grouped by date (Today, Yesterday, This Week, etc.). Each transaction row shows: date/time, merchant, category icon, amount (red for expense, green for income), and row actions menu",
+      "states": [
+        "default",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "props": {
+        "transactions": {
+          "type": "Array<{ id: string; date: string; merchant: string; category: string; amount: number; type: 'income' | 'expense; description: string }>",
+          "required": true,
+          "description": "Array of transactions grouped by date"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Currency code for formatting amounts"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether transactions are currently loading"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if transactions failed to load"
+        },
+        "onTransactionClick": {
+          "type": "(transactionId: string) => void",
+          "required": false,
+          "description": "Callback fired when a transaction row is clicked"
+        },
+        "onEdit": {
+          "type": "(transactionId: string) => void",
+          "required": false,
+          "description": "Callback fired when edit action is selected"
+        },
+        "onDelete": {
+          "type": "(transactionId: string) => void",
+          "required": false,
+          "description": "Callback fired when delete action is selected"
+        }
+      }
+    },
+    {
+      "id": "transaction-detail-modal",
+      "name": "TransactionDetailModal",
+      "taxonomy": "organism",
+      "description": "Modal for viewing/editing transaction: merchant, amount, category, date, description, receipt upload, and save/delete buttons",
+      "states": [
+        "default",
+        "loading",
+        "error"
+      ],
+      "radixPrimitive": "Dialog",
+      "props": {
+        "isOpen": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether modal is visible"
+        },
+        "transaction": {
+          "type": "{ id: string; merchant: string; amount: number; category: string; date: string; description: string; receiptUrl?: string }",
+          "required": true,
+          "description": "Transaction data to display and edit"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Currency code for formatting amounts"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether form is currently submitting"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if save failed"
+        },
+        "onSave": {
+          "type": "(updatedTransaction: object) => void",
+          "required": true,
+          "description": "Callback fired when save button is clicked with updated transaction data"
+        },
+        "onDelete": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when delete button is clicked"
+        },
+        "onCancel": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when cancel button is clicked or modal is closed"
+        }
+      }
+    },
+    {
+      "id": "settings-navigation",
+      "name": "SettingsNavigation",
+      "taxonomy": "molecule",
+      "description": "Secondary nav: Profile, Budget, Notifications, Accounts, Privacy, Help",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active"
+      ],
+      "variants": {
+        "layout": [
+          "vertical",
+          "horizontal"
+        ]
+      },
+      "radixPrimitive": "NavigationMenu",
+      "props": {
+        "items": {
+          "type": "Array<{ label: string; value: string; icon?: ReactNode }>",
+          "required": true,
+          "description": "Settings navigation items with labels and optional icons"
+        },
+        "activeSection": {
+          "type": "string",
+          "required": true,
+          "description": "Currently active settings section"
+        },
+        "onSectionChange": {
+          "type": "(section: string) => void",
+          "required": true,
+          "description": "Callback fired when a settings section is selected"
+        }
+      }
+    },
+    {
+      "id": "profile-section",
+      "name": "ProfileSection",
+      "taxonomy": "organism",
+      "description": "User avatar, name, email, edit profile button. Form fields: first name, last name, email, phone (optional)",
+      "states": [
+        "default",
+        "loading",
+        "error"
+      ],
+      "props": {
+        "user": {
+          "type": "{ id: string; firstName: string; lastName: string; email: string; phone?: string; avatarUrl: string }",
+          "required": true,
+          "description": "Current user profile data"
+        },
+        "isEditing": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether profile is in edit mode"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether profile update is in progress"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if profile update failed"
+        },
+        "onEdit": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when edit button is clicked"
+        },
+        "onSave": {
+          "type": "(updatedUser: object) => void",
+          "required": false,
+          "description": "Callback fired when profile changes are saved"
+        },
+        "onCancel": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when edit is cancelled"
+        }
+      }
+    },
+    {
+      "id": "budget-settings-section",
+      "name": "BudgetSettingsSection",
+      "taxonomy": "organism",
+      "description": "Monthly budget limit input, currency selector, budget reset day picker",
+      "states": [
+        "default",
+        "loading",
+        "error"
+      ],
+      "props": {
+        "monthlyBudget": {
+          "type": "number",
+          "required": true,
+          "description": "Current monthly budget limit in cents"
+        },
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Selected currency code"
+        },
+        "budgetResetDay": {
+          "type": "number",
+          "required": true,
+          "description": "Day of month when budget resets (1-31)"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether settings are being saved"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if save failed"
+        },
+        "onBudgetChange": {
+          "type": "(amount: number) => void",
+          "required": true,
+          "description": "Callback fired when monthly budget is updated"
+        },
+        "onCurrencyChange": {
+          "type": "(currency: string) => void",
+          "required": true,
+          "description": "Callback fired when currency is changed"
+        },
+        "onResetDayChange": {
+          "type": "(day: number) => void",
+          "required": true,
+          "description": "Callback fired when budget reset day is changed"
+        }
+      }
+    },
+    {
+      "id": "notification-settings-section",
+      "name": "NotificationSettingsSection",
+      "taxonomy": "organism",
+      "description": "Toggle switches: budget alerts, goal milestones, streak reminders, weekly summary email",
+      "states": [
+        "default",
+        "loading",
+        "error"
+      ],
+      "radixPrimitive": "Switch",
+      "props": {
+        "settings": {
+          "type": "{ budgetAlerts: boolean; goalMilestones: boolean; streakReminders: boolean; weeklySummary: boolean }",
+          "required": true,
+          "description": "Current notification preference settings"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether settings are being saved"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if save failed"
+        },
+        "onSettingChange": {
+          "type": "(setting: string, enabled: boolean) => void",
+          "required": true,
+          "description": "Callback fired when a notification setting is toggled"
+        }
+      }
+    },
+    {
+      "id": "connected-accounts-section",
+      "name": "ConnectedAccountsSection",
+      "taxonomy": "organism",
+      "description": "List of connected bank accounts/payment methods with disconnect buttons and 'Add Account' button",
+      "states": [
+        "default",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "props": {
+        "accounts": {
+          "type": "Array<{ id: string; name: string; type: string; lastFour: string; connected: boolean }>",
+          "required": true,
+          "description": "List of connected bank accounts and payment methods"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether accounts are being loaded"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Error message if accounts failed to load"
+        },
+        "onAddAccount": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when 'Add Account' button is clicked"
+        },
+        "onDisconnect": {
+          "type": "(accountId: string) => void",
+          "required": false,
+          "description": "Callback fired when disconnect button is clicked"
+        }
+      }
+    },
+    {
+      "id": "privacy-section",
+      "name": "PrivacySection",
+      "taxonomy": "molecule",
+      "description": "Links to privacy policy, terms of service, data export button",
+      "states": [
+        "default",
+        "hover",
+        "focus"
+      ],
+      "props": {
+        "privacyPolicyUrl": {
+          "type": "string",
+          "required": true,
+          "description": "URL to privacy policy document"
+        },
+        "termsOfServiceUrl": {
+          "type": "string",
+          "required": true,
+          "description": "URL to terms of service document"
+        },
+        "onExportData": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when data export button is clicked"
+        }
+      }
+    },
+    {
+      "id": "danger-zone-section",
+      "name": "DangerZoneSection",
+      "taxonomy": "molecule",
+      "description": "Logout button and delete account button (with confirmation modal)",
+      "states": [
+        "default",
+        "hover",
+        "focus"
+      ],
+      "props": {
+        "onLogout": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when logout button is clicked"
+        },
+        "onDeleteAccount": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when delete account is confirmed"
+        }
+      }
+    },
+    {
+      "id": "welcome-hero",
+      "name": "WelcomeHero",
+      "taxonomy": "organism",
+      "description": "Wavelength logo, headline 'Make Money Management Feel Like a Game', subheading about tracking spending and earning streaks, and 'Get Started' CTA button",
+      "states": [
+        "default"
+      ],
+      "props": {
+        "logoSrc": {
+          "type": "string",
+          "required": true,
+          "description": "URL to Wavelength logo image"
+        },
+        "headline": {
+          "type": "string",
+          "required": true,
+          "description": "Main headline text"
+        },
+        "subheading": {
+          "type": "string",
+          "required": true,
+          "description": "Supporting subheading text"
+        },
+        "ctaLabel": {
+          "type": "string",
+          "required": true,
+          "description": "Call-to-action button label"
+        },
+        "onCTA": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when CTA button is clicked"
+        }
+      }
+    },
+    {
+      "id": "onboarding-header",
+      "name": "OnboardingHeader",
+      "taxonomy": "molecule",
+      "description": "Step indicator (1 of 3), headline 'What's Your Monthly Budget?', and subheading",
+      "states": [
+        "default"
+      ],
+      "props": {
+        "currentStep": {
+          "type": "number",
+          "required": true,
+          "description": "Current step number in onboarding flow"
+        },
+        "totalSteps": {
+          "type": "number",
+          "required": true,
+          "description": "Total number of onboarding steps"
+        },
+        "headline": {
+          "type": "string",
+          "required": true,
+          "description": "Step headline text"
+        },
+        "subheading": {
+          "type": "string",
+          "required": true,
+          "description": "Step subheading or description"
+        }
+      }
+    },
+    {
+      "id": "budget-input-form",
+      "name": "BudgetInputForm",
+      "taxonomy": "organism",
+      "description": "Currency selector dropdown, budget amount input field with currency symbol, and Next/Skip buttons",
+      "states": [
+        "default",
+        "loading",
+        "error"
+      ],
+      "props": {
+        "currency": {
+          "type": "string",
+          "required": true,
+          "description": "Selected currency code"
+        },
+        "budgetAmount": {
+          "type": "number",
+          "required": true,
+          "description": "Entered budget amount in cents"
+        },
+        "currencies": {
+          "type": "string[]",
+          "required": true,
+          "description": "Available currency options"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether form is submitting"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Form validation or submission error"
+        },
+        "onCurrencyChange": {
+          "type": "(currency: string) => void",
+          "required": true,
+          "description": "Callback fired when currency is selected"
+        },
+        "onBudgetChange": {
+          "type": "(amount: number) => void",
+          "required": true,
+          "description": "Callback fired when budget amount is entered"
+        },
+        "onNext": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when Next button is clicked"
+        },
+        "onSkip": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when Skip button is clicked"
+        }
+      }
+    },
+    {
+      "id": "goal-creation-form",
+      "name": "GoalCreationForm",
+      "taxonomy": "organism",
+      "description": "Form fields: goal name input, category selector (Vacation, Emergency Fund, Car, Education, etc.), target amount input, deadline date picker, and Next/Skip buttons",
+      "states": [
+        "default",
+        "loading",
+        "error"
+      ],
+      "props": {
+        "goalName": {
+          "type": "string",
+          "required": true,
+          "description": "Entered goal name"
+        },
+        "category": {
+          "type": "string",
+          "required": true,
+          "description": "Selected goal category"
+        },
+        "targetAmount": {
+          "type": "number",
+          "required": true,
+          "description": "Target savings amount in cents"
+        },
+        "deadline": {
+          "type": "string",
+          "required": true,
+          "description": "Goal deadline date in ISO format"
+        },
+        "categories": {
+          "type": "Array<{ label: string; value: string }>",
+          "required": true,
+          "description": "Available goal categories"
+        },
+        "isLoading": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether form is submitting"
+        },
+        "error": {
+          "type": "string",
+          "required": false,
+          "description": "Form validation or submission error"
+        },
+        "onGoalNameChange": {
+          "type": "(name: string) => void",
+          "required": true,
+          "description": "Callback fired when goal name is entered"
+        },
+        "onCategoryChange": {
+          "type": "(category: string) => void",
+          "required": true,
+          "description": "Callback fired when category is selected"
+        },
+        "onTargetAmountChange": {
+          "type": "(amount: number) => void",
+          "required": true,
+          "description": "Callback fired when target amount is entered"
+        },
+        "onDeadlineChange": {
+          "type": "(date: string) => void",
+          "required": true,
+          "description": "Callback fired when deadline date is selected"
+        },
+        "onNext": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when Next button is clicked"
+        },
+        "onSkip": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when Skip button is clicked"
+        }
+      }
+    },
+    {
+      "id": "completion-hero",
+      "name": "CompletionHero",
+      "taxonomy": "organism",
+      "description": "Celebration icon/illustration, headline 'You're All Set!', subheading about starting their journey, and 'Go to Dashboard' button",
+      "states": [
+        "default"
+      ],
+      "props": {
+        "headline": {
+          "type": "string",
+          "required": true,
+          "description": "Completion headline text"
+        },
+        "subheading": {
+          "type": "string",
+          "required": true,
+          "description": "Completion subheading text"
+        },
+        "ctaLabel": {
+          "type": "string",
+          "required": true,
+          "description": "Call-to-action button label"
+        },
+        "onCTA": {
+          "type": "() => void",
+          "required": true,
+          "description": "Callback fired when CTA button is clicked"
+        }
+      }
+    },
+    {
+      "id": "global-sidebar",
+      "name": "GlobalSidebar",
+      "taxonomy": "organism",
+      "description": "Fixed left sidebar (240-280px) on desktop. Contains Wavelength logo, main navigation (Dashboard, Goals, Transactions, Settings), and user profile section at bottom. Collapses to icon-only on smaller viewports.",
+      "states": [
+        "default",
+        "hover"
+      ],
+      "variants": {
+        "state": [
+          "expanded",
+          "collapsed"
+        ],
+        "layout": [
+          "desktop",
+          "mobile"
+        ]
+      },
+      "props": {
+        "logoSrc": {
+          "type": "string",
+          "required": true,
+          "description": "URL to Wavelength logo image"
+        },
+        "appTitle": {
+          "type": "string",
+          "required": true,
+          "description": "App name displayed in expanded sidebar"
+        },
+        "navigationItems": {
+          "type": "Array<{ label: string; href: string; icon: ReactNode }>",
+          "required": true,
+          "description": "Main navigation menu items with labels, routes, and icons"
+        },
+        "currentPath": {
+          "type": "string",
+          "required": true,
+          "description": "Current page route to determine active state"
+        },
+        "user": {
+          "type": "{ name: string; avatarUrl: string }",
+          "required": true,
+          "description": "Current user info for profile section"
+        },
+        "isCollapsed": {
+          "type": "boolean",
+          "required": false,
+          "description": "Whether sidebar is in collapsed icon-only state"
+        },
+        "onNavigate": {
+          "type": "(path: string) => void",
+          "required": false,
+          "description": "Callback fired when navigation item is clicked"
+        },
+        "onToggleCollapse": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when collapse toggle is clicked"
+        }
+      }
+    },
+    {
+      "id": "global-topbar",
+      "name": "GlobalTopbar",
+      "taxonomy": "organism",
+      "description": "Fixed top navigation bar (56-64px) spanning full width. Contains app logo/title on left, notification bell icon, and user avatar dropdown on right. Visible on all app screens.",
+      "states": [
+        "default",
+        "hover"
+      ],
+      "radixPrimitive": "DropdownMenu",
+      "props": {
+        "logoSrc": {
+          "type": "string",
+          "required": true,
+          "description": "URL to Wavelength logo image"
+        },
+        "appTitle": {
+          "type": "string",
+          "required": true,
+          "description": "App name displayed in topbar"
+        },
+        "notificationCount": {
+          "type": "number",
+          "required": false,
+          "description": "Number of unread notifications to display as badge"
+        },
+        "userAvatar": {
+          "type": "string",
+          "required": true,
+          "description": "URL to current user's avatar image"
+        },
+        "userName": {
+          "type": "string",
+          "required": true,
+          "description": "Current user's display name for accessibility"
+        },
+        "onNotificationClick": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when notification bell is clicked"
+        },
+        "onAvatarMenuOpen": {
+          "type": "() => void",
+          "required": false,
+          "description": "Callback fired when user avatar dropdown opens"
+        }
+      }
+    }
+  ],
+  "generatedAt": "2025-01-10T14:32:00Z"
+}

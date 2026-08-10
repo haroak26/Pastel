@@ -1,0 +1,369 @@
+import * as React from "react";
+import PageHeader from "../components/page-header";
+import StreakBand from "../components/streak-band";
+import BalanceSummary from "../components/balance-summary";
+import SpendingChart from "../components/spending-chart";
+import CategoryList from "../components/category-list";
+import GoalsPreview from "../components/goals-preview";
+import ViewAllGoalsLink from "../components/view-all-goals-link";
+import TransactionTable from "../components/transaction-table";
+import ViewAllTransactionsLink from "../components/view-all-transactions-link";
+import SectionHeader from "../components/section-header";
+import Logo from "../components/logo";
+import NavLinks from "../components/nav-links";
+import UserMenu from "../components/user-menu";
+
+const Header = PageHeader as React.ComponentType<any>;
+const Streak = StreakBand as React.ComponentType<any>;
+const Balance = BalanceSummary as React.ComponentType<any>;
+const Chart = SpendingChart as React.ComponentType<any>;
+const Categories = CategoryList as React.ComponentType<any>;
+const Goals = GoalsPreview as React.ComponentType<any>;
+const GoalsLink = ViewAllGoalsLink as React.ComponentType<any>;
+const Transactions = TransactionTable as React.ComponentType<any>;
+const TransactionsLink = ViewAllTransactionsLink as React.ComponentType<any>;
+const Heading = SectionHeader as React.ComponentType<any>;
+const BrandLogo = Logo as React.ComponentType<any>;
+const Navigation = NavLinks as React.ComponentType<any>;
+const AccountMenu = UserMenu as React.ComponentType<any>;
+
+const user = {
+  id: "usr_1",
+  name: "Maya Thompson",
+  email: "maya.thompson@wavelength.app",
+  role: "Budget owner",
+  avatar:
+    "https://ui-avatars.com/api/?name=Maya+Thompson&background=0f766e&color=f7f5ef",
+};
+
+const spendingCategories = [
+  {
+    id: "food",
+    name: "Food & dining",
+    amount: 684.32,
+    budget: 850,
+    percentage: 31,
+    color: "var(--color-accent-500)",
+  },
+  {
+    id: "housing",
+    name: "Housing",
+    amount: 540,
+    budget: 600,
+    percentage: 24,
+    color: "var(--color-accent-600)",
+  },
+  {
+    id: "transport",
+    name: "Transport",
+    amount: 318.75,
+    budget: 450,
+    percentage: 14,
+    color: "var(--color-neutral-600)",
+  },
+  {
+    id: "shopping",
+    name: "Shopping",
+    amount: 276.4,
+    budget: 400,
+    percentage: 12,
+    color: "var(--color-neutral-500)",
+  },
+  {
+    id: "entertainment",
+    name: "Entertainment",
+    amount: 214.18,
+    budget: 300,
+    percentage: 10,
+    color: "var(--color-neutral-400)",
+  },
+  {
+    id: "utilities",
+    name: "Utilities",
+    amount: 184.6,
+    budget: 250,
+    percentage: 9,
+    color: "var(--color-neutral-300)",
+  },
+];
+
+const goals = [
+  {
+    id: "goal_1",
+    name: "Japan trip",
+    currentAmount: 2850,
+    targetAmount: 5000,
+    progress: 57,
+    deadline: "Dec 15, 2026",
+    remaining: "$2,150 to go",
+  },
+  {
+    id: "goal_2",
+    name: "Emergency fund",
+    currentAmount: 4200,
+    targetAmount: 6000,
+    progress: 70,
+    deadline: "Oct 31, 2026",
+    remaining: "$1,800 to go",
+  },
+  {
+    id: "goal_3",
+    name: "New laptop",
+    currentAmount: 960,
+    targetAmount: 1800,
+    progress: 53,
+    deadline: "Nov 20, 2026",
+    remaining: "$840 to go",
+  },
+  {
+    id: "goal_4",
+    name: "Holiday gifts",
+    currentAmount: 325,
+    targetAmount: 750,
+    progress: 43,
+    deadline: "Dec 1, 2026",
+    remaining: "$425 to go",
+  },
+];
+
+const transactions = [
+  {
+    id: "txn_1",
+    date: "Aug 28, 2026",
+    merchant: "Marlow Market",
+    category: "Food & dining",
+    amount: 86.42,
+    status: "Completed",
+    account: "Everyday checking",
+    type: "Debit",
+  },
+  {
+    id: "txn_2",
+    date: "Aug 27, 2026",
+    merchant: "Metro Transit",
+    category: "Transport",
+    amount: 42,
+    status: "Completed",
+    account: "Everyday checking",
+    type: "Debit",
+  },
+  {
+    id: "txn_3",
+    date: "Aug 25, 2026",
+    merchant: "Northstar Energy",
+    category: "Utilities",
+    amount: 118.6,
+    status: "Completed",
+    account: "Everyday checking",
+    type: "Debit",
+  },
+  {
+    id: "txn_4",
+    date: "Aug 23, 2026",
+    merchant: "Field Notes Supply",
+    category: "Shopping",
+    amount: 64.9,
+    status: "Completed",
+    account: "Everyday checking",
+    type: "Debit",
+  },
+  {
+    id: "txn_5",
+    date: "Aug 21, 2026",
+    merchant: "Lantern Cinema",
+    category: "Entertainment",
+    amount: 38.5,
+    status: "Completed",
+    account: "Everyday checking",
+    type: "Debit",
+  },
+  {
+    id: "txn_6",
+    date: "Aug 19, 2026",
+    merchant: "Cedar & Stone",
+    category: "Food & dining",
+    amount: 124.8,
+    status: "Completed",
+    account: "Everyday checking",
+    type: "Debit",
+  },
+];
+
+export default function Dashboard() {
+  return (
+    <div className="min-h-screen bg-[var(--color-surface-background)] font-[var(--font-body)] text-[var(--color-text-primary)]">
+      <aside className="fixed inset-y-0 left-0 flex w-[280px] flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-[var(--space-4)] py-[var(--space-6)]">
+        <div className="px-[var(--space-2)]">
+          <BrandLogo size="md" />
+        </div>
+
+        <div className="mt-[var(--space-8)] px-[var(--space-2)] text-sm font-[var(--weight-medium)] text-[var(--color-text-muted)]">
+          Navigation
+        </div>
+
+        <nav className="mt-[var(--space-3)]" aria-label="Navigation">
+          <Navigation
+            items={[
+              { label: "Dashboard", href: "/dashboard", active: true },
+              { label: "Transactions", href: "/transactions" },
+              { label: "Goals", href: "/goals" },
+              { label: "Accounts", href: "/accounts" },
+              { label: "Settings", href: "/settings" },
+            ]}
+            activeItem="Dashboard"
+          />
+        </nav>
+
+        <div className="mt-auto border-t border-[var(--color-border-subtle)] pt-[var(--space-4)]">
+          <AccountMenu
+            user={user}
+            onSettings={() => undefined}
+            onLogout={() => undefined}
+          />
+        </div>
+      </aside>
+
+      <div className="ml-[280px] min-h-screen">
+        <header role="navigation">
+          <Header
+            currentMonth="August 2026"
+            monthLabel="August 2026"
+            onPreviousMonth={() => undefined}
+            onNextMonth={() => undefined}
+            user={user}
+          />
+        </header>
+
+        <main className="mx-auto max-w-[1280px] px-[var(--space-8)] py-[var(--space-8)]">
+          <section className="mb-[var(--space-8)]">
+            <div className="flex items-end justify-between gap-[var(--space-6)]">
+              <div>
+                <h1 className="font-[var(--font-display)] text-3xl font-[var(--weight-semibold)] tracking-tight text-[var(--color-text-primary)]">
+                  August spending at a glance
+                </h1>
+                <p className="mt-[var(--space-2)] text-base text-[var(--color-text-secondary)]">
+                  See where your money went, check your progress, and keep your
+                  12-day streak going.
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => undefined}
+                className="inline-flex h-[var(--control-md)] items-center justify-center rounded-[var(--radius-md)] bg-[var(--color-accent-500)] px-[var(--space-4)] text-sm font-[var(--weight-medium)] text-[var(--color-text-inverse)] transition-colors hover:bg-[var(--color-accent-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 active:bg-[var(--color-accent-700)]"
+              >
+                Add transaction
+              </button>
+            </div>
+          </section>
+
+          <section
+            aria-label="Streak and balance"
+            className="grid grid-cols-1 gap-[var(--space-6)] xl:grid-cols-5"
+          >
+            <div className="xl:col-span-2">
+              <Streak
+                currentStreak={12}
+                daysRemaining={3}
+                nextReward="20-day streak"
+                rewardLabel="Next reward unlock"
+                title="Money check-in streak"
+                label="Current streak"
+              />
+            </div>
+            <div className="xl:col-span-3">
+              <Balance
+                availableBalance={4826.75}
+                monthlySpend={2218.25}
+                budgetRemaining={1231.75}
+                savingsRate={18}
+                labels={{
+                  monthlySpend: "Monthly spend",
+                  budgetRemaining: "Budget remaining",
+                  savingsRate: "Savings rate",
+                }}
+              />
+            </div>
+          </section>
+
+          <section
+            aria-label="Spending breakdown"
+            className="mt-[var(--space-12)]"
+          >
+            <Heading title="Spending breakdown" />
+            <div className="mt-[var(--space-4)] grid grid-cols-1 gap-[var(--space-6)] lg:grid-cols-5">
+              <div className="lg:col-span-2">
+                <Chart
+                  title="August by category"
+                  categories={spendingCategories}
+                  total={2218.25}
+                  trend="Down from last month"
+                />
+              </div>
+              <div className="lg:col-span-3">
+                <Categories
+                  title="Category"
+                  categories={spendingCategories}
+                  amountLabel="Amount"
+                  budgetLabel="Budget limit"
+                  shareLabel="Share of spend"
+                  sortable
+                />
+              </div>
+            </div>
+          </section>
+
+          <section
+            aria-label="Active goals"
+            className="mt-[var(--space-12)]"
+          >
+            <div className="flex items-center justify-between gap-[var(--space-4)]">
+              <Heading title="Active goals" />
+              <GoalsLink
+                href="/goals"
+                onClick={() => undefined}
+                label="View all goals"
+              />
+            </div>
+            <div className="mt-[var(--space-4)]">
+              <Goals
+                title="Goal progress"
+                goals={goals}
+                showDeadlines
+              />
+            </div>
+          </section>
+
+          <section
+            aria-label="Recent transactions"
+            className="mt-[var(--space-12)] pb-[var(--space-12)]"
+          >
+            <div className="flex items-center justify-between gap-[var(--space-4)]">
+              <Heading title="Recent transactions" />
+              <TransactionsLink
+                href="/transactions"
+                onClick={() => undefined}
+                label="View all transactions"
+              />
+            </div>
+            <div className="mt-[var(--space-4)]">
+              <Transactions
+                transactions={transactions}
+                columns={[
+                  { key: "date", label: "Date" },
+                  { key: "merchant", label: "Merchant" },
+                  { key: "category", label: "Category" },
+                  { key: "amount", label: "Amount" },
+                  { key: "status", label: "Status" },
+                  { key: "account", label: "Account" },
+                  { key: "type", label: "Type" },
+                ]}
+                editable
+              />
+            </div>
+          </section>
+        </main>
+      </div>
+    </div>
+  );
+}

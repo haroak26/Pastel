@@ -1,0 +1,209 @@
+// AccountSection.tsx — Account security and data-management actions for Wavelength settings.
+import type { ButtonHTMLAttributes } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const accountSectionVariants = cva(
+  "rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)]",
+  {
+    variants: {
+      tone: {
+        standard: "",
+      },
+    },
+    defaultVariants: {
+      tone: "standard",
+    },
+  }
+);
+
+const accountActionVariants = cva(
+  "inline-flex h-[var(--control-md)] items-center justify-center gap-[var(--space-2)] rounded-[var(--radius-md)] border px-[var(--space-4)] font-[var(--font-body)] font-[var(--weight-medium)] transition-all duration-[var(--duration-fast)] ease-[var(--easing-standard)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        primary:
+          "border-[var(--color-accent-500)] bg-[var(--color-accent-500)] text-[var(--color-text-inverse)] hover:border-[var(--color-accent-600)] hover:bg-[var(--color-accent-600)] active:border-[var(--color-accent-900)] active:bg-[var(--color-accent-900)]",
+        secondary:
+          "border-[var(--color-border-default)] bg-[var(--color-surface-raised)] text-[var(--color-text-primary)] hover:bg-[var(--color-neutral-100)] active:bg-[var(--color-neutral-200)]",
+        danger:
+          "border-[var(--color-danger-500)] bg-[var(--color-surface-raised)] text-[var(--color-danger-900)] hover:bg-[var(--color-danger-50)] active:bg-[var(--color-danger-50)]",
+      },
+    },
+    defaultVariants: {
+      variant: "secondary",
+    },
+  }
+);
+
+interface AccountActionProps
+  extends ButtonHTMLAttributes<HTMLButtonElement>,
+    VariantProps<typeof accountActionVariants> {
+  loading?: boolean;
+}
+
+export interface AccountSectionProps
+  extends VariantProps<typeof accountSectionVariants> {
+  onChangePassword: () => void;
+  onExportData: () => void;
+  onDeleteAccount: () => void;
+  isLoading?: boolean;
+}
+
+function LoadingSpinner() {
+  return (
+    <svg
+      className="h-[var(--space-4)] w-[var(--space-4)] animate-spin"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
+  );
+}
+
+function AccountAction({
+  className,
+  variant,
+  loading = false,
+  disabled,
+  children,
+  ...props
+}: AccountActionProps) {
+  return (
+    <button
+      className={cn(accountActionVariants({ variant }), className)}
+      disabled={disabled || loading}
+      aria-busy={loading}
+      {...props}
+    >
+      {loading && <LoadingSpinner />}
+      {children}
+    </button>
+  );
+}
+
+export default function AccountSection({
+  className,
+  tone,
+  onChangePassword,
+  onExportData,
+  onDeleteAccount,
+  isLoading = false,
+}: AccountSectionProps) {
+  return (
+    <section
+      className={cn(accountSectionVariants({ tone }), className)}
+      aria-labelledby="account-section-title"
+      aria-busy={isLoading}
+    >
+      <div className="border-b border-[var(--color-border-subtle)] px-[var(--space-6)] py-[var(--space-6)]">
+        <h2
+          id="account-section-title"
+          className="font-[var(--font-display)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]"
+          style={{ font: "var(--text-xl)" }}
+        >
+          Account
+        </h2>
+        <p
+          className="mt-[var(--space-2)] max-w-prose font-[var(--font-body)] text-[var(--color-text-secondary)]"
+          style={{ font: "var(--text-base)" }}
+        >
+          Keep your Wavelength account secure and take your budgeting data with
+          you whenever you need it.
+        </p>
+      </div>
+
+      <div className="divide-y divide-[var(--color-border-subtle)]">
+        <div className="flex flex-col gap-[var(--space-4)] px-[var(--space-6)] py-[var(--space-4)] sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3
+              className="font-[var(--font-body)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]"
+              style={{ font: "var(--text-base)" }}
+            >
+              Change password
+            </h3>
+            <p
+              className="mt-[var(--space-1)] font-[var(--font-body)] text-[var(--color-text-secondary)]"
+              style={{ font: "var(--text-sm)" }}
+            >
+              Update the password you use to sign in.
+            </p>
+          </div>
+          <AccountAction
+            variant="primary"
+            type="button"
+            loading={isLoading}
+            onClick={onChangePassword}
+          >
+            Change password
+          </AccountAction>
+        </div>
+
+        <div className="flex flex-col gap-[var(--space-4)] px-[var(--space-6)] py-[var(--space-4)] sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3
+              className="font-[var(--font-body)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]"
+              style={{ font: "var(--text-base)" }}
+            >
+              Export your data
+            </h3>
+            <p
+              className="mt-[var(--space-1)] font-[var(--font-body)] text-[var(--color-text-secondary)]"
+              style={{ font: "var(--text-sm)" }}
+            >
+              Download your spending history and savings goals.
+            </p>
+          </div>
+          <AccountAction
+            variant="secondary"
+            type="button"
+            loading={isLoading}
+            onClick={onExportData}
+          >
+            Export data
+          </AccountAction>
+        </div>
+
+        <div className="flex flex-col gap-[var(--space-4)] px-[var(--space-6)] py-[var(--space-4)] sm:flex-row sm:items-center sm:justify-between">
+          <div>
+            <h3
+              className="font-[var(--font-body)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]"
+              style={{ font: "var(--text-base)" }}
+            >
+              Delete account
+            </h3>
+            <p
+              className="mt-[var(--space-1)] font-[var(--font-body)] text-[var(--color-text-secondary)]"
+              style={{ font: "var(--text-sm)" }}
+            >
+              Permanently remove your account and Wavelength data.
+            </p>
+          </div>
+          <AccountAction
+            variant="danger"
+            type="button"
+            loading={isLoading}
+            onClick={onDeleteAccount}
+          >
+            Delete account
+          </AccountAction>
+        </div>
+      </div>
+    </section>
+  );
+}

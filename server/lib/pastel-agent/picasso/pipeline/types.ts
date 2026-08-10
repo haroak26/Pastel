@@ -225,16 +225,16 @@ export interface ComponentsManifest {
 // ── Critque rubric (Stage 5) ───────────────────────────────────────────
 
 export interface RubricScores {
+  productContext: number;
+  brandCoherence: number;
   hierarchy: number;
-  tokenFidelity: number;
-  gridAlignment: number;
+  composition: number;
   spacingRhythm: number;
-  colorRestraint: number;
-  typographicRhythm: number;
   componentConsistency: number;
+  navigation: number;
+  contentCopy: number;
+  responsiveDesign: number;
   accessibilityBaseline: number;
-  brandFit: number;
-  overallPolish: number;
 }
 
 export type RubricDimension = keyof RubricScores;

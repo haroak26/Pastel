@@ -1,0 +1,29 @@
+// SectionHeader.tsx — Compact section label for organizing Wavelength dashboard and goals content. Use above related budgeting or savings sections.
+import * as React from "react";
+import { cva } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const sectionHeaderVariants = cva(
+  "flex items-center gap-[var(--space-3)] font-[var(--font-display)] text-[var(--text-sm)] font-[var(--weight-semibold)] leading-[var(--text-sm)] text-[var(--color-text-primary)]"
+);
+
+export interface SectionHeaderProps
+  extends React.HTMLAttributes<HTMLHeadingElement> {
+  label: string;
+}
+
+export default function SectionHeader({
+  className,
+  label,
+  ...props
+}: SectionHeaderProps) {
+  return (
+    <h2 className={cn(sectionHeaderVariants(), className)} {...props}>
+      <span
+        className="h-[var(--space-6)] w-[var(--space-1)] rounded-[var(--radius-full)] bg-[var(--color-accent-500)]"
+        aria-hidden="true"
+      />
+      <span>{label}</span>
+    </h2>
+  );
+}

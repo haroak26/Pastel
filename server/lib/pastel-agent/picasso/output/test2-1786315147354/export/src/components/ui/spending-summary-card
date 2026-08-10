@@ -1,0 +1,171 @@
+// SpendingSummaryCard.tsx — Shows Wavelength’s monthly spending progress, budget ceiling, and remaining amount. Use on dashboard summaries where a quick budget pulse is needed.
+import type { HTMLAttributes } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const spendingSummaryCardVariants = cva(
+  "rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] p-[var(--space-6)] font-[var(--font-body)] text-[var(--color-text-primary)] shadow-[var(--shadow-sm)] transition-colors duration-[var(--duration-base)] ease-[var(--easing-standard)]"
+);
+
+export interface SpendingSummaryCardProps
+  extends HTMLAttributes<HTMLElement>,
+    VariantProps<typeof spendingSummaryCardVariants> {
+  totalSpent: number;
+  budgetLimit: number;
+  currencyCode?: string;
+  isLoading?: boolean;
+}
+
+export default function SpendingSummaryCard({
+  className,
+  totalSpent,
+  budgetLimit,
+  currencyCode = "USD",
+  isLoading = false,
+  ...props
+}: SpendingSummaryCardProps) {
+  const remaining = budgetLimit - totalSpent;
+  const progress = budgetLimit > 0
+    ? Math.min(Math.max(totalSpent / budgetLimit, 0), 1)
+    : 0;
+  const radius = 26;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference * (1 - progress);
+
+  const formatAmount = (amount: number) =>
+    new Intl.NumberFormat(undefined, {
+      style: "currency",
+      currency: currencyCode,
+      maximumFractionDigits: 2,
+    }).format(amount);
+
+  return (
+    <article
+      className={cn(spendingSummaryCardVariants(), className)}
+      aria-busy={isLoading}
+      {...props}
+    >
+      <div className="flex items-start justify-between gap-[var(--space-4)]">
+        <div className="min-w-0">
+          <p className="text-sm font-[var(--weight-medium)] text-[var(--color-text-muted)]">
+            Spent this month
+          </p>
+
+          {isLoading ? (
+            <div
+              className="mt-[var(--space-2)] h-[var(--space-8)] w-[var(--space-16)] animate-pulse rounded-[var(--radius-sm)] bg-[var(--color-neutral-100)]"
+              aria-hidden="true"
+            />
+          ) : (
+            <p className="mt-[var(--space-2)] font-[var(--font-display)] text-3xl font-[var(--weight-semibold)] tabular-nums tracking-tight">
+              {formatAmount(totalSpent)}
+            </p>
+          )}
+        </div>
+
+        <div className="relative flex h-[var(--space-16)] w-[var(--space-16)] shrink-0 items-center justify-center">
+          {isLoading ? (
+            <svg
+              className="h-[var(--space-6)] w-[var(--space-6)] animate-spin text-[var(--color-accent-500)]"
+              style={{
+                animationDuration: "var(--duration-slow)",
+                animationTimingFunction: "var(--easing-standard)",
+              }}
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="4"
+              />
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+              />
+            </svg>
+          ) : (
+            <>
+              <svg
+                className="h-full w-full -rotate-90"
+                viewBox="0 0 64 64"
+                role="progressbar"
+                aria-label="Monthly budget used"
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={Math.round(progress * 100)}
+              >
+                <circle
+                  cx="32"
+                  cy="32"
+                  r={radius}
+                  fill="none"
+                  stroke="var(--color-neutral-200)"
+                  strokeWidth="6"
+                />
+                <circle
+                  cx="32"
+                  cy="32"
+                  r={radius}
+                  fill="none"
+                  stroke="var(--color-accent-500)"
+                  strokeWidth="6"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={dashOffset}
+                  className="transition-[stroke-dashoffset] duration-[var(--duration-slow)] ease-[var(--easing-standard)]"
+                />
+              </svg>
+              <span className="absolute font-[var(--font-mono)] text-xs font-[var(--weight-semibold)] tabular-nums text-[var(--color-text-secondary)]">
+                {Math.round(progress * 100)}%
+              </span>
+            </>
+          )}
+        </div>
+      </div>
+
+      <dl className="mt-[var(--space-6)] divide-y divide-[var(--color-border-subtle)] border-t border-[var(--color-border-subtle)]">
+        <div className="flex items-center justify-between gap-[var(--space-4)] py-[var(--space-3)]">
+          <dt className="text-sm text-[var(--color-text-muted)]">Budget limit</dt>
+          {isLoading ? (
+            <dd
+              className="h-[var(--space-4)] w-[var(--space-12)] animate-pulse rounded-[var(--radius-sm)] bg-[var(--color-neutral-100)]"
+              aria-hidden="true"
+            />
+          ) : (
+            <dd className="font-[var(--font-mono)] text-sm font-[var(--weight-medium)] tabular-nums">
+              {formatAmount(budgetLimit)}
+            </dd>
+          )}
+        </div>
+
+        <div className="flex items-center justify-between gap-[var(--space-4)] py-[var(--space-3)]">
+          <dt className="text-sm text-[var(--color-text-muted)]">Remaining</dt>
+          {isLoading ? (
+            <dd
+              className="h-[var(--space-4)] w-[var(--space-12)] animate-pulse rounded-[var(--radius-sm)] bg-[var(--color-neutral-100)]"
+              aria-hidden="true"
+            />
+          ) : (
+            <dd
+              className={cn(
+                "font-[var(--font-mono)] text-sm font-[var(--weight-semibold)] tabular-nums",
+                remaining < 0
+                  ? "text-[var(--color-danger-500)]"
+                  : "text-[var(--color-success-500)]"
+              )}
+            >
+              {formatAmount(remaining)}
+            </dd>
+          )}
+        </div>
+      </dl>
+    </article>
+  );
+}

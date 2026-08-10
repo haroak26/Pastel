@@ -1,0 +1,205 @@
+// ContributionChart.tsx — Cumulative savings progress chart for tracking a Wavelength goal against its deadline.
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const contributionChartVariants = cva(
+  "w-full rounded-[var(--radius-lg)] bg-[var(--color-surface-raised)] p-[var(--space-6)] font-[var(--font-body)] text-[var(--color-text-primary)] shadow-[var(--shadow-md)]",
+  {}
+);
+
+export interface ContributionChartProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof contributionChartVariants> {
+  data: Array<{ date: string; amount: number }>;
+  targetAmount: number;
+  deadline: string;
+  isLoading?: boolean;
+}
+
+export default function ContributionChart({
+  className,
+  data,
+  targetAmount,
+  deadline,
+  isLoading = false,
+  ...props
+}: ContributionChartProps) {
+  const width = 720;
+  const height = 280;
+  const chartPadding = {
+    top: 24,
+    right: 12,
+    bottom: 42,
+    left: 12,
+  };
+
+  const amounts = data.map((point) => point.amount);
+  const maximumAmount = Math.max(targetAmount, ...amounts, 1);
+  const chartWidth = width - chartPadding.left - chartPadding.right;
+  const chartHeight = height - chartPadding.top - chartPadding.bottom;
+
+  const points = data.map((point, index) => {
+    const x =
+      data.length > 1
+        ? chartPadding.left + (index / (data.length - 1)) * chartWidth
+        : chartPadding.left + chartWidth / 2;
+    const y =
+      chartPadding.top +
+      chartHeight -
+      (Math.max(point.amount, 0) / maximumAmount) * chartHeight;
+
+    return { ...point, x, y };
+  });
+
+  const linePath = points
+    .map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`)
+    .join(" ");
+
+  const targetY =
+    chartPadding.top +
+    chartHeight -
+    (targetAmount / maximumAmount) * chartHeight;
+
+  const formatAmount = (amount: number) =>
+    new Intl.NumberFormat("en-US", {
+      style: "currency",
+      currency: "USD",
+      maximumFractionDigits: 0,
+    }).format(amount);
+
+  const formatDate = (date: string) =>
+    new Intl.DateTimeFormat("en-US", {
+      month: "short",
+      day: "numeric",
+    }).format(new Date(date));
+
+  const firstDate = data[0]?.date;
+  const lastDate = data[data.length - 1]?.date;
+  const latestAmount = data[data.length - 1]?.amount ?? 0;
+
+  return (
+    <div
+      className={cn(contributionChartVariants(), className)}
+      aria-busy={isLoading}
+      aria-label={`Cumulative savings progress toward ${formatAmount(
+        targetAmount
+      )} by ${formatDate(deadline)}`}
+      {...props}
+    >
+      <div className="flex items-start justify-between gap-[var(--space-4)] border-b border-[var(--color-border-subtle)] pb-[var(--space-4)]">
+        <div>
+          <p className="font-[var(--font-display)] text-[var(--text-xl)] font-[var(--weight-semibold)]">
+            {formatAmount(latestAmount)}
+          </p>
+          <p className="mt-[var(--space-1)] text-[var(--text-sm)] text-[var(--color-text-secondary)]">
+            saved so far
+          </p>
+        </div>
+
+        <div className="text-right">
+          <p className="font-[var(--font-mono)] text-[var(--text-sm)] font-[var(--weight-medium)] tabular-nums text-[var(--color-text-primary)]">
+            {formatAmount(targetAmount)}
+          </p>
+          <p className="mt-[var(--space-1)] text-[var(--text-sm)] text-[var(--color-text-muted)]">
+            by {formatDate(deadline)}
+          </p>
+        </div>
+      </div>
+
+      <div className="relative mt-[var(--space-6)]">
+        {isLoading ? (
+          <div className="flex min-h-[var(--control-lg)] items-center justify-center">
+            <svg
+              className="h-[var(--space-6)] w-[var(--space-6)] animate-spin text-[var(--color-accent-500)]"
+              style={{ animationDuration: "var(--duration-slow)" }}
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24"
+              aria-hidden="true"
+            >
+              <circle
+                className="opacity-25"
+                cx="12"
+                cy="12"
+                r="10"
+                stroke="currentColor"
+                strokeWidth="3"
+              />
+              <path
+                className="opacity-90"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V1.5A10.5 10.5 0 003.5 12H4z"
+              />
+            </svg>
+          </div>
+        ) : (
+          <svg
+            className="h-auto w-full overflow-visible"
+            viewBox={`0 0 ${width} ${height}`}
+            role="img"
+            aria-label={`Savings increased from ${
+              firstDate ? formatDate(firstDate) : ""
+            } to ${lastDate ? formatDate(lastDate) : ""}`}
+          >
+            <line
+              x1={chartPadding.left}
+              x2={width - chartPadding.right}
+              y1={targetY}
+              y2={targetY}
+              stroke="var(--color-border-default)"
+              strokeDasharray="6 6"
+              strokeWidth="2"
+            />
+
+            <path
+              d={linePath}
+              fill="none"
+              stroke="var(--color-accent-500)"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              strokeWidth="4"
+            />
+
+            {points.map((point) => (
+              <circle
+                key={`${point.date}-${point.amount}`}
+                cx={point.x}
+                cy={point.y}
+                r="5"
+                fill="var(--color-surface-raised)"
+                stroke="var(--color-accent-500)"
+                strokeWidth="3"
+              />
+            ))}
+
+            {firstDate && (
+              <text
+                x={chartPadding.left}
+                y={height - 12}
+                fill="var(--color-text-muted)"
+                fontFamily="var(--font-body)"
+                fontSize="var(--text-xs)"
+              >
+                {formatDate(firstDate)}
+              </text>
+            )}
+
+            {lastDate && (
+              <text
+                x={width - chartPadding.right}
+                y={height - 12}
+                fill="var(--color-text-muted)"
+                fontFamily="var(--font-body)"
+                fontSize="var(--text-xs)"
+                textAnchor="end"
+              >
+                {formatDate(lastDate)}
+              </text>
+            )}
+          </svg>
+        )}
+      </div>
+    </div>
+  );
+}

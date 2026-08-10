@@ -1,0 +1,25 @@
+[
+  {
+    "name": "Quiet Ledger",
+    "summary": "A technically polished budgeting workspace that makes financial clarity feel calm, credible, and precise. Stripe-inspired structure keeps the playful moments focused on progress rather than decoration.",
+    "accentColor": "#0F766E",
+    "accentRationale": "Deep teal communicates trust and financial stability while feeling fresher and more distinctive for a younger audience than conventional fintech blue.",
+    "typography": {
+      "display": "Sora",
+      "body": "DM Sans",
+      "mono": "Source Code Pro"
+    },
+    "surfaces": "Light posture with a cool neutral-50 page background, neutral-100 navigation and input surfaces, neutral-50 raised content areas with restrained Level 1 shadows, and neutral-200 overlay surfaces for menus and dialogs.",
+    "spacing": "balanced",
+    "radius": "sharp",
+    "motion": "snappy",
+    "visualKeywords": [
+      "technical clarity",
+      "teal precision",
+      "ledger rows",
+      "quiet confidence",
+      "code-inspired data",
+      "restrained depth"
+    ]
+  }
+]

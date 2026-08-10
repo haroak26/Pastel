@@ -1,0 +1,153 @@
+// StreakBanner.tsx — Highlights a user’s consecutive on-budget days and personal record progress on the Wavelength dashboard.
+import type { HTMLAttributes } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const streakBannerVariants = cva(
+  "relative overflow-hidden rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] font-[var(--font-body)] text-[var(--color-text-primary)] shadow-[var(--shadow-sm)] transition-all duration-[var(--duration-base)] ease-[var(--easing-standard)] hover:border-[var(--color-accent-500)] active:border-[var(--color-accent-600)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      size: {
+        sm: "p-[var(--space-3)]",
+        md: "p-[var(--space-4)]",
+        lg: "p-[var(--space-6)]",
+      },
+    },
+    defaultVariants: {
+      size: "md",
+    },
+  }
+);
+
+export interface StreakBannerProps
+  extends HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof streakBannerVariants> {
+  streakDays: number;
+  maxStreakDays?: number;
+  isLoading?: boolean;
+}
+
+export default function StreakBanner({
+  className,
+  size,
+  streakDays,
+  maxStreakDays,
+  isLoading = false,
+  ...props
+}: StreakBannerProps) {
+  const recordDays = Math.max(maxStreakDays ?? streakDays, 1);
+  const progress = Math.min(Math.max((streakDays / recordDays) * 100, 0), 100);
+
+  return (
+    <div
+      className={cn(streakBannerVariants({ size }), className)}
+      role="status"
+      aria-busy={isLoading}
+      aria-live="polite"
+      {...props}
+    >
+      <div className="flex items-start justify-between gap-[var(--space-4)]">
+        <div className="flex min-w-0 items-start gap-[var(--space-3)]">
+          <div
+            className="flex shrink-0 items-center justify-center rounded-[var(--radius-full)] bg-[var(--color-warning-50)] text-[var(--color-warning-500)]"
+            style={{
+              width: "var(--control-md)",
+              height: "var(--control-md)",
+            }}
+            aria-hidden="true"
+          >
+            {isLoading ? (
+              <svg
+                className="h-[var(--space-4)] w-[var(--space-4)] animate-spin"
+                viewBox="0 0 24 24"
+                fill="none"
+              >
+                <circle
+                  cx="12"
+                  cy="12"
+                  r="9"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  className="opacity-25"
+                />
+                <path
+                  d="M21 12a9 9 0 0 0-9-9"
+                  stroke="currentColor"
+                  strokeWidth="3"
+                  strokeLinecap="round"
+                  className="opacity-90"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="h-[var(--space-4)] w-[var(--space-4)]"
+                viewBox="0 0 24 24"
+                fill="currentColor"
+              >
+                <path d="M13.7 2.6c.3 3-1.1 4.7-2.6 6.1-.8-1.2-1-2.7-.5-4.2-3.2 2-5.1 5-5.1 8.4a6.5 6.5 0 0 0 13 0c0-3.7-2.1-6.9-4.8-10.3Z" />
+                <path
+                  d="M12.4 21c-1.7 0-3.1-1.4-3.1-3.1 0-1.3.8-2.5 2.1-3.5.1 1 .5 1.7 1.1 2.2.7-.7 1.3-1.5 1.2-2.8 1.1 1.4 1.7 2.7 1.7 4.1 0 1.7-1.3 3.1-3 3.1Z"
+                  fill="var(--color-warning-50)"
+                />
+              </svg>
+            )}
+          </div>
+
+          <div className="min-w-0">
+            <p className="text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-secondary)]">
+              {isLoading ? "Updating your streak" : "Current spending streak"}
+            </p>
+            <div className="mt-[var(--space-1)] flex items-baseline gap-[var(--space-2)]">
+              <span
+                className={cn(
+                  "font-[var(--font-display)] font-[var(--weight-bold)] tabular-nums tracking-[-0.03em]",
+                  size === "sm" && "text-[var(--text-xl)]",
+                  size === "md" && "text-[var(--text-2xl)]",
+                  size === "lg" && "text-[var(--text-3xl)]"
+                )}
+              >
+                {streakDays}
+              </span>
+              <span className="text-[var(--text-sm)] text-[var(--color-text-muted)]">
+                days on budget
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {maxStreakDays !== undefined && (
+          <div className="shrink-0 text-right">
+            <p className="text-[var(--text-xs)] font-[var(--weight-medium)] text-[var(--color-text-muted)]">
+              Personal best
+            </p>
+            <p className="mt-[var(--space-1)] font-[var(--font-mono)] text-[var(--text-base)] font-[var(--weight-semibold)] tabular-nums text-[var(--color-text-primary)]">
+              {maxStreakDays} days
+            </p>
+          </div>
+        )}
+      </div>
+
+      <div className="mt-[var(--space-4)]">
+        <div
+          className="h-[var(--space-2)] overflow-hidden rounded-[var(--radius-full)] bg-[var(--color-neutral-100)]"
+          role="progressbar"
+          aria-label="Progress toward personal spending streak record"
+          aria-valuemin={0}
+          aria-valuemax={recordDays}
+          aria-valuenow={isLoading ? undefined : Math.min(streakDays, recordDays)}
+        >
+          <div
+            className="h-full rounded-[var(--radius-full)] bg-[var(--color-accent-500)] transition-[width] duration-[var(--duration-slow)] ease-[var(--easing-standard)]"
+            style={{ width: isLoading ? "0%" : `${progress}%` }}
+          />
+        </div>
+        {maxStreakDays !== undefined && (
+          <div className="mt-[var(--space-2)] flex justify-between gap-[var(--space-3)] text-[var(--text-xs)] text-[var(--color-text-muted)]">
+            <span>Keep the streak alive</span>
+            <span className="tabular-nums">{maxStreakDays - streakDays > 0 ? `${maxStreakDays - streakDays} to beat it` : "Record matched"}</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

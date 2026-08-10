@@ -1,0 +1,81 @@
+// GoalTargetInput.tsx — Currency input for setting savings goal target amounts. Use in goal creation and editing flows.
+import React, { useState } from "react";
+import { cn } from "../lib/cn";
+
+export interface GoalTargetInputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "onChange"> {
+  value: number | null;
+  onChange: (value: number | null) => void;
+  placeholder?: string;
+  error?: string | null;
+}
+
+export default function GoalTargetInput({
+  value,
+  onChange,
+  placeholder = "e.g., $2,500",
+  error = null,
+  disabled = false,
+  className,
+  ...props
+}: GoalTargetInputProps) {
+  const [isFocused, setIsFocused] = useState(false);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const inputValue = e.target.value;
+
+    if (inputValue === "" || inputValue === "$") {
+      onChange(null);
+      return;
+    }
+
+    const numericValue = parseFloat(inputValue.replace(/[$,]/g, ""));
+
+    if (!isNaN(numericValue) && numericValue >= 0) {
+      onChange(numericValue);
+    }
+  };
+
+  const formatCurrency = (num: number | null): string => {
+    if (num === null || num === undefined) return "";
+    return `$${num.toLocaleString("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2,
+    })}`;
+  };
+
+  const displayValue = value !== null ? formatCurrency(value) : "";
+
+  return (
+    <div className="flex flex-col gap-[var(--space-2)]">
+      <input
+        type="text"
+        value={displayValue}
+        onChange={handleChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className={cn(
+          "h-[var(--control-md)] w-full rounded-[var(--radius-md)] border-2 px-[var(--space-3)] font-[var(--font-body)] text-[var(--text-base)] font-[var(--weight-regular)] text-[var(--color-text-primary)] placeholder-[var(--color-text-muted)] transition-all duration-[var(--duration-fast)] ease-[var(--easing-standard)]",
+          "bg-[var(--color-surface-raised)] border-[var(--color-border-default)]",
+          "hover:border-[var(--color-border-subtle)]",
+          "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 focus-visible:border-[var(--color-accent-500)]",
+          error
+            ? "border-[var(--color-danger-500)] hover:border-[var(--color-danger-500)]"
+            : "",
+          disabled
+            ? "pointer-events-none opacity-50 bg-[var(--color-surface-overlay)]"
+            : "",
+          className
+        )}
+        {...props}
+      />
+      {error && (
+        <p className="text-[var(--text-xs)] font-[var(--weight-regular)] text-[var(--color-danger-500)]">
+          {error}
+        </p>
+      )}
+    </div>
+  );
+}

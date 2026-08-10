@@ -1,0 +1,87 @@
+// PageHeader.tsx — Provides a focused page title area with optional context and primary or secondary actions.
+import React from "react";
+import { cva } from "class-variance-authority";
+import { cn } from "../lib/cn";
+import Button from "./Button";
+
+const pageHeaderVariants = cva(
+  "flex flex-col gap-[var(--space-4)] border-b border-[var(--color-border-subtle)] pb-[var(--space-6)] sm:flex-row sm:items-end sm:justify-between"
+);
+
+export interface PageHeaderProps {
+  title: string;
+  subtitle?: string;
+  primaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
+  secondaryAction?: {
+    label: string;
+    onClick: () => void;
+  };
+  className?: string;
+}
+
+export default function PageHeader({
+  title,
+  subtitle,
+  primaryAction,
+  secondaryAction,
+  className,
+}: PageHeaderProps) {
+  return (
+    <header className={cn(pageHeaderVariants(), className)}>
+      <div className="min-w-0">
+        <h1
+          className="text-[var(--color-text-primary)]"
+          style={{
+            font: "var(--text-3xl)",
+            fontFamily: "var(--font-display)",
+            fontWeight: "var(--weight-semibold)",
+          }}
+        >
+          {title}
+        </h1>
+
+        {subtitle && (
+          <p
+            className="mt-[var(--space-2)] max-w-prose text-[var(--color-text-secondary)]"
+            style={{
+              font: "var(--text-base)",
+              fontFamily: "var(--font-body)",
+              fontWeight: "var(--weight-regular)",
+            }}
+          >
+            {subtitle}
+          </p>
+        )}
+      </div>
+
+      {(secondaryAction || primaryAction) && (
+        <div className="flex shrink-0 flex-wrap items-center gap-[var(--space-2)]">
+          {secondaryAction && (
+            <Button
+              type="button"
+              variant="secondary"
+              size="md"
+              onClick={secondaryAction.onClick}
+            >
+              {secondaryAction.label}
+            </Button>
+          )}
+
+          {primaryAction && (
+            <Button
+              type="button"
+              variant="primary"
+              size="md"
+              onClick={primaryAction.onClick}
+            >
+              {primaryAction.label}
+            </Button>
+          )}
+        </div>
+      )}
+    </header>
+  );
+}

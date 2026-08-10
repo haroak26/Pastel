@@ -1,0 +1,248 @@
+// SpendingBreakdownCard.tsx — Shows where Wavelength users spent money across a selected period. Use on dashboard spending summaries.
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const spendingBreakdownCardVariants = cva(
+  "rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] p-[var(--space-6)] font-[var(--font-body)] text-[var(--color-text-primary)] shadow-[var(--shadow-sm)] transition-all duration-[var(--duration-base)] ease-[var(--easing-standard)]",
+  {
+    variants: {
+      chartType: {
+        donut: "space-y-[var(--space-6)]",
+        "horizontal-bar": "space-y-[var(--space-6)]",
+      },
+      period: {
+        week: "",
+        month: "",
+        custom: "",
+      },
+    },
+    defaultVariants: {
+      chartType: "donut",
+      period: "month",
+    },
+  }
+);
+
+export interface SpendingBreakdownItem {
+  category: string;
+  amount: number;
+  percentage: number;
+  color: string;
+}
+
+export interface SpendingBreakdownCardProps
+  extends React.HTMLAttributes<HTMLDivElement>,
+    VariantProps<typeof spendingBreakdownCardVariants> {
+  data: SpendingBreakdownItem[];
+  totalSpent: number;
+  currency?: string;
+  isLoading?: boolean;
+}
+
+function formatAmount(amount: number, currency: string) {
+  return `${currency}${amount.toFixed(2)}`;
+}
+
+function LoadingSpinner() {
+  return (
+    <svg
+      className="h-[var(--space-4)] w-[var(--space-4)] animate-spin text-[var(--color-accent-500)]"
+      xmlns="http://www.w3.org/2000/svg"
+      fill="none"
+      viewBox="0 0 24 24"
+      aria-hidden="true"
+    >
+      <circle
+        className="opacity-25"
+        cx="12"
+        cy="12"
+        r="10"
+        stroke="currentColor"
+        strokeWidth="4"
+      />
+      <path
+        className="opacity-75"
+        fill="currentColor"
+        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+      />
+    </svg>
+  );
+}
+
+export default function SpendingBreakdownCard({
+  className,
+  chartType,
+  period,
+  data,
+  totalSpent,
+  currency = "$",
+  isLoading = false,
+  ...props
+}: SpendingBreakdownCardProps) {
+  const circumference = 2 * Math.PI * 42;
+  let accumulatedPercentage = 0;
+
+  return (
+    <section
+      className={cn(
+        spendingBreakdownCardVariants({ chartType, period }),
+        className
+      )}
+      aria-busy={isLoading}
+      {...props}
+    >
+      <div className="flex items-start justify-between gap-[var(--space-4)] border-b border-[var(--color-border-subtle)] pb-[var(--space-4)]">
+        <div>
+          <p className="font-[var(--font-display)] text-[var(--text-lg)] font-[var(--weight-semibold)]">
+            Spending breakdown
+          </p>
+          <p className="mt-[var(--space-1)] text-[var(--text-sm)] text-[var(--color-text-muted)]">
+            {period === "week"
+              ? "This week"
+              : period === "custom"
+                ? "Custom period"
+                : "This month"}
+          </p>
+        </div>
+
+        {isLoading && (
+          <div
+            className="flex h-[var(--control-sm)] items-center gap-[var(--space-2)] rounded-[var(--radius-full)] bg-[var(--color-accent-50)] px-[var(--space-3)] text-[var(--text-sm)] text-[var(--color-accent-900)]"
+            role="status"
+          >
+            <LoadingSpinner />
+            <span>Updating</span>
+          </div>
+        )}
+      </div>
+
+      {isLoading ? (
+        <div className="flex min-h-[var(--space-24)] items-center justify-center py-[var(--space-8)]">
+          <span className="sr-only">Loading spending breakdown</span>
+          <LoadingSpinner />
+        </div>
+      ) : data.length === 0 ? (
+        <div className="flex min-h-[var(--space-24)] items-center border-b border-[var(--color-border-subtle)] py-[var(--space-6)]">
+          <div>
+            <p className="font-[var(--font-display)] text-[var(--text-xl)] font-[var(--weight-semibold)]">
+              No spending recorded
+            </p>
+            <p className="mt-[var(--space-2)] max-w-prose text-[var(--text-base)] text-[var(--color-text-muted)]">
+              Add a transaction in this period to see how your spending is split.
+            </p>
+          </div>
+        </div>
+      ) : chartType === "horizontal-bar" ? (
+        <div className="space-y-[var(--space-4)]" aria-label="Spending by category">
+          {data.map((item) => (
+            <div key={item.category} className="space-y-[var(--space-2)]">
+              <div className="flex items-baseline justify-between gap-[var(--space-4)]">
+                <span className="text-[var(--text-base)] font-[var(--weight-medium)]">
+                  {item.category}
+                </span>
+                <span className="font-[var(--font-mono)] text-[var(--text-sm)] tabular-nums text-[var(--color-text-secondary)]">
+                  {formatAmount(item.amount, currency)} · {item.percentage}%
+                </span>
+              </div>
+              <div
+                className="h-[var(--space-2)] overflow-hidden rounded-[var(--radius-full)] bg-[var(--color-neutral-100)]"
+                role="progressbar"
+                aria-label={`${item.category} spending`}
+                aria-valuemin={0}
+                aria-valuemax={100}
+                aria-valuenow={item.percentage}
+              >
+                <div
+                  className="h-full rounded-[var(--radius-full)] transition-[width] duration-[var(--duration-slow)] ease-[var(--easing-standard)]"
+                  style={{
+                    width: `${Math.max(0, Math.min(100, item.percentage))}%`,
+                    backgroundColor: item.color,
+                  }}
+                />
+              </div>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="flex flex-col items-center gap-[var(--space-6)] sm:flex-row sm:items-center">
+          <div className="relative shrink-0">
+            <svg
+              className="h-[var(--space-24)] w-[var(--space-24)] -rotate-90"
+              viewBox="0 0 100 100"
+              role="img"
+              aria-label="Donut chart showing spending by category"
+            >
+              <circle
+                cx="50"
+                cy="50"
+                r="42"
+                fill="none"
+                stroke="var(--color-neutral-100)"
+                strokeWidth="12"
+              />
+              {data.map((item) => {
+                const dashLength =
+                  (Math.max(0, item.percentage) / 100) * circumference;
+                const dashOffset =
+                  -(accumulatedPercentage / 100) * circumference;
+                accumulatedPercentage += item.percentage;
+
+                return (
+                  <circle
+                    key={item.category}
+                    cx="50"
+                    cy="50"
+                    r="42"
+                    fill="none"
+                    stroke={item.color}
+                    strokeWidth="12"
+                    strokeDasharray={`${dashLength} ${circumference - dashLength}`}
+                    strokeDashoffset={dashOffset}
+                    strokeLinecap="butt"
+                  />
+                );
+              })}
+            </svg>
+            <div className="absolute inset-0 flex flex-col items-center justify-center">
+              <span className="font-[var(--font-mono)] text-[var(--text-xl)] font-[var(--weight-semibold)] tabular-nums">
+                {formatAmount(totalSpent, currency)}
+              </span>
+              <span className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
+                total spent
+              </span>
+            </div>
+          </div>
+
+          <div className="w-full divide-y divide-[var(--color-border-subtle)]">
+            {data.map((item) => (
+              <div
+                key={item.category}
+                className="flex items-center justify-between gap-[var(--space-4)] py-[var(--space-3)] first:pt-0 last:pb-0"
+              >
+                <div className="flex min-w-0 items-center gap-[var(--space-2)]">
+                  <span
+                    className="h-[var(--space-2)] w-[var(--space-2)] shrink-0 rounded-[var(--radius-full)]"
+                    style={{ backgroundColor: item.color }}
+                    aria-hidden="true"
+                  />
+                  <span className="truncate text-[var(--text-base)] font-[var(--weight-medium)]">
+                    {item.category}
+                  </span>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="font-[var(--font-mono)] text-[var(--text-sm)] font-[var(--weight-medium)] tabular-nums">
+                    {formatAmount(item.amount, currency)}
+                  </p>
+                  <p className="text-[var(--text-xs)] text-[var(--color-text-muted)]">
+                    {item.percentage}%
+                  </p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+    </section>
+  );
+}

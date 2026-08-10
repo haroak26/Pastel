@@ -1,0 +1,21 @@
+import React from "react";
+
+export interface IncomeInputProps {
+  className?: string;
+}
+
+export default function IncomeInput({ className }: IncomeInputProps) {
+  return (
+    <div
+      className={className}
+      style={{
+        color: "var(--color-text-primary)",
+        background: "var(--color-surface-raised)",
+        borderRadius: "var(--radius-md)",
+        padding: "var(--space-4)",
+      }}
+    >
+      {/* IncomeInput — Currency input field for monthly income with placeholder */}
+    </div>
+  );
+}

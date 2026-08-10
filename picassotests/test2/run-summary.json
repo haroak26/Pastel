@@ -1,0 +1,681 @@
+{
+  "runId": "test2-1786318120304",
+  "agent": "picasso-v2",
+  "startedAt": "2026-08-09T23:20:30.343Z",
+  "completedAt": "2026-08-09T23:28:40.303Z",
+  "durationMs": 489960,
+  "overallSuccess": true,
+  "stages": [
+    {
+      "stage": "stage-1-discovery",
+      "start": "2026-08-09T23:20:30.354Z",
+      "end": "2026-08-09T23:20:34.113Z",
+      "durationMs": 3758,
+      "success": true
+    },
+    {
+      "stage": "stage-2-directions (attempt 1/3)",
+      "start": "2026-08-09T23:20:34.114Z",
+      "end": "2026-08-09T23:20:37.678Z",
+      "durationMs": 3564,
+      "success": true
+    },
+    {
+      "stage": "stage-2-tokens",
+      "start": "2026-08-09T23:20:37.679Z",
+      "end": "2026-08-09T23:20:46.357Z",
+      "durationMs": 8677,
+      "success": true
+    },
+    {
+      "stage": "stage-3-architecture",
+      "start": "2026-08-09T23:20:46.368Z",
+      "end": "2026-08-09T23:22:46.579Z",
+      "durationMs": 120210,
+      "success": true
+    },
+    {
+      "stage": "stage-4-content",
+      "start": "2026-08-09T23:22:46.581Z",
+      "end": "2026-08-09T23:24:03.098Z",
+      "durationMs": 76517,
+      "success": true
+    },
+    {
+      "stage": "stage-5-components",
+      "start": "2026-08-09T23:24:03.102Z",
+      "end": "2026-08-09T23:26:32.877Z",
+      "durationMs": 149775,
+      "success": true
+    },
+    {
+      "stage": "stage-5-catalog",
+      "start": "2026-08-09T23:26:32.897Z",
+      "end": "2026-08-09T23:26:53.131Z",
+      "durationMs": 20234,
+      "success": true
+    },
+    {
+      "stage": "stage-6-screen-dashboard",
+      "start": "2026-08-09T23:26:53.132Z",
+      "end": "2026-08-09T23:27:08.791Z",
+      "durationMs": 15659,
+      "success": true
+    },
+    {
+      "stage": "stage-6-screen-goals",
+      "start": "2026-08-09T23:27:08.791Z",
+      "end": "2026-08-09T23:27:23.714Z",
+      "durationMs": 14922,
+      "success": true
+    },
+    {
+      "stage": "stage-7-visual-qa",
+      "start": "2026-08-09T23:27:23.714Z",
+      "end": "2026-08-09T23:28:25.666Z",
+      "durationMs": 61952,
+      "success": true
+    },
+    {
+      "stage": "stage-8-finalize",
+      "start": "2026-08-09T23:28:25.670Z",
+      "end": "2026-08-09T23:28:40.295Z",
+      "durationMs": 14625,
+      "success": true
+    }
+  ],
+  "artifacts": [
+    {
+      "name": "discovery.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/discovery.json",
+      "size": 1521,
+      "type": "json"
+    },
+    {
+      "name": "creative-directions.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/creative-directions.json",
+      "size": 1067,
+      "type": "json"
+    },
+    {
+      "name": "tokens.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/tokens.json",
+      "size": 2713,
+      "type": "json"
+    },
+    {
+      "name": "tokens.css",
+      "path": "/home/runner/workspace/picassotests/test2/output/tokens.css",
+      "size": 2910,
+      "type": "css"
+    },
+    {
+      "name": "tailwind.config.ts",
+      "path": "/home/runner/workspace/picassotests/test2/output/tailwind.config.ts",
+      "size": 4188,
+      "type": "ts"
+    },
+    {
+      "name": "layout-plan.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/layout-plan.json",
+      "size": 5254,
+      "type": "json"
+    },
+    {
+      "name": "components-manifest.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/components-manifest.json",
+      "size": 40989,
+      "type": "json"
+    },
+    {
+      "name": "brand-kit.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/brand-kit.json",
+      "size": 6961,
+      "type": "json"
+    },
+    {
+      "name": "content-data.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/content-data.json",
+      "size": 24394,
+      "type": "json"
+    },
+    {
+      "name": "content-copy.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/content-copy.json",
+      "size": 7690,
+      "type": "json"
+    },
+    {
+      "name": "components",
+      "path": "/home/runner/workspace/picassotests/test2/output/components",
+      "size": 1264,
+      "type": "dir"
+    },
+    {
+      "name": "catalog-page.tsx",
+      "path": "/home/runner/workspace/picassotests/test2/output/catalog-page.tsx",
+      "size": 17946,
+      "type": "tsx"
+    },
+    {
+      "name": "screen-dashboard.tsx",
+      "path": "/home/runner/workspace/picassotests/test2/output/screens/dashboard.tsx",
+      "size": 10258,
+      "type": "tsx"
+    },
+    {
+      "name": "screen-goals.tsx",
+      "path": "/home/runner/workspace/picassotests/test2/output/screens/goals.tsx",
+      "size": 9270,
+      "type": "tsx"
+    },
+    {
+      "name": "screenshot-dashboard.png",
+      "path": "/home/runner/workspace/picassotests/test2/screenshots/dashboard.png",
+      "size": 98856,
+      "type": "png"
+    },
+    {
+      "name": "screenshot-goals.png",
+      "path": "/home/runner/workspace/picassotests/test2/screenshots/goals.png",
+      "size": 48291,
+      "type": "png"
+    },
+    {
+      "name": "critique-results.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/critique-results.json",
+      "size": 2468,
+      "type": "json"
+    },
+    {
+      "name": "visual-qa-feedback.json",
+      "path": "/home/runner/workspace/picassotests/test2/output/visual-qa-feedback.json",
+      "size": 644,
+      "type": "json"
+    },
+    {
+      "name": "final-report.md",
+      "path": "/home/runner/workspace/picassotests/test2/output/final-report.md",
+      "size": 1339,
+      "type": "md"
+    }
+  ],
+  "errors": [],
+  "warnings": [
+    "Content coherence: Generic placeholder content detected: \"Description\"",
+    "Blocking defects on dashboard: Landing page composition on app screen; Generic Tailwind accent; No primary action",
+    "Blocking defects on goals: Landing page composition on app screen; Generic Tailwind accent; No primary action"
+  ],
+  "screens": [
+    "dashboard",
+    "goals"
+  ],
+  "screenshots": [
+    "dashboard",
+    "goals"
+  ],
+  "critique": {
+    "averageScore": 0,
+    "passedAll": false,
+    "blockingDefects": [
+      {
+        "screen": "dashboard",
+        "defects": [
+          "Landing page composition on app screen",
+          "Generic Tailwind accent",
+          "No primary action"
+        ]
+      },
+      {
+        "screen": "goals",
+        "defects": [
+          "Landing page composition on app screen",
+          "Generic Tailwind accent",
+          "No primary action"
+        ]
+      }
+    ]
+  },
+  "finalReport": {
+    "componentCount": 29,
+    "screenCount": 2,
+    "designTokenCount": 88,
+    "qualityGates": {
+      "briefValidated": true,
+      "tokenGatePassed": true,
+      "componentGatePassed": true,
+      "screenGatePassed": false,
+      "antiSlopGatePassed": false
+    },
+    "lintPassed": false,
+    "lintIssues": [
+      "unable to parse lint output"
+    ]
+  },
+  "usage": {
+    "modelCalls": 51,
+    "totalTokens": 379059,
+    "totalCostUsd": 0.3335,
+    "totalCredits": 33.35,
+    "byModel": {
+      "openai/gpt-5.6-luna": {
+        "calls": 48,
+        "cost": 0.30002
+      },
+      "anthropic/claude-haiku-4-5-20251001": {
+        "calls": 3,
+        "cost": 0.0335
+      }
+    },
+    "detail": [
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 8483,
+        "outputTokens": 297,
+        "imageBlocks": 0,
+        "costUsd": 0.00469
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 8357,
+        "outputTokens": 338,
+        "imageBlocks": 0,
+        "costUsd": 0.00469
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 9814,
+        "outputTokens": 1417,
+        "imageBlocks": 0,
+        "costUsd": 0.00703
+      },
+      {
+        "role": "design",
+        "model": "anthropic/claude-haiku-4-5-20251001",
+        "inputTokens": 3866,
+        "outputTokens": 3766,
+        "imageBlocks": 0,
+        "costUsd": 0.00758
+      },
+      {
+        "role": "design",
+        "model": "anthropic/claude-haiku-4-5-20251001",
+        "inputTokens": 7673,
+        "outputTokens": 3243,
+        "imageBlocks": 0,
+        "costUsd": 0.0087
+      },
+      {
+        "role": "design",
+        "model": "anthropic/claude-haiku-4-5-20251001",
+        "inputTokens": 3184,
+        "outputTokens": 10417,
+        "imageBlocks": 0,
+        "costUsd": 0.01722
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 2121,
+        "outputTokens": 1505,
+        "imageBlocks": 0,
+        "costUsd": 0.00332
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 1874,
+        "outputTokens": 1033,
+        "imageBlocks": 0,
+        "costUsd": 0.00249
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 1582,
+        "outputTokens": 6000,
+        "imageBlocks": 0,
+        "costUsd": 0.00979
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 1582,
+        "outputTokens": 7618,
+        "imageBlocks": 0,
+        "costUsd": 0.01222
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 2529,
+        "outputTokens": 2160,
+        "imageBlocks": 0,
+        "costUsd": 0.0045
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4549,
+        "outputTokens": 1947,
+        "imageBlocks": 0,
+        "costUsd": 0.0052
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4550,
+        "outputTokens": 2293,
+        "imageBlocks": 0,
+        "costUsd": 0.00571
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4554,
+        "outputTokens": 2645,
+        "imageBlocks": 0,
+        "costUsd": 0.00624
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4607,
+        "outputTokens": 2892,
+        "imageBlocks": 0,
+        "costUsd": 0.00664
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4606,
+        "outputTokens": 2134,
+        "imageBlocks": 0,
+        "costUsd": 0.0055
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4611,
+        "outputTokens": 2164,
+        "imageBlocks": 0,
+        "costUsd": 0.00555
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4592,
+        "outputTokens": 3437,
+        "imageBlocks": 0,
+        "costUsd": 0.00745
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4621,
+        "outputTokens": 2550,
+        "imageBlocks": 0,
+        "costUsd": 0.00614
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4520,
+        "outputTokens": 1609,
+        "imageBlocks": 0,
+        "costUsd": 0.00467
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4632,
+        "outputTokens": 4655,
+        "imageBlocks": 0,
+        "costUsd": 0.0093
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4545,
+        "outputTokens": 1847,
+        "imageBlocks": 0,
+        "costUsd": 0.00504
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4576,
+        "outputTokens": 1096,
+        "imageBlocks": 0,
+        "costUsd": 0.00393
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4678,
+        "outputTokens": 2452,
+        "imageBlocks": 0,
+        "costUsd": 0.00602
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4533,
+        "outputTokens": 1644,
+        "imageBlocks": 0,
+        "costUsd": 0.00473
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4658,
+        "outputTokens": 4232,
+        "imageBlocks": 0,
+        "costUsd": 0.00868
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4642,
+        "outputTokens": 4756,
+        "imageBlocks": 0,
+        "costUsd": 0.00946
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4685,
+        "outputTokens": 4167,
+        "imageBlocks": 0,
+        "costUsd": 0.00859
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4533,
+        "outputTokens": 1502,
+        "imageBlocks": 0,
+        "costUsd": 0.00452
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4650,
+        "outputTokens": 4114,
+        "imageBlocks": 0,
+        "costUsd": 0.0085
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4658,
+        "outputTokens": 4436,
+        "imageBlocks": 0,
+        "costUsd": 0.00898
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4594,
+        "outputTokens": 1813,
+        "imageBlocks": 0,
+        "costUsd": 0.00502
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4612,
+        "outputTokens": 3648,
+        "imageBlocks": 0,
+        "costUsd": 0.00778
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4606,
+        "outputTokens": 2716,
+        "imageBlocks": 0,
+        "costUsd": 0.00638
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4568,
+        "outputTokens": 2863,
+        "imageBlocks": 0,
+        "costUsd": 0.00658
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4576,
+        "outputTokens": 3081,
+        "imageBlocks": 0,
+        "costUsd": 0.00691
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4502,
+        "outputTokens": 2424,
+        "imageBlocks": 0,
+        "costUsd": 0.00589
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4542,
+        "outputTokens": 1384,
+        "imageBlocks": 0,
+        "costUsd": 0.00435
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4486,
+        "outputTokens": 3237,
+        "imageBlocks": 0,
+        "costUsd": 0.0071
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4510,
+        "outputTokens": 1410,
+        "imageBlocks": 0,
+        "costUsd": 0.00437
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4598,
+        "outputTokens": 1889,
+        "imageBlocks": 0,
+        "costUsd": 0.00513
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4520,
+        "outputTokens": 1498,
+        "imageBlocks": 0,
+        "costUsd": 0.00451
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4615,
+        "outputTokens": 3447,
+        "imageBlocks": 0,
+        "costUsd": 0.00748
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4723,
+        "outputTokens": 3222,
+        "imageBlocks": 0,
+        "costUsd": 0.00719
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4660,
+        "outputTokens": 3088,
+        "imageBlocks": 0,
+        "costUsd": 0.00696
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 4623,
+        "outputTokens": 2965,
+        "imageBlocks": 0,
+        "costUsd": 0.00676
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 2986,
+        "outputTokens": 4336,
+        "imageBlocks": 0,
+        "costUsd": 0.008
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 7708,
+        "outputTokens": 2992,
+        "imageBlocks": 0,
+        "costUsd": 0.00834
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 7674,
+        "outputTokens": 2689,
+        "imageBlocks": 0,
+        "costUsd": 0.00787
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 2455,
+        "outputTokens": 497,
+        "imageBlocks": 1,
+        "costUsd": 0.00197
+      },
+      {
+        "role": "repair",
+        "model": "openai/gpt-5.6-luna",
+        "inputTokens": 2456,
+        "outputTokens": 415,
+        "imageBlocks": 1,
+        "costUsd": 0.00185
+      }
+    ]
+  }
+}

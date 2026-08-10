@@ -1,0 +1,48 @@
+import React from "react";
+import { cn } from "../lib/cn";
+
+export interface GoalNameInputProps
+  extends React.InputHTMLAttributes<HTMLInputElement> {
+  value?: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  error?: string | null;
+}
+
+export default function GoalNameInput({
+  value = "",
+  onChange,
+  placeholder = "e.g., Summer trip",
+  error = null,
+  className,
+  disabled = false,
+  ...props
+}: GoalNameInputProps) {
+  return (
+    <div className="flex flex-col gap-[var(--space-2)]">
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder={placeholder}
+        disabled={disabled}
+        className={cn(
+          "w-full h-[var(--control-md)] px-[var(--space-4)] rounded-[var(--radius-md)] font-[var(--font-body)] text-[var(--text-base)] text-[var(--color-text-primary)] placeholder:text-[var(--color-text-muted)] bg-[var(--color-surface-raised)] border border-[var(--color-border-default)] transition-all duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:border-[var(--color-border-subtle)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none",
+          error && "border-[var(--color-danger-500)] focus-visible:ring-[var(--color-danger-500)]",
+          className
+        )}
+        aria-invalid={!!error}
+        aria-describedby={error ? "goal-name-error" : undefined}
+        {...props}
+      />
+      {error && (
+        <span
+          id="goal-name-error"
+          className="text-[var(--text-sm)] text-[var(--color-danger-500)] font-[var(--weight-regular)]"
+        >
+          {error}
+        </span>
+      )}
+    </div>
+  );
+}

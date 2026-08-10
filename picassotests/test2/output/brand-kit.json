@@ -1,0 +1,46 @@
+{
+  "colorRules": {
+    "accentUsage": "Use the deep teal accent as the single action and interaction color: primary CTAs, active navigation states, links, focus rings, selected controls, progress indicators, and occasional fintech status highlights. Keep accent usage intentional and visible 3-7 times per screen maximum; use it to guide decisions rather than decorate surfaces.",
+    "semanticUsage": "Use success, warning, danger, and info as restrained semantic signals for transaction states, account alerts, validation, and educational guidance. Prefer tinted backgrounds with readable semantic text and subtle borders; reserve saturated semantic color for the signal itself, not large surfaces. Semantic colors must remain distinct from the brand accent and must never replace neutral hierarchy.",
+    "neutralUsage": "Use the pale green-gray background for the primary app canvas, the near-white raised surface for panels and controls, and the soft overlay tone for secondary regions. Use primary text for balances, headings, and high-priority financial data; secondary text for supporting explanations; muted text for metadata and captions. Use default borders for component boundaries and subtle borders for low-emphasis dividers. Maintain clear contrast without pure black or pure white.",
+    "forbiddenPatterns": [
+      "Do not use more than one accent hue in a screen or introduce generic bright blue, indigo, or purple as a secondary brand color.",
+      "Do not use gradients on cards, sections, panels, or other surfaces.",
+      "Do not use the accent as a large decorative background or flood an entire panel with saturated teal.",
+      "Do not use color alone to communicate transaction success, failure, warnings, or account status.",
+      "Do not use pure black or pure white; preserve the warm, pale green-gray neutral atmosphere."
+    ]
+  },
+  "typographyRules": {
+    "displayUsage": "Use Sora for brand-forward headings, page titles, balance figures, onboarding moments, and short high-impact labels. Its geometric character should make money management feel confident and approachable without turning the interface into a novelty display.",
+    "bodyUsage": "Use DM Sans for all explanatory copy, navigation labels, form fields, transaction rows, buttons, helper text, and financial summaries. Keep body copy conversational, direct, and easy to scan for people building financial habits for the first time.",
+    "monoUsage": "Use Source Code Pro sparingly for technical identifiers, reference numbers, account or transaction IDs, export values, and tabular numeric data where alignment improves scanning. Do not use it for ordinary balances, headings, or general interface copy.",
+    "weightRules": "Use 600-700 for page headings and key balance figures, with 700 reserved for the strongest hierarchy. Use 500-600 for buttons, navigation emphasis, labels, and important values. Use 400 for body copy, descriptions, inputs, and transaction details. Never use 200, 300, 800, or 900, and never bold an entire paragraph.",
+    "sizeRules": "Use 16px/24px as the minimum body size. Use 12px/16px only for compact metadata, timestamps, and captions when contrast remains strong; use 14px/20px for supporting labels. Use 20-24px for component headings, 30-36px for page headings, and 48px/52px selectively for major balances or hero moments. Keep hierarchy compact and purposeful rather than scaling every label upward."
+  },
+  "spacingRules": {
+    "sectionMargins": "Use 48-96px vertical separation for major app sections and up to 128px only for major onboarding or narrative moments. Vary spacing according to hierarchy; do not give every section the same vertical padding. Keep the app inside a centered 1280px container with a sidebar-plus-content structure.",
+    "componentPadding": "Use 16px horizontal and 12px vertical padding for compact rows, controls, and transaction items. Use 24px horizontal and 16px vertical padding for relaxed panels and summary regions. Use 32px padding for high-priority financial overviews or onboarding blocks, while preserving readable row density.",
+    "rhythmDescription": "Follow a calm 4px base with a dominant 8px rhythm, using the provided 8, 16, 24, 32, 48, and 64px steps consistently. The density is balanced: enough whitespace to reduce financial anxiety, but enough rows and data visible to make the app useful at a glance. Prefer lists, tables, and clearly grouped rows over repeated card grids."
+  },
+  "motionRules": {
+    "transitions": "Use opacity for lightweight reveals and status feedback, transform for drawers, menus, and layout movement, and color or border changes for hover, focus, selected, validation, and transaction-state changes. Keep motion secondary to financial comprehension and never animate balances in a way that obscures the final value.",
+    "easing": "Use the standard cubic-bezier(0.2, 0, 0, 1) curve for smooth, controlled movement. Motion should feel responsive and playful through timing and small translations, not through bounce, overshoot, or spring-heavy effects.",
+    "duration": "Use 120ms for hover, press, focus, and other micro-interactions; 200ms for control state changes, popovers, and row updates; and 320ms for drawers, page-level transitions, and meaningful reveals. Respect reduced-motion preferences and remove nonessential transforms when requested."
+  },
+  "signatureMoves": [
+    "Pair Sora headings with prominent, highly legible financial figures so balances feel bold and approachable rather than intimidating.",
+    "Use deep teal as a precise action signal across primary controls, active sidebar states, focus rings, and selected financial filters.",
+    "Build the core experience from structured transaction rows, compact summaries, and practical data groupings instead of decorative card mosaics.",
+    "Use pale green-gray canvas tones with near-white raised surfaces to create a calm money-management environment while preserving a playful teal point of view.",
+    "Give important numbers and account states clear typographic hierarchy, with restrained Source Code Pro usage for IDs and technical financial references."
+  ],
+  "antiPatterns": [
+    "Do not use centered marketing-hero layouts, footer navigation, or tabbar navigation in the desktop app; use a functional sidebar and content workspace.",
+    "Do not create card carousels, avatar testimonials, abstract blobs, floating dots, or decorative financial illustrations that compete with account data.",
+    "Do not show more than three cards in a viewport; prefer transaction lists, tables, and rows with at least four meaningful entries.",
+    "Do not pair generic 'Get started' and 'Learn more' actions or use vague financial copy; every CTA should name the concrete task it performs.",
+    "Do not use gradient hero sections, oversized all-caps copy, tiny body text, or excessive accent-colored surfaces."
+  ],
+  "generatedAt": "2026-08-09T00:00:00Z"
+}

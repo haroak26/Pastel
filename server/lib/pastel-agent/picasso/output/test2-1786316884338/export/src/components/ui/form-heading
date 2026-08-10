@@ -1,0 +1,24 @@
+// FormHeading.tsx — Primary heading for a Wavelength budgeting form prompt. Use to introduce a focused money question.
+import type { HTMLAttributes } from "react";
+import { cva } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const formHeadingVariants = cva(
+  "font-[var(--font-display)] text-[var(--text-2xl)] font-[var(--weight-semibold)] leading-tight tracking-tight text-[var(--color-text-primary)]"
+);
+
+export interface FormHeadingProps extends HTMLAttributes<HTMLHeadingElement> {
+  text: string;
+}
+
+export default function FormHeading({
+  className,
+  text,
+  ...props
+}: FormHeadingProps) {
+  return (
+    <h2 className={cn(formHeadingVariants(), className)} {...props}>
+      {text}
+    </h2>
+  );
+}

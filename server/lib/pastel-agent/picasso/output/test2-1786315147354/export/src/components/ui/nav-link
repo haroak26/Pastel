@@ -1,0 +1,84 @@
+// NavLink.tsx — Navigation link for moving between Wavelength’s budgeting views, with an accent-backed active state.
+import type { AnchorHTMLAttributes, ReactNode } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const navLinkVariants = cva(
+  "inline-flex h-[var(--control-md)] items-center gap-[var(--space-3)] rounded-[var(--radius-md)] px-[var(--space-3)] font-[var(--font-body)] text-base font-[var(--weight-medium)] transition-all duration-[var(--duration-fast)] ease-[var(--easing-standard)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50",
+  {
+    variants: {
+      active: {
+        true: "bg-[var(--color-accent-50)] text-[var(--color-accent-900)]",
+        false:
+          "text-[var(--color-text-secondary)] hover:bg-[var(--color-neutral-100)] hover:text-[var(--color-text-primary)] active:bg-[var(--color-neutral-200)]",
+      },
+    },
+    defaultVariants: {
+      active: false,
+    },
+  }
+);
+
+export interface NavLinkProps
+  extends Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "onClick">,
+    VariantProps<typeof navLinkVariants> {
+  label: string;
+  icon: ReactNode;
+  href: string;
+  isActive?: boolean;
+  onClick?: () => void;
+  loading?: boolean;
+}
+
+export default function NavLink({
+  className,
+  label,
+  icon,
+  href,
+  isActive = false,
+  onClick,
+  loading = false,
+  ...props
+}: NavLinkProps) {
+  return (
+    <a
+      className={cn(
+        navLinkVariants({ active: isActive }),
+        className
+      )}
+      href={href}
+      onClick={onClick}
+      aria-current={isActive ? "page" : undefined}
+      aria-busy={loading}
+      aria-disabled={loading ? true : undefined}
+      {...props}
+    >
+      {loading ? (
+        <svg
+          className="h-[var(--space-4)] w-[var(--space-4)] animate-spin"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
+        </svg>
+      ) : (
+        <span aria-hidden="true">{icon}</span>
+      )}
+      <span>{label}</span>
+    </a>
+  );
+}

@@ -396,16 +396,16 @@ function validateCritiqueResponse(value: unknown): CritiqueAIResponse {
 
   return {
     scores: {
+      productContext: scores.productContext as number,
+      brandCoherence: scores.brandCoherence as number,
       hierarchy: scores.hierarchy as number,
-      tokenFidelity: scores.tokenFidelity as number,
-      gridAlignment: scores.gridAlignment as number,
+      composition: scores.composition as number,
       spacingRhythm: scores.spacingRhythm as number,
-      colorRestraint: scores.colorRestraint as number,
-      typographicRhythm: scores.typographicRhythm as number,
       componentConsistency: scores.componentConsistency as number,
+      navigation: scores.navigation as number,
+      contentCopy: scores.contentCopy as number,
+      responsiveDesign: scores.responsiveDesign as number,
       accessibilityBaseline: scores.accessibilityBaseline as number,
-      brandFit: scores.brandFit as number,
-      overallPolish: scores.overallPolish as number,
     },
     diagnosis: obj.diagnosis as string,
     affectedIds: (obj.affectedIds as string[]) ?? [],
@@ -466,10 +466,10 @@ export async function critiqueScreenshots(
     } catch (err) {
       console.error(`[critique] Failed for ${name}:`, err instanceof Error ? err.message : err);
       results.push({
-        scores: { hierarchy: 1, tokenFidelity: 1, gridAlignment: 1, spacingRhythm: 1, colorRestraint: 1, typographicRhythm: 1, componentConsistency: 1, accessibilityBaseline: 1, brandFit: 1, overallPolish: 1 },
+        scores: { productContext: 1, brandCoherence: 1, hierarchy: 1, composition: 1, spacingRhythm: 1, componentConsistency: 1, navigation: 1, contentCopy: 1, responsiveDesign: 1, accessibilityBaseline: 1 },
         average: 1,
         passed: false,
-        failingDimensions: ["hierarchy", "tokenFidelity", "gridAlignment", "spacingRhythm", "colorRestraint", "typographicRhythm", "componentConsistency", "accessibilityBaseline", "brandFit", "overallPolish"],
+        failingDimensions: ["productContext", "brandCoherence", "hierarchy", "composition", "spacingRhythm", "componentConsistency", "navigation", "contentCopy", "responsiveDesign", "accessibilityBaseline"],
         diagnosis: `Critique evaluation failed for ${name}: ${err instanceof Error ? err.message : String(err)}`,
         routeTo: "components",
         affectedIds: [],

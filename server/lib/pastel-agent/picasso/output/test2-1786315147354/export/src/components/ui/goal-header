@@ -1,0 +1,235 @@
+// GoalHeader.tsx — Goal detail header with progress context and edit or delete actions. Use at the top of an individual savings goal view.
+import { useState } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const goalHeaderActionVariants = cva(
+  "inline-flex items-center justify-center rounded-[var(--radius-md)] font-[var(--weight-medium)] transition-all duration-[var(--duration-fast)] ease-[var(--easing-standard)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50",
+  {
+    variants: {
+      variant: {
+        icon:
+          "text-[var(--color-text-secondary)] hover:bg-[var(--color-neutral-100)] hover:text-[var(--color-text-primary)] active:bg-[var(--color-neutral-200)]",
+        menu:
+          "w-full justify-start gap-[var(--space-2)] px-[var(--space-3)] text-[var(--color-text-primary)] hover:bg-[var(--color-neutral-100)] active:bg-[var(--color-neutral-200)]",
+        danger:
+          "w-full justify-start gap-[var(--space-2)] px-[var(--space-3)] text-[var(--color-danger-500)] hover:bg-[var(--color-danger-50)] active:bg-[var(--color-danger-50)]",
+      },
+      size: {
+        sm: "h-[var(--control-sm)]",
+        md: "h-[var(--control-md)]",
+      },
+    },
+    defaultVariants: {
+      variant: "icon",
+      size: "md",
+    },
+  }
+);
+
+export interface GoalHeaderProps
+  extends VariantProps<typeof goalHeaderActionVariants> {
+  goal: {
+    name: string;
+    targetAmount: number;
+    deadline: string;
+  };
+  onBack: () => void;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  loading?: boolean;
+  className?: string;
+}
+
+export default function GoalHeader({
+  goal,
+  onBack,
+  onEdit,
+  onDelete,
+  loading = false,
+  className,
+}: GoalHeaderProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const hasActions = Boolean(onEdit || onDelete);
+
+  const formattedTargetAmount = new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(goal.targetAmount);
+
+  return (
+    <header
+      className={cn(
+        "relative flex items-center gap-[var(--space-4)] rounded-[var(--radius-lg)] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] px-[var(--space-4)] py-[var(--space-3)]",
+        className
+      )}
+      aria-busy={loading}
+    >
+      <button
+        type="button"
+        className={cn(
+          goalHeaderActionVariants({ variant: "icon", size: "md" }),
+          "w-[var(--control-md)] shrink-0"
+        )}
+        onClick={onBack}
+        disabled={loading}
+        aria-label="Back to goals"
+      >
+        <svg
+          className="h-[var(--space-4)] w-[var(--space-4)]"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          aria-hidden="true"
+        >
+          <path d="m15 18-6-6 6-6" />
+        </svg>
+      </button>
+
+      <div className="min-w-0 flex-1">
+        <h1 className="truncate font-[var(--font-display)] text-[var(--text-xl)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
+          {goal.name}
+        </h1>
+        <div className="mt-[var(--space-1)] flex flex-wrap items-center gap-x-[var(--space-3)] gap-y-[var(--space-1)] font-[var(--font-body)] text-[var(--text-sm)] text-[var(--color-text-secondary)]">
+          <span className="font-[var(--font-mono)] tabular-nums text-[var(--color-accent-500)]">
+            {formattedTargetAmount}
+          </span>
+          <span
+            className="h-[var(--space-1)] w-[var(--space-1)] rounded-[var(--radius-full)] bg-[var(--color-border-default)]"
+            aria-hidden="true"
+          />
+          <span>Due {goal.deadline}</span>
+        </div>
+      </div>
+
+      {hasActions && (
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            className={cn(
+              goalHeaderActionVariants({ variant: "icon", size: "md" }),
+              "w-[var(--control-md)]"
+            )}
+            onClick={() => setMenuOpen((open) => !open)}
+            disabled={loading}
+            aria-label={`Actions for ${goal.name}`}
+            aria-expanded={menuOpen}
+            aria-haspopup="menu"
+          >
+            {loading ? (
+              <svg
+                className="h-[var(--space-4)] w-[var(--space-4)] animate-spin"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+                aria-hidden="true"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+                />
+              </svg>
+            ) : (
+              <svg
+                className="h-[var(--space-4)] w-[var(--space-4)]"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <circle cx="5" cy="12" r="1" />
+                <circle cx="12" cy="12" r="1" />
+                <circle cx="19" cy="12" r="1" />
+              </svg>
+            )}
+          </button>
+
+          {menuOpen && (
+            <div
+              className="absolute right-0 top-[calc(100%+var(--space-2))] z-10 min-w-[var(--space-24)] rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] p-[var(--space-1)] shadow-[var(--shadow-md)]"
+              role="menu"
+              aria-label={`${goal.name} actions`}
+            >
+              {onEdit && (
+                <button
+                  type="button"
+                  className={cn(
+                    goalHeaderActionVariants({ variant: "menu", size: "sm" })
+                  )}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onEdit();
+                  }}
+                  role="menuitem"
+                >
+                  <svg
+                    className="h-[var(--space-4)] w-[var(--space-4)]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                  Edit goal
+                </button>
+              )}
+
+              {onDelete && (
+                <button
+                  type="button"
+                  className={cn(
+                    goalHeaderActionVariants({ variant: "danger", size: "sm" })
+                  )}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    onDelete();
+                  }}
+                  role="menuitem"
+                >
+                  <svg
+                    className="h-[var(--space-4)] w-[var(--space-4)]"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    aria-hidden="true"
+                  >
+                    <path d="M3 6h18" />
+                    <path d="M8 6V4h8v2" />
+                    <path d="M19 6l-1 14H6L5 6" />
+                    <path d="M10 11v5" />
+                    <path d="M14 11v5" />
+                  </svg>
+                  Delete goal
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+    </header>
+  );
+}

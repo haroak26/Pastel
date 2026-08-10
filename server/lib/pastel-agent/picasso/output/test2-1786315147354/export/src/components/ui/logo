@@ -1,0 +1,121 @@
+// Logo.tsx — Wavelength wordmark and wave icon for product navigation and brand recognition.
+import * as React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const logoVariants = cva(
+  "inline-flex w-fit items-center gap-[var(--space-2)] rounded-[var(--radius-md)] text-[var(--color-accent-500)] font-[var(--font-display)] font-[var(--weight-semibold)] transition-all duration-[var(--duration-fast)] ease-[var(--easing-standard)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 hover:text-[var(--color-accent-600)] active:text-[var(--color-accent-900)] disabled:pointer-events-none disabled:opacity-50 aria-disabled:pointer-events-none aria-disabled:opacity-50",
+  {
+    variants: {
+      size: {
+        sm: "h-[var(--control-sm)] text-[var(--text-sm)]",
+        md: "h-[var(--control-md)] text-[var(--text-lg)]",
+        lg: "h-[var(--control-lg)] text-[var(--text-xl)]",
+      },
+      variant: {
+        full: "px-[var(--space-1)]",
+        icon: "px-[var(--space-1)]",
+      },
+    },
+    defaultVariants: {
+      size: "md",
+      variant: "full",
+    },
+  }
+);
+
+export interface LogoProps
+  extends Omit<React.AnchorHTMLAttributes<HTMLAnchorElement>, "href">,
+    VariantProps<typeof logoVariants> {
+  href?: string;
+  loading?: boolean;
+  disabled?: boolean;
+}
+
+export default function Logo({
+  className,
+  size,
+  variant,
+  href,
+  loading = false,
+  disabled = false,
+  "aria-label": ariaLabel,
+  ...props
+}: LogoProps) {
+  const content = (
+    <>
+      {loading ? (
+        <svg
+          className="h-[var(--space-4)] w-[var(--space-4)] animate-spin"
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          aria-hidden="true"
+        >
+          <circle
+            className="opacity-25"
+            cx="12"
+            cy="12"
+            r="10"
+            stroke="currentColor"
+            strokeWidth="4"
+          />
+          <path
+            className="opacity-75"
+            fill="currentColor"
+            d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+          />
+        </svg>
+      ) : (
+        <svg
+          className="h-[var(--space-6)] w-[var(--space-6)] shrink-0"
+          viewBox="0 0 32 32"
+          fill="none"
+          xmlns="http://www.w3.org/2000/svg"
+          aria-hidden="true"
+        >
+          <path
+            d="M4 12.5C7.2 12.5 7.2 19.5 10.4 19.5C13.6 19.5 13.6 8.5 16.8 8.5C20 8.5 20 19.5 23.2 19.5C26.4 19.5 26.4 12.5 29 12.5"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+          />
+          <path
+            d="M4 21.5C7.2 21.5 7.2 25 10.4 25C13.6 25 13.6 16.5 16.8 16.5C20 16.5 20 25 23.2 25C26.4 25 26.4 21.5 29 21.5"
+            stroke="currentColor"
+            strokeWidth="3"
+            strokeLinecap="round"
+            opacity="0.45"
+          />
+        </svg>
+      )}
+      {variant === "full" && <span>Wavelength</span>}
+    </>
+  );
+
+  const sharedProps = {
+    className: cn(logoVariants({ size, variant }), className),
+    "aria-busy": loading,
+    "aria-disabled": disabled || undefined,
+    "aria-label": ariaLabel ?? "Wavelength",
+  };
+
+  if (href) {
+    return (
+      <a
+        href={disabled || loading ? undefined : href}
+        tabIndex={disabled || loading ? -1 : undefined}
+        {...sharedProps}
+        {...props}
+      >
+        {content}
+      </a>
+    );
+  }
+
+  return (
+    <span {...sharedProps}>
+      {content}
+    </span>
+  );
+}

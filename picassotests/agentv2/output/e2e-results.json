@@ -1,0 +1,64 @@
+{
+  "results": [
+    {
+      "name": "Module Loading",
+      "passed": true,
+      "detail": "7 modules loaded",
+      "durationMs": 0
+    },
+    {
+      "name": "Stage 1: Discovery",
+      "passed": true,
+      "detail": "Context detection: 5/5 correct",
+      "durationMs": 0
+    },
+    {
+      "name": "Stage 2: Token Validation",
+      "passed": true,
+      "detail": "86 tokens, 0 issues",
+      "durationMs": 19
+    },
+    {
+      "name": "Stage 3: Architecture",
+      "passed": true,
+      "detail": "1 screens, 1 regions",
+      "durationMs": 0
+    },
+    {
+      "name": "Stage 4: Content",
+      "passed": true,
+      "detail": "1 data items, 1 users",
+      "durationMs": 0
+    },
+    {
+      "name": "Stage 5: Anti-Slop",
+      "passed": true,
+      "detail": "4 violations detected (4 blocking)",
+      "durationMs": 6
+    },
+    {
+      "name": "Stage 6: Rubric",
+      "passed": true,
+      "detail": "Weighted score: 7.2/10 (threshold: 7.0)",
+      "durationMs": 0
+    },
+    {
+      "name": "Stage 7: Blocking Defects",
+      "passed": true,
+      "detail": "1 blocking defects detected",
+      "durationMs": 0
+    },
+    {
+      "name": "Stage 8: Knowledge Base",
+      "passed": true,
+      "detail": "1477 KB across 53 files",
+      "durationMs": 68
+    }
+  ],
+  "summary": {
+    "passed": 9,
+    "total": 9,
+    "totalTime": 93,
+    "timestamp": "2026-08-09T20:35:45.262Z"
+  }
+}

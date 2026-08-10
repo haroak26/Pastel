@@ -1,0 +1,263 @@
+// GoalDetailCard.tsx — Expanded savings-goal view with progress ring, milestone badges, and goal details. Use when a selected Wavelength goal needs its full progress story.
+import React from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const goalDetailCardVariants = cva(
+  "overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] font-[var(--font-body)] text-[var(--color-text-primary)] shadow-[var(--shadow-md)]",
+  {
+    variants: {
+      state: {
+        default: "",
+        loading: "animate-pulse",
+      },
+    },
+    defaultVariants: {
+      state: "default",
+    },
+  }
+);
+
+export interface GoalDetailCardProps
+  extends React.HTMLAttributes<HTMLElement>,
+    VariantProps<typeof goalDetailCardVariants> {
+  goal: {
+    id: string;
+    name: string;
+    targetAmount: number;
+    currentAmount: number;
+    deadline: string;
+    category: string;
+    description?: string;
+  };
+  milestones?: Array<{
+    percentage: number;
+    earned: boolean;
+    earnedDate?: string;
+  }>;
+  isLoading?: boolean;
+}
+
+function formatAmount(amount: number): string {
+  return new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  }).format(amount);
+}
+
+function formatDate(date: string): string {
+  return new Intl.DateTimeFormat("en-US", {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(new Date(date));
+}
+
+export default function GoalDetailCard({
+  className,
+  goal,
+  milestones = [],
+  isLoading = false,
+  state,
+  ...props
+}: GoalDetailCardProps) {
+  const progress = Math.min(
+    100,
+    Math.max(
+      0,
+      goal.targetAmount > 0
+        ? (goal.currentAmount / goal.targetAmount) * 100
+        : 0
+    )
+  );
+  const progressLabel = `${Math.round(progress)}%`;
+  const radius = 52;
+  const circumference = 2 * Math.PI * radius;
+  const dashOffset = circumference - (progress / 100) * circumference;
+
+  return (
+    <article
+      className={cn(
+        goalDetailCardVariants({
+          state: isLoading ? "loading" : state,
+        }),
+        className
+      )}
+      aria-busy={isLoading}
+      aria-labelledby={`${goal.id}-name`}
+      {...props}
+    >
+      {isLoading ? (
+        <div
+          className="flex min-h-[var(--control-lg)] items-center gap-[var(--space-4)] p-[var(--space-6)]"
+          aria-label="Loading goal details"
+        >
+          <svg
+            className="h-[var(--space-8)] w-[var(--space-8)] animate-spin text-[var(--color-accent-500)]"
+            viewBox="0 0 24 24"
+            fill="none"
+            aria-hidden="true"
+          >
+            <circle
+              cx="12"
+              cy="12"
+              r="9"
+              stroke="currentColor"
+              strokeOpacity="0.2"
+              strokeWidth="3"
+            />
+            <path
+              d="M21 12a9 9 0 0 1-9 9"
+              stroke="currentColor"
+              strokeWidth="3"
+              strokeLinecap="round"
+            />
+          </svg>
+          <span className="text-[length:var(--text-base)] text-[var(--color-text-secondary)]">
+            Loading goal details
+          </span>
+        </div>
+      ) : (
+        <>
+          <div className="flex flex-col gap-[var(--space-6)] border-b border-[var(--color-border-subtle)] p-[var(--space-6)] sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="mb-[var(--space-2)] text-[length:var(--text-xs)] font-[var(--weight-semibold)] tracking-wide text-[var(--color-text-muted)]">
+                {goal.category}
+              </p>
+              <h2
+                id={`${goal.id}-name`}
+                className="font-[var(--font-display)] text-[length:var(--text-2xl)] font-[var(--weight-semibold)] leading-tight"
+              >
+                {goal.name}
+              </h2>
+              {goal.description && (
+                <p className="mt-[var(--space-3)] max-w-prose text-[length:var(--text-base)] leading-relaxed text-[var(--color-text-secondary)]">
+                  {goal.description}
+                </p>
+              )}
+            </div>
+
+            <div className="relative flex shrink-0 items-center justify-center">
+              <svg
+                className="h-[var(--space-24)] w-[var(--space-24)] -rotate-90"
+                viewBox="0 0 120 120"
+                role="img"
+                aria-label={`${progressLabel} of savings goal reached`}
+              >
+                <circle
+                  cx="60"
+                  cy="60"
+                  r={radius}
+                  fill="none"
+                  stroke="var(--color-neutral-200)"
+                  strokeWidth="10"
+                />
+                <circle
+                  cx="60"
+                  cy="60"
+                  r={radius}
+                  fill="none"
+                  stroke="var(--color-accent-500)"
+                  strokeWidth="10"
+                  strokeLinecap="round"
+                  strokeDasharray={circumference}
+                  strokeDashoffset={dashOffset}
+                  pathLength="100"
+                  className="transition-all duration-[var(--duration-slow)] ease-[var(--easing-standard)]"
+                />
+              </svg>
+              <div className="absolute inset-0 flex flex-col items-center justify-center">
+                <span className="font-[var(--font-display)] text-[length:var(--text-2xl)] font-[var(--weight-bold)] tabular-nums">
+                  {progressLabel}
+                </span>
+                <span className="text-[length:var(--text-xs)] text-[var(--color-text-muted)]">
+                  saved
+                </span>
+              </div>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 divide-y divide-[var(--color-border-subtle)] sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+            <div className="p-[var(--space-4)]">
+              <p className="text-[length:var(--text-xs)] text-[var(--color-text-muted)]">
+                Saved so far
+              </p>
+              <p className="mt-[var(--space-1)] font-[var(--font-display)] text-[length:var(--text-xl)] font-[var(--weight-semibold)] tabular-nums">
+                {formatAmount(goal.currentAmount)}
+              </p>
+            </div>
+            <div className="p-[var(--space-4)]">
+              <p className="text-[length:var(--text-xs)] text-[var(--color-text-muted)]">
+                Target amount
+              </p>
+              <p className="mt-[var(--space-1)] font-[var(--font-display)] text-[length:var(--text-xl)] font-[var(--weight-semibold)] tabular-nums">
+                {formatAmount(goal.targetAmount)}
+              </p>
+            </div>
+            <div className="p-[var(--space-4)]">
+              <p className="text-[length:var(--text-xs)] text-[var(--color-text-muted)]">
+                Deadline
+              </p>
+              <p className="mt-[var(--space-1)] font-[var(--font-display)] text-[length:var(--text-xl)] font-[var(--weight-semibold)]">
+                {formatDate(goal.deadline)}
+              </p>
+            </div>
+          </div>
+
+          <div className="border-t border-[var(--color-border-subtle)] p-[var(--space-6)]">
+            <div className="mb-[var(--space-4)] flex items-baseline justify-between gap-[var(--space-4)]">
+              <h3 className="font-[var(--font-display)] text-[length:var(--text-lg)] font-[var(--weight-semibold)]">
+                Milestone streak
+              </h3>
+              <span className="text-[length:var(--text-sm)] text-[var(--color-text-muted)]">
+                {milestones.filter((milestone) => milestone.earned).length} of{" "}
+                {milestones.length} earned
+              </span>
+            </div>
+
+            <ul className="divide-y divide-[var(--color-border-subtle)]">
+              {milestones.map((milestone) => (
+                <li
+                  key={milestone.percentage}
+                  className="flex items-center justify-between gap-[var(--space-4)] py-[var(--space-3)] first:pt-0 last:pb-0"
+                >
+                  <div className="flex items-center gap-[var(--space-3)]">
+                    <span
+                      className={cn(
+                        "flex h-[var(--control-sm)] w-[var(--control-sm)] items-center justify-center rounded-[var(--radius-full)] border text-[length:var(--text-xs)] font-[var(--weight-semibold)] tabular-nums transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)]",
+                        milestone.earned
+                          ? "border-[var(--color-accent-500)] bg-[var(--color-accent-50)] text-[var(--color-accent-600)]"
+                          : "border-[var(--color-border-default)] bg-[var(--color-neutral-50)] text-[var(--color-text-muted)]"
+                      )}
+                      aria-hidden="true"
+                    >
+                      {milestone.percentage}
+                    </span>
+                    <span className="text-[length:var(--text-base)] text-[var(--color-text-secondary)]">
+                      {milestone.percentage}% saved
+                    </span>
+                  </div>
+                  <span
+                    className={cn(
+                      "text-right text-[length:var(--text-sm)]",
+                      milestone.earned
+                        ? "font-[var(--weight-medium)] text-[var(--color-success-500)]"
+                        : "text-[var(--color-text-muted)]"
+                    )}
+                  >
+                    {milestone.earned && milestone.earnedDate
+                      ? formatDate(milestone.earnedDate)
+                      : milestone.earned
+                        ? "Earned"
+                        : "Not yet"}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </>
+      )}
+    </article>
+  );
+}

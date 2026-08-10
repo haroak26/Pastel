@@ -1,0 +1,114 @@
+// MilestoneRewardsSection.tsx — Displays goal milestones as earned rewards and progress markers. Use on savings goal and budgeting progress views.
+import type { ReactNode } from "react";
+import { cva } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const milestoneRewardsVariants = cva(
+  "w-full overflow-hidden rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] shadow-[var(--shadow-sm)] font-[var(--font-body)]"
+);
+
+export interface MilestoneRewardsSectionProps {
+  milestones: Array<{
+    percentage: number;
+    label: string;
+    earned: boolean;
+    earnedDate?: string;
+    icon: ReactNode;
+  }>;
+  currentProgress: number;
+  className?: string;
+}
+
+export default function MilestoneRewardsSection({
+  milestones,
+  currentProgress,
+  className,
+}: MilestoneRewardsSectionProps) {
+  const progress = Math.min(100, Math.max(0, currentProgress));
+
+  return (
+    <section
+      className={cn(milestoneRewardsVariants(), className)}
+      aria-label="Milestone rewards"
+    >
+      <div className="flex flex-col gap-[var(--space-6)] p-[var(--space-6)]">
+        <div className="flex items-end justify-between gap-[var(--space-4)]">
+          <div className="flex min-w-0 flex-col gap-[var(--space-1)]">
+            <p className="font-[var(--font-body)] text-[var(--text-sm)] font-[var(--weight-medium)] text-[var(--color-text-muted)]">
+              Goal progress
+            </p>
+            <p className="font-[var(--font-display)] text-[var(--text-3xl)] font-[var(--weight-semibold)] tabular-nums text-[var(--color-text-primary)]">
+              {progress}%
+            </p>
+          </div>
+          <p className="pb-[var(--space-1)] text-right font-[var(--font-body)] text-[var(--text-sm)] text-[var(--color-text-secondary)]">
+            {milestones.filter((milestone) => milestone.earned).length} of{" "}
+            {milestones.length} rewards earned
+          </p>
+        </div>
+
+        <div
+          className="h-[var(--space-2)] overflow-hidden rounded-[var(--radius-full)] bg-[var(--color-neutral-100)]"
+          role="progressbar"
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progress}
+          aria-label={`Current goal progress: ${progress}%`}
+        >
+          <div
+            className="h-full rounded-[var(--radius-full)] bg-[var(--color-accent-500)] transition-[width] duration-[var(--duration-slow)] ease-[var(--easing-standard)]"
+            style={{ width: `${progress}%` }}
+          />
+        </div>
+      </div>
+
+      <div className="divide-y divide-[var(--color-border-subtle)]">
+        {milestones.map((milestone) => (
+          <div
+            key={`${milestone.percentage}-${milestone.label}`}
+            className="flex items-center gap-[var(--space-4)] px-[var(--space-6)] py-[var(--space-4)]"
+          >
+            <div
+              className={cn(
+                "flex h-[var(--control-lg)] w-[var(--control-lg)] shrink-0 items-center justify-center rounded-[var(--radius-full)]",
+                milestone.earned
+                  ? "bg-[var(--color-success-50)] text-[var(--color-success-500)]"
+                  : "bg-[var(--color-neutral-100)] text-[var(--color-text-muted)]"
+              )}
+              aria-hidden="true"
+            >
+              {milestone.icon}
+            </div>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-baseline gap-x-[var(--space-2)] gap-y-[var(--space-1)]">
+                <p className="font-[var(--font-body)] text-[var(--text-base)] font-[var(--weight-semibold)] text-[var(--color-text-primary)]">
+                  {milestone.label}
+                </p>
+                <span className="font-[var(--font-mono)] text-[var(--text-sm)] font-[var(--weight-medium)] tabular-nums text-[var(--color-text-muted)]">
+                  {milestone.percentage}%
+                </span>
+              </div>
+              {milestone.earnedDate && (
+                <p className="mt-[var(--space-1)] font-[var(--font-body)] text-[var(--text-sm)] text-[var(--color-text-muted)]">
+                  Earned {milestone.earnedDate}
+                </p>
+              )}
+            </div>
+
+            <span
+              className={cn(
+                "shrink-0 rounded-[var(--radius-full)] px-[var(--space-3)] py-[var(--space-1)] font-[var(--font-body)] text-[var(--text-xs)] font-[var(--weight-semibold)]",
+                milestone.earned
+                  ? "bg-[var(--color-success-50)] text-[var(--color-success-900)]"
+                  : "bg-[var(--color-neutral-100)] text-[var(--color-text-muted)]"
+              )}
+            >
+              {milestone.earned ? "Earned" : "Locked"}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
+  );
+}

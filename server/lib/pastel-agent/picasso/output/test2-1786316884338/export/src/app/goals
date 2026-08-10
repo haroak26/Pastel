@@ -1,0 +1,280 @@
+import React from "react";
+import pageHeader from "../components/page-header";
+import goalCard from "../components/goal-card";
+import achievementBand from "../components/achievement-band";
+import completedGoalsList from "../components/completed-goals-list";
+import logo from "../components/logo";
+import navLinks from "../components/nav-links";
+import userMenu from "../components/user-menu";
+import sectionHeader from "../components/section-header";
+
+const PageHeader = pageHeader as React.ComponentType<any>;
+const GoalCard = goalCard as React.ComponentType<any>;
+const AchievementBand = achievementBand as React.ComponentType<any>;
+const CompletedGoalsList = completedGoalsList as React.ComponentType<any>;
+const Logo = logo as React.ComponentType<any>;
+const NavLinks = navLinks as React.ComponentType<any>;
+const UserMenu = userMenu as React.ComponentType<any>;
+const SectionHeader = sectionHeader as React.ComponentType<any>;
+
+const activeGoals = [
+  {
+    id: "goal_1",
+    name: "Japan trip",
+    description: "Two weeks exploring Tokyo and Kyoto",
+    targetAmount: 4200,
+    savedAmount: 2860,
+    remainingAmount: 1340,
+    deadline: "September 30, 2026",
+    targetDate: "September 30, 2026",
+    progress: 68,
+    status: "on-track",
+    statusLabel: "On track",
+    currency: "USD",
+  },
+  {
+    id: "goal_2",
+    name: "Emergency fund",
+    description: "A reliable cushion for unexpected expenses",
+    targetAmount: 7500,
+    savedAmount: 4125,
+    remainingAmount: 3375,
+    deadline: "December 31, 2026",
+    targetDate: "December 31, 2026",
+    progress: 55,
+    status: "on-track",
+    statusLabel: "On track",
+    currency: "USD",
+  },
+  {
+    id: "goal_3",
+    name: "New laptop",
+    description: "MacBook Pro for freelance design work",
+    targetAmount: 2400,
+    savedAmount: 1440,
+    remainingAmount: 960,
+    deadline: "July 15, 2026",
+    targetDate: "July 15, 2026",
+    progress: 60,
+    status: "needs-attention",
+    statusLabel: "Needs attention",
+    currency: "USD",
+  },
+  {
+    id: "goal_4",
+    name: "Holiday gifts",
+    description: "Gifts and travel for the December holidays",
+    targetAmount: 1600,
+    savedAmount: 1184,
+    remainingAmount: 416,
+    deadline: "November 30, 2026",
+    targetDate: "November 30, 2026",
+    progress: 74,
+    status: "on-track",
+    statusLabel: "On track",
+    currency: "USD",
+  },
+];
+
+const completedGoals = [
+  {
+    id: "completed_1",
+    name: "Weekend in Montreal",
+    completedOn: "May 18, 2026",
+    completionDate: "May 18, 2026",
+    finalAmount: 980,
+    amount: 980,
+    currency: "USD",
+    badge: "Goal completed",
+    status: "completed",
+  },
+  {
+    id: "completed_2",
+    name: "Standing desk",
+    completedOn: "February 6, 2026",
+    completionDate: "February 6, 2026",
+    finalAmount: 640,
+    amount: 640,
+    currency: "USD",
+    badge: "Goal completed",
+    status: "completed",
+  },
+  {
+    id: "completed_3",
+    name: "Holiday travel",
+    completedOn: "December 2, 2025",
+    completionDate: "December 2, 2025",
+    finalAmount: 1850,
+    amount: 1850,
+    currency: "USD",
+    badge: "Goal completed",
+    status: "completed",
+  },
+  {
+    id: "completed_4",
+    name: "Professional certification",
+    completedOn: "October 14, 2025",
+    completionDate: "October 14, 2025",
+    finalAmount: 725,
+    amount: 725,
+    currency: "USD",
+    badge: "Goal completed",
+    status: "completed",
+  },
+];
+
+export default function Goals() {
+  const handleCreateGoal = () => {};
+  const handleAddContribution = () => {};
+  const handleViewDashboard = () => {};
+
+  return (
+    <div className="min-h-screen bg-[var(--color-surface-background)] font-[var(--font-body)] text-[var(--color-text-primary)]">
+      <div className="flex min-h-screen">
+        <aside className="hidden w-[264px] shrink-0 flex-col border-r border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-[var(--space-4)] py-[var(--space-6)] lg:flex">
+          <div className="px-[var(--space-3)]">
+            <Logo size="md" />
+          </div>
+
+          <div className="mt-[var(--space-12)]">
+            <p className="mb-[var(--space-3)] px-[var(--space-4)] text-sm font-[var(--weight-medium)] text-[var(--color-text-muted)]">
+              Navigation
+            </p>
+            <NavLinks
+              items={[
+                { label: "Dashboard", href: "/dashboard" },
+                { label: "Transactions", href: "/transactions" },
+                { label: "Goals", href: "/goals", active: true },
+                { label: "Accounts", href: "/accounts" },
+                { label: "Settings", href: "/settings" },
+              ]}
+              links={[
+                { label: "Dashboard", href: "/dashboard" },
+                { label: "Transactions", href: "/transactions" },
+                { label: "Goals", href: "/goals", active: true },
+                { label: "Accounts", href: "/accounts" },
+                { label: "Settings", href: "/settings" },
+              ]}
+              activeItem="Goals"
+            />
+          </div>
+
+          <div className="mt-auto border-t border-[var(--color-border-subtle)] pt-[var(--space-4)]">
+            <UserMenu
+              user={{
+                name: "Maya Thompson",
+                email: "maya.thompson@wavelength.app",
+                role: "Budget owner",
+                avatar:
+                  "https://ui-avatars.com/api/?name=Maya+Thompson&background=0f766e&color=f7f5ef",
+              }}
+            />
+          </div>
+        </aside>
+
+        <main className="min-w-0 flex-1">
+          <PageHeader
+            title="Savings goals"
+            heading="Savings goals"
+            subtitle="Create goals, track contributions, and revisit the milestones you have already reached."
+            onCreate={handleCreateGoal}
+            onCreateGoal={handleCreateGoal}
+            createLabel="Create savings goal"
+            actionLabel="Create savings goal"
+          />
+
+          <div className="mx-auto max-w-[1280px] px-[var(--space-4)] py-[var(--space-6)] sm:px-[var(--space-6)] lg:px-[var(--space-8)]">
+            <section className="rounded-[var(--radius-xl)] border border-[var(--color-border-subtle)] bg-[var(--color-accent-50)] p-[var(--space-6)]">
+              <div className="flex flex-col justify-between gap-[var(--space-6)] lg:flex-row lg:items-end">
+                <div className="max-w-2xl">
+                  <p className="text-sm font-[var(--weight-semibold)] text-[var(--color-accent-700)]">
+                    Your savings plan
+                  </p>
+                  <h1 className="mt-[var(--space-2)] font-[var(--font-display)] text-3xl font-[var(--weight-semibold)] tracking-tight">
+                    Keep your next milestone in sight.
+                  </h1>
+                  <p className="mt-[var(--space-3)] max-w-xl text-base leading-7 text-[var(--color-text-secondary)]">
+                    You are building momentum across four active goals. Add a contribution whenever you have room, or adjust a target as your plans change.
+                  </p>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-[var(--space-3)]">
+                  <button
+                    type="button"
+                    onClick={handleAddContribution}
+                    className="inline-flex h-[var(--control-md)] items-center justify-center rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] px-[var(--space-4)] text-sm font-[var(--weight-medium)] text-[var(--color-text-primary)] transition-colors hover:border-[var(--color-accent-500)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
+                  >
+                    Add contribution
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleViewDashboard}
+                    className="inline-flex h-[var(--control-md)] items-center justify-center rounded-[var(--radius-md)] px-[var(--space-4)] text-sm font-[var(--weight-medium)] text-[var(--color-accent-600)] transition-colors hover:bg-[var(--color-surface-raised)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)]"
+                  >
+                    View dashboard
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-[var(--space-6)] grid grid-cols-2 gap-[var(--space-4)] border-t border-[var(--color-accent-100)] pt-[var(--space-6)] md:grid-cols-4">
+                <div>
+                  <p className="text-sm text-[var(--color-text-secondary)]">Active goals</p>
+                  <p className="mt-[var(--space-1)] font-[var(--font-display)] text-2xl font-[var(--weight-semibold)]">4</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[var(--color-text-secondary)]">Saved amount</p>
+                  <p className="mt-[var(--space-1)] font-[var(--font-display)] text-2xl font-[var(--weight-semibold)]">$9,609</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[var(--color-text-secondary)]">Remaining</p>
+                  <p className="mt-[var(--space-1)] font-[var(--font-display)] text-2xl font-[var(--weight-semibold)]">$6,091</p>
+                </div>
+                <div>
+                  <p className="text-sm text-[var(--color-text-secondary)]">Completed goals</p>
+                  <p className="mt-[var(--space-1)] font-[var(--font-display)] text-2xl font-[var(--weight-semibold)]">4</p>
+                </div>
+              </div>
+            </section>
+
+            <section className="mt-[var(--space-8)]">
+              <div className="mb-[var(--space-4)] flex items-center justify-between">
+                <SectionHeader title="Active goals" label="Active goals" />
+                <span className="text-sm text-[var(--color-text-muted)]">4 goals</span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-[var(--space-4)] xl:grid-cols-2">
+                {activeGoals.map((goal) => (
+                  <GoalCard
+                    key={goal.id}
+                    goal={goal}
+                    {...goal}
+                    onEdit={() => {}}
+                    onDelete={() => {}}
+                    onAddContribution={handleAddContribution}
+                  />
+                ))}
+              </div>
+            </section>
+
+            <section className="mt-[var(--space-12)] rounded-[var(--radius-lg)] border border-[var(--color-border-subtle)] bg-[var(--color-surface-raised)] px-[var(--space-6)]">
+              <AchievementBand
+                title="Achievement history"
+                heading="Completed goals"
+                label="Completed goals"
+                completedCount={completedGoals.length}
+                count={completedGoals.length}
+              />
+              <div className="py-[var(--space-4)]">
+                <CompletedGoalsList
+                  goals={completedGoals}
+                  completedGoals={completedGoals}
+                  onGoalClick={() => {}}
+                />
+              </div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

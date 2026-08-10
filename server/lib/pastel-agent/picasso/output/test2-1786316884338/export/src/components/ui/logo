@@ -1,0 +1,59 @@
+// Logo.tsx — Wavelength brand mark and wordmark for product navigation and identity surfaces.
+import type { HTMLAttributes } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const logoVariants = cva(
+  "inline-flex select-none items-center text-[var(--color-accent-500)] font-[var(--font-display)] font-[var(--weight-bold)]",
+  {
+    variants: {
+      size: {
+        sm: "h-[var(--control-sm)] text-[var(--text-base)]",
+        md: "h-[var(--control-md)] text-[var(--text-lg)]",
+        lg: "h-[var(--control-lg)] text-[var(--text-xl)]",
+      },
+      variant: {
+        full: "gap-[var(--space-2)]",
+        icon: "aspect-square justify-center",
+      },
+    },
+    defaultVariants: {
+      size: "md",
+      variant: "full",
+    },
+  }
+);
+
+export interface LogoProps
+  extends HTMLAttributes<HTMLSpanElement>,
+    VariantProps<typeof logoVariants> {}
+
+export default function Logo({
+  className,
+  size,
+  variant,
+  "aria-label": ariaLabel,
+  ...props
+}: LogoProps) {
+  const isIconOnly = variant === "icon";
+
+  return (
+    <span
+      className={cn(logoVariants({ size, variant }), className)}
+      aria-label={isIconOnly ? ariaLabel ?? "Wavelength" : ariaLabel}
+      {...props}
+    >
+      <svg
+        className="h-full w-auto shrink-0"
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        aria-hidden="true"
+      >
+        <path d="M2 7.5c2.5 0 2.5 9 5 9s2.5-9 5-9 2.5 9 5 9 2.5-9 5-9v3c-1.2 0-1.2 9-4 9s-2.8-9-5-9-2.8 9-5 9-4-9-4-9Z" />
+      </svg>
+
+      {!isIconOnly && <span>Wavelength</span>}
+    </span>
+  );
+}

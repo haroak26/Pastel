@@ -1,0 +1,237 @@
+// GoalCard.tsx — Savings goal progress card with status treatment and edit/delete actions. Use in the Wavelength goals view.
+import { useState, type HTMLAttributes } from "react";
+import { cva, type VariantProps } from "class-variance-authority";
+import { cn } from "../lib/cn";
+
+const goalCardVariants = cva(
+  "relative flex flex-col gap-[var(--space-6)] rounded-[var(--radius-lg)] border bg-[var(--color-surface-raised)] p-[var(--space-6)] font-[var(--font-body)] text-[var(--color-text-primary)] transition-all duration-[var(--duration-base)] ease-[var(--easing-standard)] hover:border-[var(--color-neutral-400)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2",
+  {
+    variants: {
+      status: {
+        active: "border-[var(--color-border-default)]",
+        completed:
+          "border-[var(--color-success-500)] bg-[var(--color-success-50)]",
+        paused:
+          "border-[var(--color-warning-500)] bg-[var(--color-warning-50)]",
+      },
+    },
+    defaultVariants: {
+      status: "active",
+    },
+  }
+);
+
+const progressVariants = cva(
+  "h-[var(--space-2)] overflow-hidden rounded-[var(--radius-full)] transition-all duration-[var(--duration-slow)] ease-[var(--easing-standard)]",
+  {
+    variants: {
+      status: {
+        active: "bg-[var(--color-accent-500)]",
+        completed: "bg-[var(--color-success-500)]",
+        paused: "bg-[var(--color-warning-500)]",
+      },
+    },
+    defaultVariants: {
+      status: "active",
+    },
+  }
+);
+
+export interface GoalCardProps
+  extends Omit<HTMLAttributes<HTMLElement>, "id" | "title">,
+    VariantProps<typeof goalCardVariants> {
+  id: string;
+  name: string;
+  target: number;
+  saved: number;
+  deadline: Date;
+  onEdit?: () => void;
+  onDelete?: () => void;
+  loading?: boolean;
+}
+
+export default function GoalCard({
+  id,
+  name,
+  target,
+  saved,
+  deadline,
+  onEdit,
+  onDelete,
+  status = "active",
+  loading = false,
+  className,
+  ...props
+}: GoalCardProps) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const progress = target > 0 ? Math.min(Math.max((saved / target) * 100, 0), 100) : 0;
+  const remaining = Math.max(target - saved, 0);
+  const currency = new Intl.NumberFormat(undefined, {
+    style: "currency",
+    currency: "USD",
+    maximumFractionDigits: 0,
+  });
+  const formattedDeadline = new Intl.DateTimeFormat(undefined, {
+    month: "short",
+    day: "numeric",
+    year: "numeric",
+  }).format(deadline);
+
+  const statusLabel =
+    status === "completed"
+      ? "Completed"
+      : status === "paused"
+        ? "Paused"
+        : "Active";
+
+  return (
+    <article
+      id={id}
+      tabIndex={0}
+      aria-busy={loading}
+      className={cn(goalCardVariants({ status }), className)}
+      {...props}
+    >
+      <div className="flex items-start justify-between gap-[var(--space-4)]">
+        <div className="min-w-0">
+          <div className="mb-[var(--space-2)] flex items-center gap-[var(--space-2)]">
+            <span
+              className={cn(
+                "inline-flex min-h-[var(--control-sm)] items-center rounded-[var(--radius-full)] px-[var(--space-3)] font-[var(--weight-medium)] text-xs",
+                status === "completed" &&
+                  "bg-[var(--color-success-500)] text-[var(--color-text-inverse)]",
+                status === "paused" &&
+                  "bg-[var(--color-warning-500)] text-[var(--color-text-inverse)]",
+                status === "active" &&
+                  "bg-[var(--color-accent-50)] text-[var(--color-accent-900)]"
+              )}
+            >
+              {statusLabel}
+            </span>
+          </div>
+          <h3 className="truncate font-[var(--font-display)] text-xl font-[var(--weight-semibold)]">
+            {name}
+          </h3>
+        </div>
+
+        <div className="relative shrink-0">
+          <button
+            type="button"
+            aria-label={`Manage ${name}`}
+            aria-expanded={menuOpen}
+            aria-controls={`${id}-actions`}
+            disabled={loading}
+            onClick={() => setMenuOpen((open) => !open)}
+            className="inline-flex h-[var(--control-sm)] w-[var(--control-sm)] items-center justify-center rounded-[var(--radius-md)] text-[var(--color-text-secondary)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-neutral-100)] hover:text-[var(--color-text-primary)] active:bg-[var(--color-neutral-200)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+          >
+            <svg
+              aria-hidden="true"
+              className="h-[var(--space-4)] w-[var(--space-4)]"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+            >
+              <circle cx="5" cy="12" r="1" />
+              <circle cx="12" cy="12" r="1" />
+              <circle cx="19" cy="12" r="1" />
+            </svg>
+          </button>
+
+          {menuOpen && (
+            <div
+              id={`${id}-actions`}
+              role="menu"
+              className="absolute right-0 top-[calc(100%+var(--space-2))] z-10 min-w-[var(--control-lg)] rounded-[var(--radius-md)] border border-[var(--color-border-default)] bg-[var(--color-surface-raised)] p-[var(--space-1)] shadow-[var(--shadow-md)]"
+            >
+              <button
+                type="button"
+                role="menuitem"
+                disabled={loading || !onEdit}
+                onClick={() => {
+                  onEdit?.();
+                  setMenuOpen(false);
+                }}
+                className="flex h-[var(--control-md)] w-full items-center rounded-[var(--radius-sm)] px-[var(--space-3)] font-[var(--weight-medium)] text-sm text-[var(--color-text-primary)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-neutral-100)] active:bg-[var(--color-neutral-200)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              >
+                Edit goal
+              </button>
+              <button
+                type="button"
+                role="menuitem"
+                disabled={loading || !onDelete}
+                onClick={() => {
+                  onDelete?.();
+                  setMenuOpen(false);
+                }}
+                className="flex h-[var(--control-md)] w-full items-center rounded-[var(--radius-sm)] px-[var(--space-3)] font-[var(--weight-medium)] text-sm text-[var(--color-danger-500)] transition-colors duration-[var(--duration-fast)] ease-[var(--easing-standard)] hover:bg-[var(--color-danger-50)] active:bg-[var(--color-danger-50)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--color-border-focus)] focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50"
+              >
+                Delete goal
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="flex items-end justify-between gap-[var(--space-4)]">
+        <div>
+          <p className="font-[var(--font-display)] text-3xl font-[var(--weight-semibold)] tabular-nums">
+            {currency.format(saved)}
+          </p>
+          <p className="mt-[var(--space-1)] font-[var(--font-body)] text-sm text-[var(--color-text-secondary)]">
+            of {currency.format(target)} saved
+          </p>
+        </div>
+        <p className="text-right font-[var(--font-mono)] text-sm tabular-nums text-[var(--color-text-muted)]">
+          {Math.round(progress)}%
+        </p>
+      </div>
+
+      <div aria-label={`${Math.round(progress)} percent of goal saved`} role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(progress)} className="h-[var(--space-2)] rounded-[var(--radius-full)] bg-[var(--color-neutral-200)]">
+        <div
+          className={cn(progressVariants({ status }))}
+          style={{ width: `${progress}%` }}
+        />
+      </div>
+
+      <div className="flex flex-wrap items-center justify-between gap-[var(--space-3)] border-t border-[var(--color-border-subtle)] pt-[var(--space-4)] text-sm">
+        <span className="text-[var(--color-text-secondary)]">
+          {status === "completed"
+            ? "Goal reached"
+            : `${currency.format(remaining)} to go`}
+        </span>
+        <span className="font-[var(--weight-medium)] text-[var(--color-text-primary)]">
+          Due {formattedDeadline}
+        </span>
+      </div>
+
+      {loading && (
+        <div
+          className="absolute inset-0 flex items-center justify-center rounded-[var(--radius-lg)] bg-[var(--color-surface-raised)] opacity-75"
+          aria-hidden="true"
+        >
+          <svg
+            className="h-[var(--space-6)] w-[var(--space-6)] animate-spin text-[var(--color-accent-500)]"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24"
+          >
+            <circle
+              className="opacity-25"
+              cx="12"
+              cy="12"
+              r="10"
+              stroke="currentColor"
+              strokeWidth="4"
+            />
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z"
+            />
+          </svg>
+        </div>
+      )}
+    </article>
+  );
+}
