@@ -125,8 +125,8 @@ export function auditDensity(input: V17DensityInput): V17DensityReport {
     issues.push(`${input.screenId}: missing supporting context (secondary column, insight, or activity)`);
   }
 
-  if (input.uniqueSurfaceTypes < t.minUniqueSurfaces) {
-    issues.push(`${input.screenId}: ${input.uniqueSurfaceTypes} surface types used (min ${t.minUniqueSurfaces} — screens should vary surface treatments)`);
+  if (input.surfaceTypesUsed.length < t.minUniqueSurfaces) {
+    issues.push(`${input.screenId}: ${input.surfaceTypesUsed.length} surface types used (min ${t.minUniqueSurfaces} — screens should vary surface treatments)`);
   }
 
   if (input.estimatedContentVp < t.minContentFillPercent) {

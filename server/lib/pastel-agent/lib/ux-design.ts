@@ -655,7 +655,7 @@ function defaultUxFor(screen: WireframeScreen, role: ScreenRole, mode?: ProductM
       sections: screen.blocks.map((b) => ({
         block: b.block,
         variant: b.variant,
-        surface: SURFACE_OF[`${b.block}:${b.variant ?? "default"}`] ?? SURFACE_OF.custom,
+        surface: (SURFACE_OF[`${b.block}:${b.variant ?? "default"}`] ?? SURFACE_OF.custom) as "band" | "card" | "rows" | "tiles" | "toolbar" | "gallery" | undefined,
         sticky: role === "detail" && b.block === "detail" && b.variant === "pane",
         emphasis: b.emphasis,
       })),

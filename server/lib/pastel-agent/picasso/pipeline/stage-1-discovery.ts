@@ -1,7 +1,9 @@
-import type { Brief } from "./types";
-import { chatText, type ChatMessage } from "../../gateway";
-import { loadMegadesign, loadCompanyDoc, loadProductMode } from "./knowledge";
+import type { Brief, CompanyRef } from "./types";
+import { NICHE_COMPANY_MAP } from "./types";
+import { listCompanySlugs, getCompanyWithTaglines, loadCompanyDeepDive, hasCompanyDeepDive } from "./knowledge";
 import { detectProductContext, type ProductContext } from "./anti-slop";
+import { chatJSON, MAX_TOKENS_PER_CALL, type ChatMessage } from "../../gateway";
+import { z } from "zod";
 
 export interface DiscoveryInput {
   brief: Brief;
@@ -9,167 +11,85 @@ export interface DiscoveryInput {
 
 export interface DiscoveryOutput {
   productContext: ProductContext;
-  validationPassed: boolean;
-  reasonIfFailed: string | null;
-  selectedReferences: { name: string; rationale: string }[];
   contextDescription: string;
+  selectedReferences: CompanyRef[];
+  creativeSeed: string;
 }
 
-function validateContextFit(brief: Brief, context: ProductContext): { valid: boolean; reason: string | null } {
-  const desc = brief.description.toLowerCase();
+const discoverySchema = z.object({
+  productContext: z.enum(["app", "landing", "docs", "social", "unknown"]),
+  contextDescription: z.string().min(10).max(400),
+  selectedReferences: z.array(z.string()).max(2),
+  creativeSeed: z.string().min(4).max(80),
+});
 
-  if (context === "app" && (brief.platform === "marketing" || desc.includes("hero section"))) {
-    return { valid: false, reason: "Brief describes marketing/landing page but resolves to an app context — context mismatch. An app should not have hero sections and marketing CTAs." };
-  }
+const DISCOVERY_SYSTEM = `You are the discovery lead of a product-design studio. You read a one-paragraph brief and return the product's true shape and a creative seed.
 
-  if (context === "landing" && brief.platform === "mobile") {
-    return { valid: false, reason: "Mobile apps should not be landing pages. Set platform to 'web' or 'marketing' for landing pages." };
-  }
-
-  if (brief.niche === "fintech" && brief.personality.includes("playful") && context === "app") {
-    return { valid: true, reason: null };
-  }
-
-  return { valid: true, reason: null };
-}
-
-async function selectReferences(brief: Brief): Promise<{ name: string; rationale: string }[]> {
-  if (brief.companyRefs && brief.companyRefs.length > 0) {
-    const refs: { name: string; rationale: string }[] = [];
-    for (const slug of brief.companyRefs) {
-      try {
-        loadCompanyDoc(slug);
-        refs.push({ name: slug, rationale: `User-selected reference for ${brief.niche} product` });
-      } catch {
-        // skip unavailable
-      }
-    }
-    if (refs.length > 0) return refs;
-  }
-
-  const nicheMap: Record<string, string[]> = {
-    fintech: ["stripe", "mercury", "linear"],
-    productivity: ["linear", "notion", "superhuman"],
-    commerce: ["shopify", "stripe", "airbnb"],
-    health: ["headspace", "duolingo", "airbnb"],
-    social: ["spotify", "discord", "airbnb"],
-    devtools: ["vercel", "stripe", "linear", "figma"],
-    education: ["duolingo", "notion", "headspace"],
-    travel: ["airbnb", "spotify", "uber"],
-    creative: ["figma", "framer", "spotify"],
-    other: ["stripe", "linear", "notion"],
-  };
-
-  const candidates = nicheMap[brief.niche] ?? nicheMap.other;
-  const refs: { name: string; rationale: string }[] = [];
-
-  for (const slug of candidates.slice(0, 3)) {
-    try {
-      loadCompanyDoc(slug);
-      const rationale = getReferenceRationale(slug, brief);
-      refs.push({ name: slug, rationale });
-    } catch {
-      // skip
-    }
-  }
-
-  return refs.slice(0, 2);
-}
-
-function getReferenceRationale(slug: string, brief: Brief): string {
-  const rationales: Record<string, string> = {
-    stripe: "Professional, fintech-focused, minimal design with strong data display",
-    mercury: "Startup banking, clean fintech, data precision, trustworthy",
-    linear: "Keyboard-first minimalism, dense but calm — great for productivity tools",
-    notion: "Calm and neutral, content-first, flexible layouts",
-    superhuman: "Fast and premium, near-monochrome — speed-focused products",
-    shopify: "Confident commerce, product-first, green/black palette",
-    airbnb: "Warm and approachable, photography-first, human-centric",
-    headspace: "Soft and calm, warm pastels, organic shapes — wellness and mindfulness",
-    duolingo: "Playful and energetic, gamification patterns, bright green brand",
-    spotify: "Bold dark canvas, vibrant accent, media-focused",
-    vercel: "Dark-mode-first, developer tools, sharp and technical",
-    figma: "Playful precision, creative tools, community-driven",
-    framer: "Design-tool-cool, gradient accents, motion-forward",
-    arc: "Expressive, soft rounding, modern browsing experience",
-    discord: "Gaming-first, dark mode, community and chat",
-    uber: "Bold black and white, confident, mobility-focused",
-  };
-  return rationales[slug] ?? `${slug}-inspired design approach for ${brief.niche} products`;
-}
+Rules:
+1. productContext — the single best fit:
+   - "app" — a product the user operates repeatedly (dashboard, workspace, inbox, tracker, player)
+   - "landing" — a marketing site whose job is to persuade and convert
+   - "docs" — reference/documentation material
+   - "social" — feed-first, people and conversations are the product
+   - "unknown" — genuinely ambiguous
+2. contextDescription — 1-2 sentences on what the user actually does, what the dominant moment of the UI should be (the thing a user sees first), and what makes it feel like THIS product.
+3. selectedReferences — pick 0-2 slugs from the provided list whose design craft is worth referencing (visual craft, not copying). Prefer companies that fit the product's personality.
+4. creativeSeed — a short, memorable phrase (5-8 words) that captures the unique creative angle of this product. It will be injected into every generation so this UI is unlike any other. Make it specific: a metaphor, a texture, a tone ("railroad timetable precision", "midnight arcade glow", "library card quiet"). Never generic words like "modern", "clean", "bold", "minimal".`;
 
 export async function runDiscovery(input: DiscoveryInput): Promise<DiscoveryOutput> {
   const { brief } = input;
 
-  const productContext = detectProductContext({
-    productName: brief.productName,
-    description: brief.description,
-    platform: brief.platform,
-    niche: brief.niche,
+  // Deterministic context pre-filter (cheap, no model call)
+  const deterministic = detectProductContext(brief.description);
+  const allSlugs = listCompanySlugs();
+
+  // Candidate pool: brief refs first, then niche map, filtered to existing docs.
+  const candidates: string[] = [];
+  const pushUnique = (s: string) => { if (allSlugs.includes(s) && !candidates.includes(s)) candidates.push(s); };
+  for (const ref of brief.companyRefs ?? []) pushUnique(ref.toLowerCase());
+  for (const slug of NICHE_COMPANY_MAP[brief.niche]) pushUnique(slug);
+  for (const slug of ["stripe", "linear", "airbnb", "duolingo", "notion", "vercel", "figma", "spotify", "mercury", "headspace"]) pushUnique(slug);
+
+  const messages: ChatMessage[] = [
+    { role: "system", content: DISCOVERY_SYSTEM },
+    {
+      role: "user",
+      content: [
+        `Product: ${brief.productName}`,
+        `Brief: ${brief.description}`,
+        `Audience: ${brief.audience}`,
+        `Niche: ${brief.niche}`,
+        `Personality: ${brief.personality.join(", ")}`,
+        `Platform: ${brief.platform}`,
+        "",
+        `Available reference slugs: ${candidates.join(", ")}`,
+        "",
+        "Return JSON: { productContext, contextDescription, selectedReferences (slugs from the list, max 2), creativeSeed }",
+      ].join("\n"),
+    },
+  ];
+
+  const result = await chatJSON<z.infer<typeof discoverySchema>>(messages, {
+    model: "discovery",
+    maxTokens: MAX_TOKENS_PER_CALL.discovery,
+    validate: (v) => discoverySchema.parse(v),
   });
 
-  const { valid, reason } = validateContextFit(brief, productContext);
-
-  const selectedReferences = await selectReferences(brief);
-
-  let contextDescription = "";
-  try {
-    const megadesignContent = loadMegadesign();
-    let productModeContent = "";
-    try {
-      const modeMap: Record<string, string> = {
-        app: "app-dashboard",
-        landing: "landing-page",
-        docs: "documentation",
-        social: "app-social",
-      };
-      const modeFile = modeMap[productContext] ?? "app-dashboard";
-      productModeContent = loadProductMode(modeFile);
-    } catch {
-      // fine if mode file missing
-    }
-
-    const messages: ChatMessage[] = [
-      {
-        role: "system",
-        content: `You are a design discovery agent. Analyze the product brief and output a context description.
-
-Product context: ${productContext}
-${productModeContent}
-
-Your output should describe:
-1. What this product IS (its core function)
-2. What screens/views it needs (based on context)
-3. What NOT to do (anti-patterns for this context)
-
-Keep it under 150 words. Be specific.`,
-      },
-      {
-        role: "user",
-        content: `Product: ${brief.productName}
-Description: ${brief.description}
-Audience: ${brief.audience}
-Niche: ${brief.niche}
-Personality: ${brief.personality.join(", ")}
-Platform: ${brief.platform}
-Mode: ${brief.mode}`,
-      },
-    ];
-
-    contextDescription = await chatText(messages, {
-      model: "brief",
-      temperature: 0.3,
-      maxTokens: 300,
-    });
-  } catch {
-    contextDescription = `${brief.productName} is a ${brief.niche} ${productContext} designed for ${brief.audience}.`;
-  }
+  const references = result.selectedReferences
+    .map((slug) => {
+      const taglines = getCompanyWithTaglines([slug]);
+      const t = taglines[0];
+      return t ? { slug: t.slug, name: t.slug, tagline: t.tagline } : null;
+    })
+    .filter((r): r is CompanyRef => r !== null)
+    .slice(0, 2);
 
   return {
-    productContext,
-    validationPassed: valid,
-    reasonIfFailed: reason,
-    selectedReferences,
-    contextDescription,
+    productContext: (result.productContext as ProductContext) ?? deterministic,
+    contextDescription: result.contextDescription,
+    selectedReferences: references,
+    creativeSeed: result.creativeSeed,
   };
 }
+
+export { hasCompanyDeepDive, loadCompanyDeepDive };

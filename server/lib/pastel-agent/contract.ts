@@ -276,7 +276,7 @@ export function auditV17Review(
       issues.push({ file: "src/screens/home.jsx", severity: "high", category: "v17-nav", description: "Footer detected on an app screen — footers are illegal in app contexts." });
     }
     // Detect tabbar on desktop app screens
-    if (ctx !== "marketing" && /tabbar|bottom-0.*sticky.*border-t.*pb-\[env/.test(homeCode)) {
+    if (/tabbar|bottom-0.*sticky.*border-t.*pb-\[env/.test(homeCode)) {
       issues.push({ file: "src/screens/home.jsx", severity: "high", category: "v17-nav", description: "Mobile tabbar rendered on a desktop app screen — use sidebar or topbar." });
     }
   }

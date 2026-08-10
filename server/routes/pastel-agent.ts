@@ -270,7 +270,7 @@ export function registerPastelAgentRoutes(app: Express) {
         "Content-Security-Policy",
         [
           "default-src 'none'",
-          "script-src 'unsafe-inline' https://cdn.tailwindcss.com",
+          "script-src 'unsafe-inline'",
           "style-src 'unsafe-inline' https://fonts.googleapis.com",
           "font-src https://fonts.gstatic.com",
           "img-src data:",
@@ -287,7 +287,6 @@ export function registerPastelAgentRoutes(app: Express) {
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>${escapeHtml(screen)}</title>
 ${fontLinks}
-<script src="https://cdn.tailwindcss.com"></script>
 <style>
 ${styles?.content ?? "* { box-sizing: border-box; margin: 0; padding: 0; }"}
 html, body { height: 100%; }
@@ -347,52 +346,39 @@ async function getPlanTier(userId: string): Promise<PlanTier> {
 }
 
 /**
- * V14 cost estimate.
+ * Picasso run cost estimate.
  *
- * Call graph (hybrid tiers):
- *   design (mid)    × 1
- *   brief (mid)     × 1
- *   data (mid)      × 1
- *   wireframe (mid) × 1
- *   ux design (mid) × 1
- *   planner (cheap) × ~6 components (parallel)
- *   builder (cheap) × ~6 components (parallel)
- *   copy (mid)      × 1
- *   review (mid)    × 1
- *   visualReview (mid, +image tokens) × 1
- *   repair (cheap)  × bounded (≤2 rounds × a few files)
+ * Call graph (full 8-stage pipeline):
+ *   discovery (brief, mid)   × 1
+ *   directions (design, mid) × 1
+ *   tokens + motion (mid)    × 1
+ *   architecture (mid)       × 1
+ *   content (cheap)          × 1
+ *   components (cheap)       × ~8 (parallel, retries possible)
+ *   screens (cheap)          × ~3 (parallel)
+ *   visual QA (mid + image)  × ~3
+ *   finalize (deterministic) × $0
  */
 function estimateRunCredits(prompt: string): number {
-  // V21: shell components (8) are planned deterministically and built cheap;
-  // only the 4-6 custom components run planner (cheap) + builderCustom (MID).
-  const customComponents = 5;
+  const customComponents = 8;
+  const screens = 3;
 
-  const designCost = calcCost(MODELS.design, prompt.length + 5000, 3000);
-  const briefCost = calcCost(MODELS.brief, prompt.length + 5000, 2500);
-  const dataCost = calcCost(MODELS.data, prompt.length + 4000, 4000);
-  const wireframeCost = calcCost(MODELS.wireframe, prompt.length + 6000, 6000);
-  const uxCost = calcCost(MODELS.wireframe, prompt.length + 4000, 4000);
-  const plannerCost = calcCost(MODELS.planner, 3000, 1500);
-  const builderCustomCost = calcCost(MODELS.builderCustom, 4000, 6000);
-  const builderShellCost = calcCost(MODELS.builder, 4000, 2500);
-  const copyCost = calcCost(MODELS.copy, prompt.length + 3000, 2000);
-  const composeCost = calcCost(MODELS.compose, 12000, 9000);
-  const reviewCost = calcCost(MODELS.review, prompt.length + 6000, 2500);
-  const visualCost = calcCost(MODELS.visualReview, prompt.length + 4000, 2500);
-  const repairCost = calcCost(MODELS.repair, 5000, 3000);
+  const discoveryCost = calcCost(MODELS.brief, prompt.length + 3000, 500);
+  const directionsCost = calcCost(MODELS.design, prompt.length + 5000, 3000);
+  const tokensCost = calcCost(MODELS.design, prompt.length + 6000, 4000);
+  const architectureCost = calcCost(MODELS.wireframe, prompt.length + 5000, 6000);
+  const contentCost = calcCost(MODELS.data, prompt.length + 4000, 4000);
+  const componentCost = calcCost(MODELS.builderCustom, 3000, 6000);
+  const screenCost = calcCost(MODELS.compose, 12000, 9000);
+  const visualCost = calcCost(MODELS.visualReview, prompt.length + 3000, 2500);
 
-  // V21 cost structure: planner only for custom components; custom components
-  // build on the MID tier; shell chrome builds cheap; two compose calls
-  // (the composer + retry budget); 4 repair calls = 2 bounded rounds × ~2
-  // targeted files.
   const subtotal = [
-    designCost, briefCost, dataCost, wireframeCost, uxCost,
-    copyCost, composeCost, reviewCost,
+    discoveryCost, directionsCost, tokensCost, architectureCost, contentCost,
   ].reduce((s, c) => s + c.costDollars, 0)
-    + (plannerCost.costDollars + builderCustomCost.costDollars) * customComponents
-    + builderShellCost.costDollars * 8
-    + repairCost.costDollars * 4;
+    + componentCost.costDollars * customComponents * 1.2
+    + screenCost.costDollars * screens
+    + visualCost.costDollars * screens;
 
-  const totalDollars = (subtotal + visualCost.costDollars * 0.5) * 1.15 + 0.002;
+  const totalDollars = subtotal * 1.15 + 0.002;
   return Math.max(3, Math.ceil(totalDollars * CREDIT_PER_DOLLAR * 100) / 100);
 }

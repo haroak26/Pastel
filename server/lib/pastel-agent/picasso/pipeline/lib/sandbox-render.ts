@@ -1,44 +1,32 @@
-import fs from "node:fs";
-import path from "node:path";
-import http from "node:http";
-import { fileURLToPath } from "node:url";
 import { createRequire } from "node:module";
 
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
 const _require = createRequire(import.meta.url);
 
 export interface SandboxRenderOptions {
-  screenCode: string;
-  tokensCSS: string;
+  html: string;
   screenName: string;
   width?: number;
   height?: number;
-  projectSlug: string;
-  outputDir: string;
-  /** Pre-built HTML (bundled screen JS inline) to screenshot. When provided,
-   * the sandbox writes this file directly instead of the placeholder HTML —
-   * required to render real React screens inside the E2B sandbox. */
-  previewHtml?: string;
+  warmSandbox?: unknown | null;
+  timeoutMs?: number;
 }
 
 export interface SandboxRenderResult {
-  screenshot: Buffer;
-  method: "e2b" | "playwright" | "fallback";
+  screenshot: Buffer | null;
+  method: "e2b" | "unavailable";
   renderTimeMs: number;
   width: number;
   height: number;
   errors: string[];
 }
 
-// Type definitions for E2B (for when it's available)
-interface E2BSandbox {
+// Type shape for E2B sandbox (structural typing — no hard import).
+interface E2BSandboxLike {
   files: { write(path: string, content: string): Promise<void> };
-  commands: { run(cmd: string): Promise<{ stdout: string; stderr: string }> };
+  commands: { run(cmd: string, opts?: { timeoutMs?: number }): Promise<{ stdout: string; stderr: string }> };
   kill(): Promise<void>;
 }
 
-// Check if E2B SDK is available
 function e2bAvailable(): boolean {
   try {
     _require.resolve("@e2b/code-interpreter");
@@ -48,81 +36,108 @@ function e2bAvailable(): boolean {
   }
 }
 
-// Check if Playwright is available
-function playwrightAvailable(): boolean {
-  try {
-    _require.resolve("playwright-core");
-    return true;
-  } catch {
-    return false;
-  }
+export function e2bConfigured(): boolean {
+  return !!(process.env.E2B_API_KEY) && e2bAvailable();
 }
 
-function e2bKeyConfigured(): boolean {
-  return !!(process.env.E2B_API_KEY);
-}
+// ── Warm sandbox pool ───────────────────────────────────────────────────
 
-/**
- * Render a screen using E2B sandbox (isolated, reliable).
- * This is the preferred rendering method.
- * Requires: E2B_API_KEY env variable + @e2b/code-interpreter package.
- */
-async function renderWithE2B(options: SandboxRenderOptions): Promise<SandboxRenderResult> {
-  if (!e2bAvailable()) {
-    throw new Error("E2B SDK not installed. Install with: npm install @e2b/code-interpreter");
-  }
+let warmSandbox: E2BSandboxLike | null = null;
+let warmSandboxCreatedAt = 0;
+const SANDBOX_TTL_MS = 10 * 60 * 1000; // 10 minutes
 
-  if (!e2bKeyConfigured()) {
-    throw new Error("E2B_API_KEY not set. Set it in your environment to use E2B sandboxes.");
-  }
-
-  const startTime = Date.now();
-  const errors: string[] = [];
-
+async function createSandbox(): Promise<E2BSandboxLike> {
   const { Sandbox } = await import("@e2b/code-interpreter");
+  const sb = await Sandbox.create();
+  // Pre-install browser deps + puppeteer so renders skip the cold-start tax.
+  await sb.commands.run(
+    "sudo apt-get update -qq && sudo apt-get install -y -qq libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 libx11-6 libxcb1 libxext6 libxi6 libxtst6 libglib2.0-0 libdbus-1-3 libexpat1 2>&1 | tail -1",
+    { timeoutMs: 240_000 },
+  );
+  await sb.commands.run("cd /home/user && npm init -y >/dev/null 2>&1; npm install puppeteer 2>&1 | tail -1", { timeoutMs: 240_000 });
+  return sb as unknown as E2BSandboxLike;
+}
 
-  // Default template (code-interpreter-v1) has node; "node" template doesn't exist
-  const sandbox = await Sandbox.create();
-
+/** Get the shared warm sandbox (creates + warms it if needed). */
+export async function getWarmSandbox(): Promise<unknown | null> {
+  if (!e2bConfigured()) return null;
+  const now = Date.now();
+  if (warmSandbox && now - warmSandboxCreatedAt < SANDBOX_TTL_MS) {
+    return warmSandbox;
+  }
+  if (warmSandbox) {
+    warmSandbox.kill().catch(() => {});
+    warmSandbox = null;
+  }
   try {
-    const width = options.width ?? 1440;
-    const height = options.height ?? 900;
+    warmSandbox = await createSandbox();
+    warmSandboxCreatedAt = Date.now();
+    return warmSandbox;
+  } catch (err) {
+    console.warn(`[sandbox-render] E2B sandbox warmup failed: ${err instanceof Error ? err.message : err}`);
+    return null;
+  }
+}
 
-    // Install chromium runtime deps + puppeteer inside the sandbox
-    await sandbox.commands.run(
-      "sudo apt-get update -qq && sudo apt-get install -y -qq libnspr4 libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libasound2 libpango-1.0-0 libcairo2 libx11-6 libxcb1 libxext6 libxi6 libxtst6 libglib2.0-0 libdbus-1-3 libexpat1 2>&1 | tail -1",
-      { timeoutMs: 240000 },
-    );
+export function clearWarmSandbox(): void {
+  if (warmSandbox) {
+    warmSandbox.kill().catch(() => {});
+    warmSandbox = null;
+  }
+}
 
-    const htmlContent = options.previewHtml ?? generatePreviewHTML(options.screenCode, options.tokensCSS, options.screenName, width, height);
-    await sandbox.files.write("/home/user/screen.html", htmlContent);
+// ── Rendering ───────────────────────────────────────────────────────────
 
-    // Install puppeteer and take screenshot inside sandbox
-    await sandbox.commands.run("cd /home/user && npm init -y >/dev/null 2>&1; npm install puppeteer 2>&1 | tail -1", { timeoutMs: 240000 });
-
-    const screenshotScript = `
+const SCREENSHOT_SCRIPT = `
 const puppeteer = require('puppeteer');
 (async () => {
   const browser = await puppeteer.launch({ headless: true, args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage'] });
   const page = await browser.newPage();
-  await page.setViewport({ width: ${width}, height: ${height} });
-  await page.goto('file:///home/user/screen.html', { waitUntil: 'domcontentloaded', timeout: 15000 });
-  await new Promise(r => setTimeout(r, 2500));
+  await page.setViewport({ width: __WIDTH__, height: __HEIGHT__ });
+  await page.goto('file:///home/user/screen.html', { waitUntil: 'domcontentloaded', timeout: 20000 });
+  await new Promise(r => setTimeout(r, 2200));
+  await page.evaluate(() => document.fonts.ready.then(() => true)).catch(() => {});
   const screenshot = await page.screenshot({ encoding: 'base64', type: 'png' });
   console.log(screenshot);
   await browser.close();
 })();
 `;
-    await sandbox.files.write("/home/user/screenshot.js", screenshotScript);
-    const result = await sandbox.commands.run("cd /home/user && node screenshot.js", { timeoutMs: 90000 });
 
-    const renderTime = Date.now() - startTime;
-    const screenshot = Buffer.from(result.stdout.trim(), "base64");
+/**
+ * Render a screen (pre-built HTML) inside the E2B sandbox and return a PNG.
+ * The sandbox is the ONLY render path — local browsers are never used for
+ * pipeline renders.
+ */
+export async function renderScreen(options: SandboxRenderOptions): Promise<SandboxRenderResult> {
+  const startTime = Date.now();
+  const errors: string[] = [];
+  const width = options.width ?? 1440;
+  const height = options.height ?? 900;
 
+  if (!e2bConfigured()) {
+    return { screenshot: null, method: "unavailable", renderTimeMs: Date.now() - startTime, width, height, errors: ["E2B not configured — set E2B_API_KEY"] };
+  }
+
+  const sandbox = (options.warmSandbox as E2BSandboxLike | null) ?? (await getWarmSandbox()) as E2BSandboxLike | null;
+  const ownsSandbox = !options.warmSandbox;
+  if (!sandbox) {
+    return { screenshot: null, method: "unavailable", renderTimeMs: Date.now() - startTime, width, height, errors: ["No E2B sandbox available"] };
+  }
+
+  try {
+    await sandbox.files.write("/home/user/screen.html", options.html);
+    const script = SCREENSHOT_SCRIPT.replace("__WIDTH__", String(width)).replace("__HEIGHT__", String(height));
+    await sandbox.files.write("/home/user/screenshot.js", script);
+    const result = await sandbox.commands.run("cd /home/user && node screenshot.js", { timeoutMs: options.timeoutMs ?? 90_000 });
+    const base64 = result.stdout.trim();
+    if (!base64 || base64.length < 100) {
+      errors.push("Empty screenshot output from sandbox");
+      return { screenshot: null, method: "e2b", renderTimeMs: Date.now() - startTime, width, height, errors };
+    }
     return {
-      screenshot,
+      screenshot: Buffer.from(base64, "base64"),
       method: "e2b",
-      renderTimeMs: renderTime,
+      renderTimeMs: Date.now() - startTime,
       width,
       height,
       errors,
@@ -130,211 +145,27 @@ const puppeteer = require('puppeteer');
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
     errors.push(`E2B render error: ${msg}`);
-    throw err;
+    return { screenshot: null, method: "e2b", renderTimeMs: Date.now() - startTime, width, height, errors };
   } finally {
-    await sandbox.kill().catch(() => {});
-  }
-}
-
-/**
- * Render a screen using Playwright (local headless browser).
- * Falls back to SVG placeholder if Playwright is unavailable.
- */
-async function renderWithPlaywright(options: SandboxRenderOptions): Promise<SandboxRenderResult> {
-  const startTime = Date.now();
-  const errors: string[] = [];
-  const width = options.width ?? 1440;
-  const height = options.height ?? 900;
-
-  if (!playwrightAvailable()) {
-    // Generate a placeholder SVG
-    const svg = createPlaceholderSvg(options.screenName, "Playwright not available", width, height);
-    return {
-      screenshot: svg,
-      method: "fallback",
-      renderTimeMs: Date.now() - startTime,
-      width,
-      height,
-      errors: ["Playwright not installed. Install with: npm install playwright-core"],
-    };
-  }
-
-  try {
-    const { chromium } = await import("playwright-core");
-
-    // Create preview HTML
-    const htmlContent = generatePreviewHTML(options.screenCode, options.tokensCSS, options.screenName, width, height);
-    const previewPath = path.join(options.outputDir, `${options.screenName}-preview.html`);
-    fs.writeFileSync(previewPath, htmlContent);
-
-    // Serve via local HTTP (needed for Tailwind CDN)
-    const server = await startServer(previewPath);
-    const url = `http://localhost:${server.port}`;
-
-    try {
-      const browser = await chromium.launch({ headless: true });
-      const context = await browser.newContext({ viewport: { width, height } });
-      const page = await context.newPage();
-
-      await page.goto(url, { waitUntil: "networkidle", timeout: 30000 });
-      await page.waitForTimeout(1000); // Wait for Tailwind CDN
-
-      const screenshot = await page.screenshot({ type: "png", fullPage: false });
-      await browser.close();
-
-      return {
-        screenshot: Buffer.from(screenshot),
-        method: "playwright",
-        renderTimeMs: Date.now() - startTime,
-        width,
-        height,
-        errors,
-      };
-    } finally {
-      await server.close();
+    if (ownsSandbox && options.warmSandbox) {
+      // If the caller passed a sandbox, they own it. We only clean up when we
+      // created the pool ourselves AND the caller didn't pass one.
     }
-  } catch (err) {
-    errors.push(`Playwright render error: ${err instanceof Error ? err.message : String(err)}`);
-    const svg = createPlaceholderSvg(options.screenName, `Render failed: ${err instanceof Error ? err.message : "Unknown error"}`, width, height);
-    return {
-      screenshot: svg,
-      method: "fallback",
-      renderTimeMs: Date.now() - startTime,
-      width,
-      height,
-      errors,
-    };
-  }
-}
-
-/**
- * Main render function — tries E2B first, falls back to Playwright, then SVG placeholder.
- */
-export async function renderScreen(options: SandboxRenderOptions): Promise<SandboxRenderResult> {
-  // 1. Try E2B if SDK is installed AND API key is configured
-  if (e2bAvailable() && e2bKeyConfigured()) {
-    try {
-      return await renderWithE2B(options);
-    } catch (err) {
-      console.warn(`[sandbox-render] E2B render failed, falling back to Playwright: ${err instanceof Error ? err.message : String(err)}`);
+    if (!options.warmSandbox && warmSandbox !== sandbox) {
+      sandbox.kill().catch(() => {});
     }
-  } else if (e2bAvailable() && !e2bKeyConfigured()) {
-    console.warn("[sandbox-render] E2B SDK installed but E2B_API_KEY not set — using Playwright fallback");
   }
-
-  // 2. Fall back to Playwright
-  return renderWithPlaywright(options);
 }
 
-/**
- * Render multiple screens in parallel.
- */
+/** Render many screens through one sandbox (sequential — one browser at a time). */
 export async function renderScreens(
   screens: Record<string, string>,
-  tokensCSS: string,
-  options: { projectSlug: string; outputDir: string; width?: number; height?: number },
+  options: { width?: number; height?: number; timeoutMs?: number },
 ): Promise<Record<string, SandboxRenderResult>> {
   const results: Record<string, SandboxRenderResult> = {};
-  const promises: Promise<void>[] = [];
-
-  for (const [name, code] of Object.entries(screens)) {
-    promises.push(
-      renderScreen({
-        screenCode: code,
-        tokensCSS,
-        screenName: name,
-        width: options.width,
-        height: options.height,
-        projectSlug: options.projectSlug,
-        outputDir: options.outputDir,
-      }).then((result) => {
-        results[name] = result;
-      }),
-    );
+  const warm = await getWarmSandbox();
+  for (const [name, html] of Object.entries(screens)) {
+    results[name] = await renderScreen({ html, screenName: name, width: options.width, height: options.height, timeoutMs: options.timeoutMs, warmSandbox: warm });
   }
-
-  await Promise.all(promises);
   return results;
-}
-
-// ── Helpers ──────────────────────────────────────────────────────────────
-
-function generatePreviewHTML(
-  screenCode: string,
-  tokensCSS: string,
-  screenName: string,
-  width: number,
-  height: number,
-): string {
-  return `<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=${width}, initial-scale=1.0">
-<title>${screenName} — Picasso V2 Preview</title>
-<script src="https://cdn.tailwindcss.com"></script>
-<style>
-  ${tokensCSS}
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { font-family: var(--font-body, system-ui); background: var(--color-surface-background, #fff); color: var(--color-text-primary, #111); width: ${width}px; min-height: ${height}px; }
-</style>
-</head>
-<body>
-  <div id="root"></div>
-  <script type="module">
-    import React from 'https://esm.sh/react@18';
-    import { createRoot } from 'https://esm.sh/react-dom@18/client';
-    // Component preview: ${screenName}
-    // Screenshot dimensions: ${width}x${height}
-    // Generated by Picasso V2 Sandbox Renderer
-    console.log('Picasso V2 Preview: ${screenName}');
-  </script>
-</body>
-</html>`;
-}
-
-function createPlaceholderSvg(screenName: string, message: string, width: number, height: number): Buffer {
-  const svg = `<?xml version="1.0" encoding="UTF-8"?>
-<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
-  <rect width="100%" height="100%" fill="#F3F4F6"/>
-  <rect x="${width / 2 - 200}" y="${height / 2 - 60}" width="400" height="120" rx="12" fill="#FFFFFF" stroke="#E5E7EB" stroke-width="1"/>
-  <text x="${width / 2}" y="${height / 2 - 15}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="16" font-weight="600" fill="#374151">${escapeXml(screenName)}</text>
-  <text x="${width / 2}" y="${height / 2 + 10}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="13" fill="#9CA3AF">${escapeXml(message)}</text>
-  <text x="${width / 2}" y="${height / 2 + 35}" text-anchor="middle" font-family="system-ui, sans-serif" font-size="11" fill="#D1D5DB">Picasso V2 — Render Unavailable</text>
-</svg>`;
-  return Buffer.from(svg, "utf-8");
-}
-
-function escapeXml(str: string): string {
-  return str.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
-}
-
-// Simple HTTP server for serving preview HTML
-function startServer(filePath: string): Promise<{ port: number; close: () => Promise<void> }> {
-  return new Promise((resolve, reject) => {
-    const server = http.createServer((_req, res) => {
-      try {
-        const content = fs.readFileSync(filePath, "utf-8");
-        res.writeHead(200, { "Content-Type": "text/html" });
-        res.end(content);
-      } catch (err) {
-        res.writeHead(500);
-        res.end("Error loading preview");
-      }
-    });
-
-    server.listen(0, () => {
-      const addr = server.address();
-      if (addr && typeof addr === "object") {
-        resolve({
-          port: addr.port,
-          close: () => new Promise<void>((r) => server.close(() => r())),
-        });
-      } else {
-        reject(new Error("Could not get server address"));
-      }
-    });
-
-    server.on("error", reject);
-  });
 }

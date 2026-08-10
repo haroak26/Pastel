@@ -6,3 +6,7 @@ vite.config.ts.*
 *.tar.gz
 .vercel
 .env*
+
+server/lib/pastel-agent/picasso/.preview-tmp
+server/lib/pastel-agent/picasso/output
+picassotests/test6/output

@@ -115,6 +115,8 @@ export function surfaceCls(surface: CompositionSurface): string {
       return "bg-muted/50";
     case "soft-wash":
       return "bg-muted/30";
+    case "divided-list":
+      return "divide-y";
     case "hairline-section":
       return "border-b";
     case "inset-panel":

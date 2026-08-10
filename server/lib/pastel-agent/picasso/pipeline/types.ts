@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-// ── Brief & creative direction (Stage 1) ───────────────────────────────
+// ── Brief & creative direction (Stage 1-2) ──────────────────────────────
 
 export const nicheOptions = [
   "fintech",
@@ -54,11 +54,11 @@ export const briefSchema = z.object({
 
 export type Brief = z.infer<typeof briefSchema>;
 
-// ── Design tokens (Stage 2) ────────────────────────────────────────────
+// ── Design tokens (Stage 2) ─────────────────────────────────────────────
+// Colour scales keep the design-language vocabulary (neutral/accent/semantic)
+// and are mapped deterministically to shadcn theme slots in the generated CSS.
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
-
-const colorStopsSchema = z.record(z.string());
 
 const neutralScaleSchema = z.object({
   "0": hexColor,
@@ -78,20 +78,20 @@ const neutralScaleSchema = z.object({
 const accentScaleSchema = z.object({
   "50": hexColor,
   "100": hexColor,
-  "200": hexColor.default(() => "#000000"),
-  "300": hexColor.default(() => "#000000"),
-  "400": hexColor.default(() => "#000000"),
+  "200": hexColor,
+  "300": hexColor,
+  "400": hexColor,
   "500": hexColor,
   "600": hexColor,
-  "700": hexColor.default(() => "#000000"),
-  "800": hexColor.default(() => "#000000"),
+  "700": hexColor,
+  "800": hexColor,
   "900": hexColor,
-}).or(z.object({
-  "50": hexColor, "100": hexColor, "500": hexColor, "600": hexColor, "900": hexColor,
-}));
+});
 
 const semanticScaleSchema = z.object({
-  "50": hexColor, "500": hexColor, "900": hexColor,
+  "50": hexColor,
+  "500": hexColor,
+  "900": hexColor,
 });
 
 export const tokensSchema = z.object({
@@ -99,6 +99,10 @@ export const tokensSchema = z.object({
     brand: z.string(),
     version: z.literal("1.0.0"),
     generatedAt: z.string(),
+    /** Unique per-run creative seed — guarantees each UI differs. */
+    seed: z.string(),
+    character: z.string(),
+    mode: z.enum(["light", "dark", "both"]).default("light"),
   }),
   color: z.object({
     neutral: neutralScaleSchema,
@@ -164,6 +168,7 @@ export const tokensSchema = z.object({
     easing: z.object({
       standard: z.string(),
     }),
+    character: z.string(),
   }),
   breakpoints: z.object({
     sm: z.string(),
@@ -175,7 +180,22 @@ export const tokensSchema = z.object({
 
 export type Tokens = z.infer<typeof tokensSchema>;
 
-// ── Layout & IA (Stage 3) ──────────────────────────────────────────────
+// ── Layout & IA (Stage 3 wireframe) ─────────────────────────────────────
+
+export interface ComponentSlot {
+  /** References a ComponentsManifest entry id (or a base component name). */
+  name: string;
+  taxonomy: "primitive" | "atom" | "molecule" | "organism";
+  description: string;
+}
+
+export interface ScreenRegion {
+  name: string;
+  role: "nav" | "content" | "sidebar" | "hero" | "footer" | "main" | "toolbar";
+  purpose: string;
+  hierarchy: "primary" | "secondary" | "supporting";
+  componentTypes: ComponentSlot[];
+}
 
 export interface ScreenPlan {
   id: string;
@@ -183,19 +203,9 @@ export interface ScreenPlan {
   route: string;
   description: string;
   gridColumns: number;
+  /** One dominant visual moment per screen (e.g. "scoreboard", "search hero"). */
+  dominantMoment: string;
   regions: ScreenRegion[];
-}
-
-export interface ScreenRegion {
-  name: string;
-  role: "nav" | "content" | "sidebar" | "hero" | "footer" | "main";
-  componentTypes: ComponentSlot[];
-}
-
-export interface ComponentSlot {
-  name: string;
-  taxonomy: "primitive" | "atom" | "molecule" | "organism";
-  description: string;
 }
 
 export interface LayoutPlan {
@@ -204,16 +214,19 @@ export interface LayoutPlan {
   breakpoints: Record<string, string>;
 }
 
-// ── Component manifest (Stage 3 output, Stage 4 input) ─────────────────
+// ── Component manifest (Stage 3 output, Stage 4 input) ──────────────────
 
 export interface ComponentManifestEntry {
   id: string;
   name: string;
   taxonomy: "primitive" | "atom" | "molecule" | "organism";
   description: string;
+  /** Base shadcn component the agent should edit (name in base-components/ui). */
+  baseComponent: string;
+  /** Prose: exactly how to customize the base (sizing, rounding, colour usage, density). */
+  customization: string;
   states: ("default" | "hover" | "focus" | "active" | "disabled" | "loading" | "empty" | "error")[];
   variants?: Record<string, string[]>;
-  radixPrimitive?: string;
   props: Record<string, { type: string; required: boolean; description: string }>;
 }
 
@@ -222,7 +235,25 @@ export interface ComponentsManifest {
   generatedAt: string;
 }
 
-// ── Critque rubric (Stage 5) ───────────────────────────────────────────
+// ── Prop contract (deterministic, derived from the manifest) ────────────
+
+export interface PropContractEntry {
+  componentId: string;
+  componentName: string;
+  props: Record<string, {
+    type: string;
+    required: boolean;
+    description: string;
+  }>;
+  importPath: string;
+}
+
+export interface PropContract {
+  entries: PropContractEntry[];
+  generatedAt: string;
+}
+
+// ── Critique / QA ───────────────────────────────────────────────────────
 
 export interface RubricScores {
   productContext: number;
@@ -251,6 +282,13 @@ export interface CritiqueResult {
   affectedIds: string[];
 }
 
+export interface SmokeTestResult {
+  passed: boolean;
+  errors: Array<{ type: string; message: string; component?: string }>;
+  warnings: Array<{ type: string; message: string }>;
+  renderTimeMs: number;
+}
+
 // ── Niche → company reference pre-filter ───────────────────────────────
 
 export const NICHE_COMPANY_MAP: Record<Niche, string[]> = {
@@ -268,33 +306,6 @@ export const NICHE_COMPANY_MAP: Record<Niche, string[]> = {
 
 // ── Run state ──────────────────────────────────────────────────────────
 
-export interface PicassoRunState {
-  runId: string;
-  projectId?: string;
-  userId?: string;
-
-  // Stage outputs
-  brief: Brief | null;
-  creativeDirections: CreativeDirection[] | null;
-  tokens: Tokens | null;
-  layoutPlan: LayoutPlan | null;
-  componentsManifest: ComponentsManifest | null;
-
-  // Generated files
-  generatedFiles: Record<string, string>;
-  catalogPage: string | null;
-  screenshots: Record<string, Buffer>;
-
-  // Critique state
-  critiqueResults: CritiqueResult[];
-  currentIteration: number;
-  maxIterations: number;
-
-  // Status
-  phase: PicassoPhase;
-  error: string | null;
-}
-
 export type PicassoPhase =
   | "idle"
   | "brief"
@@ -305,10 +316,3 @@ export type PicassoPhase =
   | "finalize"
   | "done"
   | "error";
-
-export interface PicassoEvent {
-  type: "phase" | "stage" | "error" | "done" | "direction" | "token" | "component" | "critique" | "file";
-  phase?: PicassoPhase;
-  message?: string;
-  data?: unknown;
-}

@@ -9,9 +9,15 @@ import { MergeGateway, type ThinkingConfig } from "merge-gateway-sdk";
  * design (tokens), data (all page content), brief, wireframe, copy (the
  * product voice), review, and visual review on rendered screenshots.
  *
- * The knowledge base (company design.md + megadesign.md) carries the visual
- * quality; models select and adapt within it. Override any role via env:
- * PASTEL_MODEL_{ROLE}.
+ * V5 TUNING (Picasso): With v3 prop-contract enforcement + runtime smoke tests
+ * and v4 anti-slop hard gate in place, mechanical/constrained tasks can safely
+ * use the CHEAP model because incorrect output is caught by automated gates.
+ * Judgment tasks (directions, visual critique, design tokens) stay on MID.
+ *
+ * Routes CHEAP for: builderCustom (components), compose (screens), data (content)
+ * Routes MID for: design (tokens/directions), brief, copy, review, visualReview
+ *
+ * Override any role via env: PASTEL_MODEL_{ROLE}.
  */
 
 export const CHEAP_DEFAULT = "anthropic/claude-haiku-4-5";
@@ -19,29 +25,26 @@ export const MID_DEFAULT = "openai/gpt-5.6-luna";
 
 export const MODELS = {
   clarify:      process.env.PASTEL_MODEL_CLARIFY      || CHEAP_DEFAULT,
+  discovery:    process.env.PASTEL_MODEL_DISCOVERY    || MID_DEFAULT,
   design:       process.env.PASTEL_MODEL_DESIGN        || MID_DEFAULT,
+  /** V5: Content generation routed to CHEAP — data shapes and copy are
+   * constrained by the layout plan + content schema; v3/v4 gates catch issues. */
+  /** Content + copy — one call per run; the product voice lives here. */
   data:         process.env.PASTEL_MODEL_DATA          || MID_DEFAULT,
   brief:        process.env.PASTEL_MODEL_BRIEF        || MID_DEFAULT,
   wireframe:    process.env.PASTEL_MODEL_WIREFRAME    || MID_DEFAULT,
   planner:      process.env.PASTEL_MODEL_PLANNER      || CHEAP_DEFAULT,
-  /** V21: custom PRODUCT components are built on the MID tier (components
-   * are where most visible design quality lives; v20 built them on the
-   * cheapest model). Shell chrome stays on `builder` (cheap). */
-  builderCustom: process.env.PASTEL_MODEL_BUILDER_CUSTOM || MID_DEFAULT,
+  /** V5: Component generation routed to CHEAP — prop contracts and runtime
+   * smoke tests catch incorrect output; no need for the large model per component. */
+  builderCustom: process.env.PASTEL_MODEL_BUILDER_CUSTOM || CHEAP_DEFAULT,
   builder:      process.env.PASTEL_MODEL_BUILDER      || CHEAP_DEFAULT,
   copy:         process.env.PASTEL_MODEL_COPY         || MID_DEFAULT,
   assemble:     process.env.PASTEL_MODEL_ASSEMBLE     || CHEAP_DEFAULT,
-  /** V19: the screen composer writes each screen's layout body with full
-   * creative control (anti-slop guided). Mid model — layout is the single
-   * biggest lever on visual quality. */
-  compose:      process.env.PASTEL_MODEL_COMPOSE       || MID_DEFAULT,
+  /** V5: Screen composition routed to CHEAP — layout constraints + prop contracts
+   * make this a constrained mechanical task, not a judgment task. */
+  compose:      process.env.PASTEL_MODEL_COMPOSE       || CHEAP_DEFAULT,
   review:       process.env.PASTEL_MODEL_REVIEW       || MID_DEFAULT,
   visualReview: process.env.PASTEL_MODEL_VISUAL_REVIEW || MID_DEFAULT,
-  /** V22: repair must be AT LEAST as capable as the model that found the
-   * defects (review runs on MID). v21 ran repair on the cheap tier with a
-   * 5000-token ceiling — structural fixes (real charts, viewport-filling
-   * restructures) were beyond its budget, so every repair round no-oped and
-   * broken runs shipped as "done". */
   repair:       process.env.PASTEL_MODEL_REPAIR       || MID_DEFAULT,
 } as const;
 
@@ -49,6 +52,7 @@ export type ModelRole = keyof typeof MODELS;
 
 export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
   clarify:      Number(process.env.PASTEL_MAX_TOKENS_CLARIFY)      || 2500,
+  discovery:    Number(process.env.PASTEL_MAX_TOKENS_DISCOVERY)    || 3000,
   design:       Number(process.env.PASTEL_MAX_TOKENS_DESIGN)       || 5000,
   data:         Number(process.env.PASTEL_MAX_TOKENS_DATA)         || 6000,
   brief:        Number(process.env.PASTEL_MAX_TOKENS_BRIEF)        || 4000,
@@ -106,7 +110,7 @@ function thinkingConfig(role?: ModelRole): ThinkingConfig | Record<string, unkno
  * v6 defaults ALL roles to thinking-off (cheap + fast); set PASTEL_THINKING_BUDGET
  * to a number to enable it. */
 export const LIGHT_ROLES: ReadonlySet<ModelRole> = new Set<ModelRole>([
-  "clarify", "design", "data", "brief", "wireframe", "planner", "builder", "builderCustom", "copy", "assemble", "compose", "review", "visualReview", "repair",
+  "clarify", "discovery", "design", "data", "brief", "wireframe", "planner", "builder", "builderCustom", "copy", "assemble", "compose", "review", "visualReview", "repair",
 ]);
 
 let cachedClient: MergeGateway | null = null;
@@ -137,6 +141,35 @@ export interface MergeGatewayLike {
 /** Test seam: swap the gateway client with a stub. Pass null to reset. */
 export function __setTestClient(client: MergeGatewayLike | MergeGateway | null): void {
   cachedClient = client as MergeGateway | null;
+}
+
+/**
+ * Global usage sink — every successful model call pushes its real usage
+ * record here when set. The Picasso run engine installs it for a run and
+ * drains it afterwards so credit settlement uses measured cost even though
+ * the pipeline stages don't pass per-call `onUsage` hooks.
+ */
+let usageSink: ((rec: UsageRecord) => void) | null = null;
+
+export function setUsageSink(sink: ((rec: UsageRecord) => void) | null): void {
+  usageSink = sink;
+}
+
+function reportUsage(opts: ChatCallOptions, rec: UsageRecord): void {
+  if (opts.onUsage) {
+    try {
+      opts.onUsage(rec);
+    } catch {
+      // usage tracking must never break a call
+    }
+  }
+  if (usageSink) {
+    try {
+      usageSink(rec);
+    } catch {
+      // usage tracking must never break a call
+    }
+  }
 }
 
 export interface ChatMessage {
@@ -330,22 +363,16 @@ export async function chat(
   }
 
   const usage = extractUsage(response!);
-  if (opts.onUsage) {
-    try {
-      opts.onUsage({
-        role: opts.model,
-        modelId: model,
-        inputChars,
-        outputChars: content.length,
-        inputTokens: usage?.inputTokens ?? 0,
-        outputTokens: usage?.outputTokens ?? 0,
-        imageBlocks,
-        ...(usage?.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
-      });
-    } catch {
-      // usage tracking must never break a call
-    }
-  }
+  reportUsage(opts, {
+    role: opts.model,
+    modelId: model,
+    inputChars,
+    outputChars: content.length,
+    inputTokens: usage?.inputTokens ?? 0,
+    outputTokens: usage?.outputTokens ?? 0,
+    imageBlocks,
+    ...(usage?.costUsd !== undefined ? { costUsd: usage.costUsd } : {}),
+  });
 
   return { content, model, inputChars, outputChars: content.length, ...(usage ? { usage } : {}) };
 }

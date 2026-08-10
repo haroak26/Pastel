@@ -1,7 +1,12 @@
 import type { VisualReference } from "./types";
 
 /**
- * Pastel Agent v16 pipeline entry point.
+ * Pastel Agent production entry point.
+ *
+ * The UI runs the full Picasso 8-stage pipeline (discovery → directions →
+ * tokens/motion → architecture → content/components/catalog → screens →
+ * smoke/lint/anti-slop gates → visual QA → finalize). The legacy in-place
+ * agent loop is no longer used by the UI.
  */
 export async function startAgentLoop(
   runId: string,
@@ -12,6 +17,6 @@ export async function startAgentLoop(
   userId?: string,
   opts?: { maxCredits?: number; holdAmount?: number; visualReference?: VisualReference },
 ): Promise<void> {
-  const { startAgentLoop: loop } = await import("./orchestrator");
-  await loop(runId, prompt, answers, projectId, holdId, userId, opts);
+  const { startPicassoAgentLoop } = await import("./picasso/run");
+  await startPicassoAgentLoop(runId, prompt, answers, projectId, holdId, userId, opts);
 }
