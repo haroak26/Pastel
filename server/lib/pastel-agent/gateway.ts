@@ -14,6 +14,12 @@ import { MergeGateway, type ThinkingConfig } from "merge-gateway-sdk";
  * use the CHEAP model because incorrect output is caught by automated gates.
  * Judgment tasks (directions, visual critique, design tokens) stay on MID.
  *
+ * V7 (Picasso): `chatJSON` gains a salvage phase — caller-supplied `repair`
+ * and `fallback` hooks run before the hard throw, so a model occasionally
+ * underfilling descriptive fields can never kill a pipeline that already
+ * spent money. New `brandKit` role: a smaller, cheaper model call for the
+ * stage-3 brand kit + UX plan (split from the giant wireframe call).
+ *
  * Routes CHEAP for: builderCustom (components), compose (screens), data (content)
  * Routes MID for: design (tokens/directions), brief, copy, review, visualReview
  *
@@ -33,6 +39,8 @@ export const MODELS = {
   data:         process.env.PASTEL_MODEL_DATA          || MID_DEFAULT,
   brief:        process.env.PASTEL_MODEL_BRIEF        || MID_DEFAULT,
   wireframe:    process.env.PASTEL_MODEL_WIREFRAME    || MID_DEFAULT,
+  /** V7: brandKit + UX plan call (stage 3 Call B) — smaller, judgment-heavy. */
+  brandKit:     process.env.PASTEL_MODEL_BRAND_KIT    || MID_DEFAULT,
   planner:      process.env.PASTEL_MODEL_PLANNER      || CHEAP_DEFAULT,
   /** V5: Component generation routed to CHEAP — prop contracts and runtime
    * smoke tests catch incorrect output; no need for the large model per component. */
@@ -57,6 +65,7 @@ export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
   data:         Number(process.env.PASTEL_MAX_TOKENS_DATA)         || 6000,
   brief:        Number(process.env.PASTEL_MAX_TOKENS_BRIEF)        || 4000,
   wireframe:    Number(process.env.PASTEL_MAX_TOKENS_WIREFRAME)    || 16000,
+  brandKit:     Number(process.env.PASTEL_MAX_TOKENS_BRAND_KIT)    || 5000,
   planner:      Number(process.env.PASTEL_MAX_TOKENS_PLANNER)      || 6000,
   builderCustom: Number(process.env.PASTEL_MAX_TOKENS_BUILDER_CUSTOM) || 9000,
   builder:      Number(process.env.PASTEL_MAX_TOKENS_BUILDER)      || 6500,
@@ -110,7 +119,7 @@ function thinkingConfig(role?: ModelRole): ThinkingConfig | Record<string, unkno
  * v6 defaults ALL roles to thinking-off (cheap + fast); set PASTEL_THINKING_BUDGET
  * to a number to enable it. */
 export const LIGHT_ROLES: ReadonlySet<ModelRole> = new Set<ModelRole>([
-  "clarify", "discovery", "design", "data", "brief", "wireframe", "planner", "builder", "builderCustom", "copy", "assemble", "compose", "review", "visualReview", "repair",
+  "clarify", "discovery", "design", "data", "brief", "wireframe", "brandKit", "planner", "builder", "builderCustom", "copy", "assemble", "compose", "review", "visualReview", "repair",
 ]);
 
 let cachedClient: MergeGateway | null = null;
@@ -302,7 +311,7 @@ export async function chat(
         input: messages.map((m) => ({ type: "message" as const, ...m })),
         temperature: opts.temperature ?? 0.5,
         max_tokens: budget,
-        thinking: withThinking ? thinkingConfig(opts.model) : undefined,
+        thinking: withThinking ? thinkingConfig(opts.model) : { type: "disabled" },
         response_format:
           opts.responseFormat === "json_object"
             ? { type: "json_object" }
@@ -404,7 +413,13 @@ function extractTextContent(response: ChatResponse): string {
   return content;
 }
 
-type ParseResult<T> = { value: T } | { error: Error; kind: "parse" | "validate" };
+type ParseResult<T> =
+  | { value: T }
+  | { error: Error; kind: "parse" }
+  /** Validation failure — `payload` carries whatever actually parsed so
+   *  repair hooks can salvage partial objects instead of throwing away
+   *  everything the model produced. */
+  | { error: Error; kind: "validate"; payload?: unknown };
 
 export function parseAndValidate<T>(raw: string, validate?: JsonValidator<T>): ParseResult<T> {
   let jsonStr = raw.trim();
@@ -428,15 +443,28 @@ export function parseAndValidate<T>(raw: string, validate?: JsonValidator<T>): P
     try {
       return { value: validate(parsed) };
     } catch (err) {
-      return { error: err instanceof Error ? err : new Error(String(err)), kind: "validate" };
+      return { error: err instanceof Error ? err : new Error(String(err)), kind: "validate", payload: parsed };
     }
   }
   return { error: new Error(jsonStr.slice(0, 300)), kind: "parse" };
 }
 
+export interface ChatJSONRepair<T> {
+  /** Repair hook: receives the raw parsed payload (may be a partial object —
+   *  or `undefined` when the model output never parsed at all), the failure
+   *  error, and the raw model text. Return a value to salvage, or
+   *  null/undefined to keep the failure. The repaired value is re-validated
+   *  before being returned. */
+  repair?: (payload: unknown, error: Error, rawContent: string) => T | null | undefined;
+  /** Deterministic last-resort value when repair cannot salvage. Only used
+   *  for descriptive/prose schemas — structural contracts must NOT supply a
+   *  fallback so genuine failures stay visible. */
+  fallback?: () => T;
+}
+
 export async function chatJSON<T>(
   messages: ChatMessage[],
-  opts: Omit<ChatCallOptions, "responseFormat"> & {
+  opts: Omit<ChatCallOptions, "responseFormat"> & ChatJSONRepair<T> & {
     validate?: JsonValidator<T>;
     /** Receives the raw model output when every attempt has failed — lets callers salvage. */
     onRawFailure?: (content: string) => void;
@@ -477,8 +505,40 @@ export async function chatJSON<T>(
   if (second && "value" in second.result) return second.result.value;
 
   const finalResult = second && "error" in second.result ? second.result : first.result;
+
+  // ── Salvage phase (V7): never throw before a caller-supplied repair /
+  // deterministic fallback has had a chance to fill missing descriptive
+  // fields. Structural failures decline repair by returning null.
+  const rawContent = second?.content ?? first.content;
+  if (opts.repair) {
+    try {
+      const payload = finalResult.kind === "validate" ? finalResult.payload : undefined;
+      const repaired = opts.repair(payload, finalResult.error, rawContent);
+      if (repaired !== null && repaired !== undefined) {
+        if (opts.validate) {
+          try {
+            const validated = opts.validate(repaired);
+            console.warn(`[pastel-agent] salvaged model output (${chatOpts.model}) via repair + re-validate — defaulted fields: ${finalResult.error.message}`);
+            return validated;
+          } catch {
+            // repaired value still fails validation — fall through
+          }
+        } else {
+          console.warn(`[pastel-agent] salvaged model output (${chatOpts.model}) via repair hook — defaulted fields: ${finalResult.error.message}`);
+          return repaired;
+        }
+      }
+    } catch (err) {
+      console.warn(`[pastel-agent] repair hook errored for model ${chatOpts.model}:`, err instanceof Error ? err.message : err);
+    }
+  }
+  if (opts.fallback) {
+    console.warn(`[pastel-agent] using deterministic fallback for model ${chatOpts.model} after failed validation: ${finalResult.error.message}`);
+    return opts.fallback();
+  }
+
   try {
-    opts.onRawFailure?.(second?.content ?? first.content);
+    opts.onRawFailure?.(rawContent);
   } catch {
     // salvage hook must never break the flow
   }

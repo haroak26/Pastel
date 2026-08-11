@@ -21,16 +21,19 @@ export interface Stage2Direction {
   signatureMoves: string[];
 }
 
+// V7: descriptive fields carry defaults (a dropped prose field must never
+// abort the pipeline); accentColor/spacing stay structural — divergence and
+// selection logic depends on them being real.
 const directionSchema = z.object({
   name: z.string(),
-  summary: z.string(),
+  summary: z.string().default("A distinctive visual direction for this product."),
   accentColor: z.string().regex(/^#[0-9a-fA-F]{6}$/),
-  surfaces: z.string(),
-  radius: z.string(),
+  surfaces: z.string().default("paper"),
+  radius: z.string().default("soft"),
   spacing: z.enum(["airy", "balanced", "dense"]),
-  motion: z.string(),
-  typographyVoice: z.string(),
-  signatureMoves: z.array(z.string()).min(2).max(5),
+  motion: z.string().default("swift"),
+  typographyVoice: z.string().default("a distinctive display face paired with a readable body face"),
+  signatureMoves: z.array(z.string()).min(2).max(5).default(["a memorable signature gesture", "a distinctive data treatment"]),
 });
 
 const directionsSchema = z.object({

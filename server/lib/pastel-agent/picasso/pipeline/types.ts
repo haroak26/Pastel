@@ -60,6 +60,11 @@ export type Brief = z.infer<typeof briefSchema>;
 
 const hexColor = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 
+/** Single-value colour slots (surface/text/border) — any CSS colour the theme
+ *  CSS can hold. Models legitimately emit oklch()/rgb() with alpha for
+ *  overlays; only the scales that feed luminance math stay strict hex. */
+const cssColor = z.string().regex(/^(#[0-9a-fA-F]{6}|oklch\([^)]*\)|oklab\([^)]*\)|rgba?\([^)]*\)|hsla?\([^)]*\)|color\([^)]*\))$/);
+
 const neutralScaleSchema = z.object({
   "0": hexColor,
   "50": hexColor,
@@ -114,20 +119,20 @@ export const tokensSchema = z.object({
       info: semanticScaleSchema,
     }),
     surface: z.object({
-      background: hexColor,
-      raised: hexColor,
-      overlay: hexColor,
+      background: cssColor,
+      raised: cssColor,
+      overlay: cssColor,
     }),
     text: z.object({
-      primary: hexColor,
-      secondary: hexColor,
-      muted: hexColor,
-      inverse: hexColor,
+      primary: cssColor,
+      secondary: cssColor,
+      muted: cssColor,
+      inverse: cssColor,
     }),
     border: z.object({
-      default: hexColor,
-      subtle: hexColor,
-      focus: hexColor,
+      default: cssColor,
+      subtle: cssColor,
+      focus: cssColor,
     }),
   }),
   typography: z.object({
@@ -138,10 +143,10 @@ export const tokensSchema = z.object({
     }),
     scale: z.record(z.string()),
     weight: z.object({
-      regular: z.number(),
-      medium: z.number(),
-      semibold: z.number(),
-      bold: z.number(),
+      regular: z.coerce.number(),
+      medium: z.coerce.number(),
+      semibold: z.coerce.number(),
+      bold: z.coerce.number(),
     }),
   }),
   space: z.record(z.string()),

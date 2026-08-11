@@ -117,6 +117,75 @@ v17 passes when:
 - Density gates catch sparse composition
 - Backward-compatible with all existing v16 tests
 
+## Picasso V7 - Hardened Orchestration (picasso/pipeline)
+
+V7 is the reliability upgrade for the Picasso agent pipeline
+(`server/lib/pastel-agent/picasso/pipeline/`), built in response to a
+reproduced E2E abort where `runArchitecture` dropped four trailing
+`brandKit` prose fields, the corrective retry failed the same way, and the
+whole run died with zero diagnostics and zero screens. The design-system
+architecture (base components + manifest + customization) is unchanged —
+V7 fixes the orchestration layer around it so a model occasionally
+underfilling a large structured response can never kill a paid-for run.
+
+### Changed
+
+- **Stage 3 split into two focused calls** (`stage-3-wireframe.ts`): one
+  STRUCTURE call (screens + globalRegions + component manifest, the part
+  that needs the design-law/component-law context) and one smaller BRAND
+  KIT + UX call (brandKit + uxDesignPlan) that receives the finished
+  component manifest as grounding. Each call has its own schema, its own
+  bounded corrective retry, and its own model budget (new `brandKit` role
+  in `gateway.ts`).
+- **Prose fields default, structural fields hard-validate**: every
+  descriptive leaf in the stage-3 schemas, discovery, and directions now
+  carries a deterministic `.default()` (token/seed-derived where possible);
+  structural fields (screens/components arrays, refs, baseComponent names,
+  taxonomy enums, accent colours) still fail loudly. The exact V6 failure
+  shape — `brandKit.spacingRules.componentPadding` etc. missing — is now
+  absorbed by defaults with a greppable `[pastel-agent]` warning.
+- **`chatJSON` salvage phase** (`gateway.ts`): before the hard throw, a
+  caller-supplied `repair` hook receives the partially-parsed payload
+  (parse failures pass the raw text), fills missing fields, and
+  re-validates; a `fallback` supplies a deterministic last-resort value.
+  Only structural failures reach the throw.
+- **Orchestrator degrades, never hard-aborts** (`orchestrator.ts`):
+  discovery, design, wireframe, component generation, and screen
+  composition are wrapped in try/catch. Failures emit activity, record a
+  degradation, and return a valid `PicassoPipelineOutput` with
+  `success: false` — partial artifacts (discovery, directions, tokens,
+  motion spec, docs) are preserved. Any degradation flips `success` and is
+  surfaced in `FinalReport.md` (new "Degradations" section in
+  `stage-8-finalize.ts`) so a degraded run is never mistaken for a clean
+  one.
+- **E2E harness never loses partial-run evidence**
+  (`picassotests/test6/e2e-run.ts`): `runOnce` catches pipeline throws,
+  records the furthest phase reached, and always writes `run-summary.json`
+  (status `aborted`, stage, error, model-call count, cost). Aborted runs
+  appear in `ISSUES.md` as "reached stage X, spent $Y, failed with Z"
+  instead of the opaque "Run never completed".
+- **Taxonomy-aware component divergence bar** (`stage-4-build.ts`):
+  molecules/organisms must be <90% similar to their base source (sampled
+  non-overlapping chunk similarity) and keep theme-slot discipline;
+  primitives may stay close to base. Vague `customization` instructions
+  are replaced deterministically with token-derived design notes
+  (`ensureCustomizationSpecificity` in stage 3) before they reach the
+  builder.
+
+### Acceptance
+
+V7 is verified by:
+
+- `server/tests/picasso-v7.test.ts` — 13 unit tests covering the repair
+  path, prose defaulting, structural hard-fails, customization
+  specificity, the taxonomy divergence bar, and the two-call stage-3 split
+  against a stubbed gateway.
+- The three-brief E2E protocol: `MERGE_GATEWAY_API_KEY=... E2B_API_KEY=...
+  npx tsx picassotests/test6/e2e-run.ts "<brief>"` three times with three
+  different briefs (or one `PASTEL_E2E_MATRIX` invocation), each ending in
+  `ALL ASSERTIONS PASSED` and `ISSUES.md` reporting
+  `**Overall:** ALL ASSERTIONS PASSED`.
+
 ## v6 - Knowledge-Base Pipeline
 
 - Introduced the company knowledge base under `knowledge/companies/`.

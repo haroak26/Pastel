@@ -73,13 +73,137 @@ export interface PicassoPipelineOutput {
   motionSpec: MotionSpec;
   directions: Stage2Direction[];
   finalReport: FinalizeReportV2 | null;
+  /** V7: stages that degraded instead of aborting, with reasons. Surfaced in
+   *  the final report so a degraded run is never mistaken for a clean one. */
+  degradations: Array<{ stage: string; reason: string }>;
 }
 
+export interface StageDegradation {
+  stage: string;
+  reason: string;
+}
+
+// ── Deterministic fallbacks for degraded runs ────────────────────────────
+// A degraded run still returns a structurally valid output so callers (the
+// production run path and the E2E harness) always get something they can
+// persist and reason about. These fallbacks are ONLY used after a stage
+// already failed — they are never passed off as real design work.
+
+function fallbackTokens(brief: Brief): Tokens {
+  const neutral = {
+    "0": "#ffffff", "50": "#fafafa", "100": "#f5f5f5", "200": "#e5e5e5", "300": "#d4d4d4",
+    "400": "#a3a3a3", "500": "#737373", "600": "#525252", "700": "#404040", "800": "#262626",
+    "900": "#171717", "950": "#0a0a0a",
+  } as const;
+  const accent = {
+    "50": "#f0fdfa", "100": "#ccfbf1", "200": "#99f6e4", "300": "#5eead4", "400": "#2dd4bf",
+    "500": "#14b8a6", "600": "#0d9488", "700": "#0f766e", "800": "#115e59", "900": "#134e4a",
+  } as const;
+  const semantic = (s: string) => ({ "50": s, "500": s, "900": s });
+
+  return {
+    meta: {
+      brand: brief.productName,
+      version: "1.0.0",
+      generatedAt: new Date().toISOString(),
+      seed: "degraded-fallback",
+      character: "swift",
+      mode: brief.mode,
+    },
+    color: {
+      neutral,
+      accent,
+      semantic: {
+        success: semantic("#16a34a"),
+        warning: semantic("#d97706"),
+        danger: semantic("#dc2626"),
+        info: semantic("#0ea5e9"),
+      },
+      surface: { background: "#ffffff", raised: "#ffffff", overlay: "#ffffff" },
+      text: { primary: "#171717", secondary: "#525252", muted: "#a3a3a3", inverse: "#ffffff" },
+      border: { default: "#e5e5e5", subtle: "#f5f5f5", focus: "#0d9488" },
+    },
+    typography: {
+      fontFamily: { display: "Manrope", body: "DM Sans", mono: "IBM Plex Mono" },
+      scale: { xs: "12px", sm: "14px", base: "16px", lg: "18px", xl: "20px", "2xl": "24px", "3xl": "30px", "4xl": "36px", "5xl": "48px" },
+      weight: { regular: 400, medium: 500, semibold: 600, bold: 700 },
+    },
+    space: {
+      "0": "0px", "2": "2px", "4": "4px", "6": "6px", "8": "8px", "12": "12px", "16": "16px",
+      "24": "24px", "32": "32px", "40": "40px", "48": "48px", "64": "64px", "80": "80px",
+      "96": "96px", "128": "128px", "160": "160px",
+    },
+    radius: { none: "0px", sm: "4px", md: "6px", lg: "8px", xl: "12px", full: "9999px" },
+    shadow: {
+      sm: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+      md: "0 4px 6px -1px rgb(0 0 0 / 0.1)",
+      lg: "0 10px 15px -3px rgb(0 0 0 / 0.1)",
+      xl: "0 20px 25px -5px rgb(0 0 0 / 0.1)",
+    },
+    motion: {
+      duration: { fast: "120ms", base: "200ms", slow: "300ms" },
+      easing: { standard: "cubic-bezier(0.4, 0, 0.2, 1)" },
+      character: "swift",
+    },
+    breakpoints: { sm: "640px", md: "768px", lg: "1024px", xl: "1280px" },
+  };
+}
+
+function emptyArchitecture(brief: Brief): ArchitectureOutput {
+  return {
+    layoutPlan: { screens: [], globalRegions: [], breakpoints: {} },
+    componentsManifest: { entries: [], generatedAt: new Date().toISOString() },
+    brandKit: {
+      colorRules: { accentUsage: "", semanticUsage: "", neutralUsage: "", forbiddenPatterns: [] },
+      typographyRules: { displayUsage: "", bodyUsage: "", monoUsage: "", weightRules: "", sizeRules: "" },
+      spacingRules: { sectionMargins: "", componentPadding: "", rhythmDescription: "" },
+      motionRules: { transitions: "", easing: "", duration: "" },
+      signatureMoves: [],
+      antiPatterns: [],
+      generatedAt: new Date().toISOString(),
+    },
+    uxDesignPlan: {
+      navigationStrategy: "",
+      surfaceRhythm: "",
+      interactionPatterns: "",
+      densityStrategy: "",
+      primaryActionPerScreen: {},
+      generatedAt: new Date().toISOString(),
+    },
+    componentInventory: [],
+  };
+}
+
+const FALLBACK_MOTION_SPEC: MotionSpec = {
+  character: "swift",
+  durations: { fast: "120ms", base: "200ms", slow: "300ms" },
+  easing: "cubic-bezier(0.4, 0, 0.2, 1)",
+  interactionRules: {
+    hover: { enabled: true, duration: "120ms" },
+    focus: { enabled: true, ring: "#0d9488" },
+    enter: { enabled: true, style: "fade" },
+    press: { enabled: true, translate: "translate-y-px" },
+  },
+};
+
+const EMPTY_DISCOVERY: DiscoveryOutput = {
+  productContext: "unknown",
+  contextDescription: "Run degraded before discovery completed.",
+  selectedReferences: [],
+  creativeSeed: "degraded-fallback",
+};
+
 /**
- * Picasso V6 pipeline core. Wired to the UI via `startPicassoAgentLoop`
+ * Picasso V7 pipeline core. Wired to the UI via `startPicassoAgentLoop`
  * (run.ts) or driven directly by tests with custom hooks.
  *
- * discovery → directions → tokens+motion → wireframe →
+ * V7 contract: every model-calling stage degrades instead of throwing past
+ * the pipeline boundary. A failed stage is recorded in `degradations`,
+ * surfaced in the final report, and the run returns `success: false` with
+ * whatever partial artifacts exist — a run never dies silently after money
+ * was already spent.
+ *
+ * discovery → directions → tokens+motion → wireframe (structure ∥ brand) →
  * content ∥ components (parallel) → screens (parallel) →
  * smoke/lint/anti-slop gates → [harden: E2B visual QA] → finalize
  */
@@ -88,10 +212,63 @@ export async function runPicassoPipeline(brief: Brief, config: PicassoRunConfig)
   const maxScreens = config.maxScreens ?? 3;
   const emit = hooks.emit;
 
+  const degradations: StageDegradation[] = [];
+  const failReason = (err: unknown): string => (err instanceof Error ? err.message : String(err));
+
+  /** Build a degraded-but-valid output for a failed stage. Never throws. */
+  const degrade = (
+    stage: string,
+    reason: string,
+    partial: Partial<PicassoPipelineOutput>,
+  ): PicassoPipelineOutput => {
+    degradations.push({ stage, reason });
+    emit("activity", { message: `${stage} stage failed — run degraded (${reason})` });
+    // Persist evidence even when the run cannot reach finalize, so a
+    // reviewer always has a doc saying which stage degraded and why.
+    try {
+      hooks.persistDoc(
+        "docs/review/Degradations.json",
+        "Stage Degradations",
+        "degradation",
+        JSON.stringify({ brief: brief.productName, generatedAt: new Date().toISOString(), degradations }, null, 2),
+      );
+    } catch { /* persistence must never mask the degradation */ }
+    return {
+      success: false,
+      report: "",
+      exportPath: "",
+      tokens: partial.tokens ?? fallbackTokens(brief),
+      globalsCSS: partial.globalsCSS ?? "",
+      layoutPlan: partial.layoutPlan ?? { screens: [], globalRegions: [], breakpoints: {} },
+      componentsManifest: partial.componentsManifest ?? { entries: [], generatedAt: new Date().toISOString() },
+      propContract: partial.propContract ?? { entries: [], generatedAt: new Date().toISOString() },
+      generatedComponents: partial.generatedComponents ?? {},
+      supportFiles: partial.supportFiles ?? {},
+      screenFiles: partial.screenFiles ?? {},
+      critiqueResults: partial.critiqueResults ?? [],
+      averageScore: partial.averageScore ?? 0,
+      passedAll: false,
+      antiSlopPassed: partial.antiSlopPassed ?? false,
+      smokeFailures: partial.smokeFailures ?? [stage],
+      discovery: partial.discovery ?? EMPTY_DISCOVERY,
+      architecture: partial.architecture ?? emptyArchitecture(brief),
+      content: partial.content ?? null,
+      motionSpec: partial.motionSpec ?? FALLBACK_MOTION_SPEC,
+      directions: partial.directions ?? [],
+      finalReport: partial.finalReport ?? null,
+      degradations,
+    };
+  };
+
   emit("phase", { phase: "discovery", status: "running" });
 
   // ══ STAGE 1: DISCOVERY ══
-  const discovery = await runDiscovery({ brief });
+  let discovery: DiscoveryOutput;
+  try {
+    discovery = await runDiscovery({ brief });
+  } catch (err) {
+    return degrade("discovery", failReason(err), {});
+  }
   emit("activity", { message: `${brief.productName} — ${discovery.productContext} context · seed: ${discovery.creativeSeed}` });
   await hooks.persistDoc("docs/brief/Brief.json", "Product Brief", "brief", JSON.stringify(brief, null, 2));
   await hooks.persistDoc("docs/planning/Discovery.json", "Discovery", "discovery", JSON.stringify(discovery, null, 2));
@@ -101,69 +278,82 @@ export async function runPicassoPipeline(brief: Brief, config: PicassoRunConfig)
 
   // ══ STAGE 2: DIRECTIONS + TOKENS + MOTION ══
   emit("phase", { phase: "design", status: "running" });
-  const megadesignContent = loadMegadesign();
-  const companyContents: Record<string, string> = {};
-  for (const ref of discovery.selectedReferences) {
-    try { companyContents[ref.slug] = loadCompanyDoc(ref.slug); } catch { /* skip */ }
+  let directions: Stage2Direction[];
+  let tokens: Tokens;
+  let globalsCSS = "";
+  let motionSpec = FALLBACK_MOTION_SPEC;
+  try {
+    const megadesignContent = loadMegadesign();
+    const companyContents: Record<string, string> = {};
+    for (const ref of discovery.selectedReferences) {
+      try { companyContents[ref.slug] = loadCompanyDoc(ref.slug); } catch { /* skip */ }
+    }
+
+    directions = await generateDirectionsWithRetry({
+      brief,
+      references: discovery.selectedReferences,
+      megadesignContent,
+      companyContents,
+      creativeSeed: discovery.creativeSeed,
+    });
+    const divergence = validateDivergence(directions);
+    const selection = selectBestDirection(directions, brief);
+    const chosen = selection.chosen;
+    emit("activity", { message: `Direction: "${chosen.name}" — ${selection.rationale} (divergence ${divergence.divergenceScore}/6)` });
+    await hooks.persistDoc("docs/design/CreativeDirections.json", "Creative Directions", "creative-directions", JSON.stringify({
+      allDirections: directions,
+      chosen,
+      chosenIndex: selection.chosenIndex,
+      rationale: selection.rationale,
+      divergenceResult: divergence,
+    }, null, 2));
+
+    const direction = {
+      name: chosen.name,
+      summary: chosen.summary,
+      influences: discovery.selectedReferences.map((r) => r.name),
+      paletteDirection: `${chosen.accentColor} — ${chosen.surfaces}`,
+      densityFit: chosen.spacing === "airy" ? "low" as const : chosen.spacing === "dense" ? "high" as const : "medium" as const,
+    };
+
+    tokens = await generateEnhancedTokens({
+      brief,
+      direction,
+      stage2Directions: directions,
+      megadesignContent,
+      companyContents,
+      contextDescription: discovery.contextDescription,
+      creativeSeed: discovery.creativeSeed,
+    });
+    globalsCSS = generateTokensCSS(tokens);
+    motionSpec = generateMotionSpec(direction, brief, tokens);
+    const tailwindConfig = generateTailwindConfig();
+
+    emit("activity", { message: `Design system: ${tokens.meta.brand} · accent ${tokens.color.accent["500"]} · ${tokens.typography.fontFamily.display} · ${motionSpec.character} motion` });
+    await hooks.persistDoc("docs/design/DesignTokens.json", "Design Tokens", "design-tokens", JSON.stringify(tokens, null, 2));
+    await hooks.persistDoc("docs/design/MotionSpec.json", "Motion Spec", "motion-spec", JSON.stringify(motionSpec, null, 2));
+    await hooks.persistFile("src/globals.css", "style", globalsCSS);
+    await hooks.persistFile("tokens/tokens.css", "build", globalsCSS);
+    await hooks.persistDoc("docs/design/TailwindConfig.json", "Tailwind Config", "build", JSON.stringify({ note: tailwindConfig }, null, 2));
+  } catch (err) {
+    return degrade("design", failReason(err), { discovery });
   }
-
-  const directions = await generateDirectionsWithRetry({
-    brief,
-    references: discovery.selectedReferences,
-    megadesignContent,
-    companyContents,
-    creativeSeed: discovery.creativeSeed,
-  });
-  const divergence = validateDivergence(directions);
-  const selection = selectBestDirection(directions, brief);
-  const chosen = selection.chosen;
-  emit("activity", { message: `Direction: "${chosen.name}" — ${selection.rationale} (divergence ${divergence.divergenceScore}/6)` });
-  await hooks.persistDoc("docs/design/CreativeDirections.json", "Creative Directions", "creative-directions", JSON.stringify({
-    allDirections: directions,
-    chosen,
-    chosenIndex: selection.chosenIndex,
-    rationale: selection.rationale,
-    divergenceResult: divergence,
-  }, null, 2));
-
-  const direction = {
-    name: chosen.name,
-    summary: chosen.summary,
-    influences: discovery.selectedReferences.map((r) => r.name),
-    paletteDirection: `${chosen.accentColor} — ${chosen.surfaces}`,
-    densityFit: chosen.spacing === "airy" ? "low" as const : chosen.spacing === "dense" ? "high" as const : "medium" as const,
-  };
-
-  const tokens = await generateEnhancedTokens({
-    brief,
-    direction,
-    stage2Directions: directions,
-    megadesignContent,
-    companyContents,
-    contextDescription: discovery.contextDescription,
-    creativeSeed: discovery.creativeSeed,
-  });
-  const globalsCSS = generateTokensCSS(tokens);
-  const motionSpec = generateMotionSpec(direction, brief, tokens);
-  const tailwindConfig = generateTailwindConfig();
-
-  emit("activity", { message: `Design system: ${tokens.meta.brand} · accent ${tokens.color.accent["500"]} · ${tokens.typography.fontFamily.display} · ${motionSpec.character} motion` });
-  await hooks.persistDoc("docs/design/DesignTokens.json", "Design Tokens", "design-tokens", JSON.stringify(tokens, null, 2));
-  await hooks.persistDoc("docs/design/MotionSpec.json", "Motion Spec", "motion-spec", JSON.stringify(motionSpec, null, 2));
-  await hooks.persistFile("src/globals.css", "style", globalsCSS);
-  await hooks.persistFile("tokens/tokens.css", "build", globalsCSS);
-  await hooks.persistDoc("docs/design/TailwindConfig.json", "Tailwind Config", "build", JSON.stringify({ note: tailwindConfig }, null, 2));
   emit("phase", { phase: "design", status: "done" });
 
-  // ══ STAGE 3: WIREFRAME (layout + manifest + brand kit) ══
+  // ══ STAGE 3: WIREFRAME (structure call + brandKit/UX call) ══
   emit("phase", { phase: "wireframe", status: "running" });
-  const architecture = await runArchitecture({
-    brief,
-    tokens,
-    productContext: discovery.productContext as ProductContext,
-    creativeSeed: discovery.creativeSeed,
-    contextDescription: discovery.contextDescription,
-  });
+  let architecture: ArchitectureOutput;
+  try {
+    architecture = await runArchitecture({
+      brief,
+      tokens,
+      productContext: discovery.productContext as ProductContext,
+      creativeSeed: discovery.creativeSeed,
+      contextDescription: discovery.contextDescription,
+    });
+  } catch (err) {
+    return degrade("wireframe", failReason(err), { discovery, tokens, globalsCSS, motionSpec, directions });
+  }
   const layoutPlan: LayoutPlan = architecture.layoutPlan;
   if (layoutPlan.screens.length > maxScreens) {
     layoutPlan.screens = layoutPlan.screens.slice(0, maxScreens);
@@ -192,7 +382,11 @@ export async function runPicassoPipeline(brief: Brief, config: PicassoRunConfig)
       emit("activity", { message: `Content generation failed (${err instanceof Error ? err.message : err})` });
       return null;
     }),
-    generateAllComponents(componentsManifest, tokens, brief, discovery.creativeSeed, 4),
+    generateAllComponents(componentsManifest, tokens, brief, discovery.creativeSeed, 4).catch((err) => {
+      degradations.push({ stage: "build", reason: `Component generation failed: ${failReason(err)}` });
+      emit("activity", { message: `Component generation failed (${failReason(err)}) — composing with plain HTML` });
+      return {};
+    }),
   ]);
 
   if (content) {
@@ -214,18 +408,25 @@ export async function runPicassoPipeline(brief: Brief, config: PicassoRunConfig)
 
   // ══ STAGE 5: SCREENS (parallel per-screen) ══
   emit("phase", { phase: "assemble", status: "running" });
-  const screenFiles = await composeAllScreens({
-    layoutPlan,
-    components: generatedComponents,
-    tokens,
-    data: content?.data ?? { itemCount: 0, metrics: [], items: [], screens: {} },
-    copy: content?.copy ?? { screens: {} },
-    productContext: discovery.productContext as ProductContext,
-    propContract,
-    brief,
-    creativeSeed: discovery.creativeSeed,
-    onProgress: (name, i, total) => emit("activity", { message: `Composed ${name} (${i}/${total})` }),
-  });
+  let screenFiles: Record<string, string>;
+  try {
+    screenFiles = await composeAllScreens({
+      layoutPlan,
+      components: generatedComponents,
+      tokens,
+      data: content?.data ?? { itemCount: 0, metrics: [], items: [], screens: {} },
+      copy: content?.copy ?? { screens: {} },
+      productContext: discovery.productContext as ProductContext,
+      propContract,
+      brief,
+      creativeSeed: discovery.creativeSeed,
+      onProgress: (name, i, total) => emit("activity", { message: `Composed ${name} (${i}/${total})` }),
+    });
+  } catch (err) {
+    degradations.push({ stage: "assemble", reason: `Screen composition failed: ${failReason(err)}` });
+    emit("activity", { message: `Screen composition failed (${failReason(err)})` });
+    screenFiles = {};
+  }
 
   for (const [id, code] of Object.entries(screenFiles)) {
     await hooks.persistFile(`src/screens/${id}.tsx`, "screen", code);
@@ -318,7 +519,8 @@ export async function runPicassoPipeline(brief: Brief, config: PicassoRunConfig)
       }
       await hooks.persistDoc("docs/review/CritiqueResults.json", "Critique Results", "critique-results", JSON.stringify(visualQA.results, null, 2));
     } catch (err) {
-      emit("activity", { message: `Visual QA unavailable (${err instanceof Error ? err.message : String(err)})` });
+      degradations.push({ stage: "visual-qa", reason: `Visual QA did not run: ${failReason(err)}` });
+      emit("activity", { message: `Visual QA unavailable (${failReason(err)})` });
     }
     emit("phase", { phase: "review", status: passedAll ? "done" : "error" });
   }
@@ -341,13 +543,15 @@ export async function runPicassoPipeline(brief: Brief, config: PicassoRunConfig)
       contentReport: content
         ? { dataItemCount: content.data.itemCount, copyScreenCount: Object.keys(content.copy.screens).length, hasSlop: !content.coherenceReport.valid || !antiSlopResult.passed }
         : { dataItemCount: 0, copyScreenCount: 0, hasSlop: true },
+      degradations: degradations.map((d) => `${d.stage}: ${d.reason}`),
     });
     await hooks.persistDoc("docs/review/FinalReport.md", "Final Report", "final-report", finalReport.summaryMarkdown);
   } catch (err) {
-    emit("activity", { message: `Finalize failed (${err instanceof Error ? err.message : String(err)})` });
+    degradations.push({ stage: "finalize", reason: `Finalize failed: ${failReason(err)}` });
+    emit("activity", { message: `Finalize failed (${failReason(err)})` });
   }
 
-  const success = smokeFailures.length === 0 && antiSlopResult.passed && (mode === "draft" || passedAll);
+  const success = degradations.length === 0 && smokeFailures.length === 0 && antiSlopResult.passed && (mode === "draft" || passedAll);
 
   return {
     success,
@@ -372,11 +576,15 @@ export async function runPicassoPipeline(brief: Brief, config: PicassoRunConfig)
     motionSpec,
     directions,
     finalReport,
+    degradations,
   };
 }
 
 export { loadMegadesign, loadCompanyDoc };
 export const PICASSO_OUTPUT_BASE = path.resolve(__dirname, "../output");
+
+/** Exported for tests/consumers that need a structurally valid token set. */
+export { fallbackTokens };
 
 export function outputBaseDir(): string {
   fs.mkdirSync(PICASSO_OUTPUT_BASE, { recursive: true });

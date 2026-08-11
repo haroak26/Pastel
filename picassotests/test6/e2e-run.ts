@@ -1,11 +1,16 @@
 /**
- * Picasso V6 — Generic E2E Acceptance Harness
+ * Picasso V7 — Generic E2E Acceptance Harness
  *
  * This harness is NOT product-specific: the brief comes from the environment
  * (or CLI arg), never hardcoded. Its primary role is proving the PIPELINE
  * works end-to-end: runs complete without errors, every composed screen
  * RENDERS in the E2B sandbox, gates pass, and (with a matrix) runs stay
  * structurally distinct.
+ *
+ * V7: a run that aborts partway is NOT a silent failure — `run-summary.json`
+ * is still written (status "aborted", stage reached, model calls + cost), and
+ * the issues report lists the run with the abort error instead of the opaque
+ * "Run never completed" block.
  *
  * Inputs (all optional, no hardcoded briefs/keys anywhere):
  *   PASTEL_E2E_BRIEF   — JSON: { productName, description, audience?, niche?,
@@ -92,10 +97,13 @@ interface RunOutcome {
   modelCalls: number;
   totalCredits: number;
   totalDollars: number;
-  output: PicassoPipelineOutput;
+  output: PicassoPipelineOutput | null;
   screensRendered: string[];
   renderErrors: string[];
   layoutSignature: Record<string, unknown>;
+  /** V7: set when the pipeline threw partway — the run still gets a summary
+   *  file and a report entry, so partial progress and cost are never lost. */
+  aborted?: { stage: string; error: string };
 }
 
 async function runOnce(brief: Brief, index: number): Promise<RunOutcome> {
@@ -107,92 +115,115 @@ async function runOnce(brief: Brief, index: number): Promise<RunOutcome> {
   const started = Date.now();
   const screensRendered: string[] = [];
   const renderErrors: string[] = [];
+  // Track the furthest pipeline phase reached so an abort is diagnosable.
+  let lastPhase = "init";
 
-  const output = await runPicassoPipeline(brief, {
-    projectId: runId,
-    mode: MODE,
-    maxScreens: MAX_SCREENS,
-    hooks: {
-      emit: () => {},
-      persistDoc: (p, _t, _k, content) => {
-        const file = path.join(runDir, p);
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, content);
-      },
-      persistFile: (p, _k, content) => {
-        const file = path.join(runDir, p);
-        fs.mkdirSync(path.dirname(file), { recursive: true });
-        fs.writeFileSync(file, content);
-      },
-    },
-  });
+  let output: PicassoPipelineOutput | null = null;
+  let aborted: { stage: string; error: string } | undefined;
 
-  // ── PRIMARY ASSERTION: every composed screen renders in E2B ─────────────
-  const compiled = await compileStylesForRun({
-    globalsCSS: output.globalsCSS,
-    components: output.generatedComponents,
-    screens: output.screenFiles,
-    support: output.supportFiles,
-  });
-  if (compiled) {
-    const warm = await getWarmSandbox();
-    const fonts = [
-      output.tokens.typography.fontFamily.display,
-      output.tokens.typography.fontFamily.body,
-      output.tokens.typography.fontFamily.mono,
-    ];
-    for (const [id, code] of Object.entries(output.screenFiles)) {
-      const bundle = await bundleScreenForPreview(id, code, output.generatedComponents, output.supportFiles);
-      if (!bundle) {
-        renderErrors.push(`${id}: bundle failed`);
-        continue;
+  try {
+    output = await runPicassoPipeline(brief, {
+      projectId: runId,
+      mode: MODE,
+      maxScreens: MAX_SCREENS,
+      hooks: {
+        emit: (type, payload) => {
+          if (type === "phase" && payload.status === "running") {
+            lastPhase = String(payload.phase ?? lastPhase);
+          }
+        },
+        persistDoc: (p, _t, _k, content) => {
+          const file = path.join(runDir, p);
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          fs.writeFileSync(file, content);
+        },
+        persistFile: (p, _k, content) => {
+          const file = path.join(runDir, p);
+          fs.mkdirSync(path.dirname(file), { recursive: true });
+          fs.writeFileSync(file, content);
+        },
+      },
+    });
+
+    // ── PRIMARY ASSERTION: every composed screen renders in E2B ─────────────
+    const compiled = await compileStylesForRun({
+      globalsCSS: output.globalsCSS,
+      components: output.generatedComponents,
+      screens: output.screenFiles,
+      support: output.supportFiles,
+    });
+    if (compiled) {
+      const warm = await getWarmSandbox();
+      const fonts = [
+        output.tokens.typography.fontFamily.display,
+        output.tokens.typography.fontFamily.body,
+        output.tokens.typography.fontFamily.mono,
+      ];
+      for (const [id, code] of Object.entries(output.screenFiles)) {
+        const bundle = await bundleScreenForPreview(id, code, output.generatedComponents, output.supportFiles);
+        if (!bundle) {
+          renderErrors.push(`${id}: bundle failed`);
+          continue;
+        }
+        const html = buildPreviewHtml(id, bundle, compiled, fonts);
+        const result = await renderScreen({ html, screenName: id, warmSandbox: warm });
+        if (result.screenshot) {
+          fs.writeFileSync(path.join(runDir, "screenshots", `${id}.png`), result.screenshot);
+          screensRendered.push(id);
+        } else {
+          renderErrors.push(`${id}: ${result.errors.join("; ")}`);
+        }
       }
-      const html = buildPreviewHtml(id, bundle, compiled, fonts);
-      const result = await renderScreen({ html, screenName: id, warmSandbox: warm });
-      if (result.screenshot) {
-        fs.writeFileSync(path.join(runDir, "screenshots", `${id}.png`), result.screenshot);
-        screensRendered.push(id);
-      } else {
-        renderErrors.push(`${id}: ${result.errors.join("; ")}`);
-      }
+    } else {
+      renderErrors.push("styles: tailwind compilation failed");
     }
-  } else {
-    renderErrors.push("styles: tailwind compilation failed");
+  } catch (err) {
+    aborted = {
+      stage: lastPhase,
+      error: err instanceof Error ? `${err.message}\n\n${err.stack ?? ""}` : String(err),
+    };
+    console.error(`  [${runId}] pipeline aborted at stage "${lastPhase}": ${err instanceof Error ? err.message : err}`);
   }
 
+  // ── V7: the ledger is drained and the summary is ALWAYS written, even on
+  // a partway abort — cost visibility is never discarded. ──
   const ledger = ledgerFromUsage(usageRecords.splice(0));
   const wallMs = Date.now() - started;
 
-  const layoutSignature = {
-    mode: brief.mode,
-    screens: output.layoutPlan.screens.map((s) => ({
-      id: s.id,
-      regions: s.regions.map((r) => `${r.role}:${r.hierarchy}:${r.componentTypes.map((c) => c.name).join("+")}`),
-      dominant: s.dominantMoment,
-    })),
-    accent: output.tokens.color.accent["500"],
-    radius: output.tokens.radius.lg,
-    seed: output.tokens.meta.seed,
-  };
+  const layoutSignature = output
+    ? {
+        mode: brief.mode,
+        screens: output.layoutPlan.screens.map((s) => ({
+          id: s.id,
+          regions: s.regions.map((r) => `${r.role}:${r.hierarchy}:${r.componentTypes.map((c) => c.name).join("+")}`),
+          dominant: s.dominantMoment,
+        })),
+        accent: output.tokens.color.accent["500"],
+        radius: output.tokens.radius.lg,
+        seed: output.tokens.meta.seed,
+      }
+    : { mode: brief.mode, screens: [], accent: "none", radius: "none", seed: "none", stageReached: lastPhase };
 
   fs.writeFileSync(path.join(runDir, "run-summary.json"), JSON.stringify({
     runId,
-    status: output.success ? "done" : "needs_review",
+    status: aborted ? "aborted" : output?.success ? "done" : "needs_review",
+    stageReached: lastPhase,
+    ...(aborted ? { error: aborted.error } : {}),
     wallSeconds: wallMs / 1000,
     modelCalls: ledger.entries.length,
     totalCredits: ledger.totalCredits,
     totalDollars: ledger.totalDollars,
-    screens: Object.keys(output.screenFiles),
+    screens: output ? Object.keys(output.screenFiles) : [],
     screensRendered,
     renderErrors,
-    smokeFailures: output.smokeFailures,
-    antiSlopPassed: output.antiSlopPassed,
-    averageScore: output.averageScore,
-    passedAll: output.passedAll,
+    smokeFailures: output?.smokeFailures ?? [],
+    antiSlopPassed: output?.antiSlopPassed ?? false,
+    averageScore: output?.averageScore ?? 0,
+    passedAll: output?.passedAll ?? false,
     layoutSignature,
   }, null, 2));
 
-  console.log(`[${runId}] ${brief.productName} — ${(wallMs / 1000).toFixed(1)}s · ${ledger.entries.length} calls · $${ledger.totalDollars.toFixed(4)} · screens=${Object.keys(output.screenFiles).length} rendered=${screensRendered.length} · QA=${output.averageScore}/10`);
+  console.log(`[${runId}] ${brief.productName} — ${(wallMs / 1000).toFixed(1)}s · ${ledger.entries.length} calls · $${ledger.totalDollars.toFixed(4)} · ${aborted ? `ABORTED at ${aborted.stage}` : `screens=${Object.keys(output!.screenFiles).length} rendered=${screensRendered.length} · QA=${output!.averageScore}/10`}`);
 
   return {
     runId,
@@ -206,6 +237,7 @@ async function runOnce(brief: Brief, index: number): Promise<RunOutcome> {
     screensRendered,
     renderErrors,
     layoutSignature,
+    ...(aborted ? { aborted } : {}),
   };
 }
 
@@ -239,13 +271,17 @@ function distinctnessCheck(runs: RunOutcome[], threshold = 0.7): { ok: boolean; 
 // ── Assertions ───────────────────────────────────────────────────────────
 
 function runAssertions(run: RunOutcome): Array<[boolean, string]> {
+  if (!run.output) {
+    return [[false, `run completed (aborted at "${run.aborted?.stage}": ${mdEscape(run.aborted?.error ?? "unknown error").slice(0, 300)})`]];
+  }
+  const output = run.output;
   const checks: Array<[boolean, string]> = [
-    [run.output.screenFiles && Object.keys(run.output.screenFiles).length >= 1, `at least 1 screen composed (got ${Object.keys(run.output.screenFiles ?? {}).length})`],
-    [run.output.smokeFailures.length === 0, `no smoke failures (got ${run.output.smokeFailures.length})`],
-    [run.output.antiSlopPassed, "anti-slop gate passed"],
-    [run.screensRendered.length >= 1, `screens rendered in E2B (${run.screensRendered.length} of ${Object.keys(run.output.screenFiles ?? {}).length})`],
+    [output.screenFiles && Object.keys(output.screenFiles).length >= 1, `at least 1 screen composed (got ${Object.keys(output.screenFiles ?? {}).length})`],
+    [output.smokeFailures.length === 0, `no smoke failures (got ${output.smokeFailures.length})`],
+    [output.antiSlopPassed, "anti-slop gate passed"],
+    [run.screensRendered.length >= 1, `screens rendered in E2B (${run.screensRendered.length} of ${Object.keys(output.screenFiles ?? {}).length})`],
     [run.renderErrors.length === 0, `no render errors (${run.renderErrors.join("; ") || "none"})`],
-    [run.output.passedAll || MODE === "draft", MODE === "draft" ? "draft mode (QA skipped)" : `visual QA passed (${run.output.averageScore}/10)`],
+    [output.passedAll || MODE === "draft", MODE === "draft" ? "draft mode (QA skipped)" : `visual QA passed (${output.averageScore}/10)`],
     [run.wallMs < 420_000, `wall time budget (${(run.wallMs / 1000).toFixed(1)}s < 420s)`],
     [run.totalCredits < 80, `credit budget (${run.totalCredits.toFixed(2)} < 80)`],
   ];
@@ -261,7 +297,7 @@ function mdEscape(s: string): string {
 function writeIssuesMd(runs: RunOutcome[], failed: boolean, abortError?: string): void {
   const issuesPath = path.resolve(__dirname, "ISSUES.md");
   const lines: string[] = [];
-  lines.push(`# Picasso V6 E2E — Issues Report`);
+  lines.push(`# Picasso V7 E2E — Issues Report`);
   lines.push("");
   lines.push(`**Date:** ${new Date().toISOString()} · **Mode:** ${MODE} · **Max screens:** ${MAX_SCREENS} · **Overall:** ${failed ? "FAILURES PRESENT" : "ALL ASSERTIONS PASSED"}`);
   lines.push("");
@@ -286,10 +322,28 @@ function writeIssuesMd(runs: RunOutcome[], failed: boolean, abortError?: string)
   for (const run of runs) {
     lines.push(`## ${run.runId} — ${mdEscape(run.brief.productName)}`);
     lines.push("");
-    lines.push(`- **Status:** ${run.output.success ? "done" : "needs_review"} · ${(run.wallMs / 1000).toFixed(1)}s · ${run.modelCalls} model calls · $${run.totalDollars.toFixed(4)} (${run.totalCredits.toFixed(2)} credits)`);
-    lines.push(`- **Screens composed:** ${Object.keys(run.output.screenFiles).length} (${Object.keys(run.output.screenFiles).join(", ") || "none"})`);
+
+    if (run.aborted) {
+      // V7: an aborted run still reports how far it got and what it cost.
+      lines.push(`- **Status:** aborted · reached stage **"${mdEscape(run.aborted.stage)}"** · ${(run.wallMs / 1000).toFixed(1)}s · ${run.modelCalls} model calls · $${run.totalDollars.toFixed(4)} (${run.totalCredits.toFixed(2)} credits)`);
+      lines.push(`- **Screens composed:** 0 · **Screens rendered (E2B):** 0`);
+      lines.push("");
+      lines.push("### Abort error");
+      lines.push("");
+      lines.push("```");
+      lines.push(run.aborted.error.slice(0, 3000));
+      lines.push("```");
+      lines.push("");
+      continue;
+    }
+
+    lines.push(`- **Status:** ${run.output!.success ? "done" : "needs_review"} · ${(run.wallMs / 1000).toFixed(1)}s · ${run.modelCalls} model calls · $${run.totalDollars.toFixed(4)} (${run.totalCredits.toFixed(2)} credits)`);
+    lines.push(`- **Screens composed:** ${Object.keys(run.output!.screenFiles).length} (${Object.keys(run.output!.screenFiles).join(", ") || "none"})`);
     lines.push(`- **Screens rendered (E2B):** ${run.screensRendered.length} — ${run.screensRendered.join(", ") || "none"}`);
-    lines.push(`- **Anti-slop gate:** ${run.output.antiSlopPassed ? "PASSED" : "FAILED"} · **Visual QA:** ${run.output.averageScore.toFixed(1)}/10 avg · **passedAll:** ${run.output.passedAll}`);
+    lines.push(`- **Anti-slop gate:** ${run.output!.antiSlopPassed ? "PASSED" : "FAILED"} · **Visual QA:** ${run.output!.averageScore.toFixed(1)}/10 avg · **passedAll:** ${run.output!.passedAll}`);
+    if (run.output!.degradations?.length) {
+      lines.push(`- **Degradations:** ${run.output!.degradations.map((d) => mdEscape(`${d.stage} (${d.reason})`)).join("; ")}`);
+    }
     lines.push("");
 
     const issues: string[] = [];
@@ -297,12 +351,12 @@ function writeIssuesMd(runs: RunOutcome[], failed: boolean, abortError?: string)
       issues.push("### Render errors (E2B sandbox)");
       for (const e of run.renderErrors) issues.push(`- ${mdEscape(e)}`);
     }
-    if (run.output.smokeFailures.length) {
+    if (run.output!.smokeFailures.length) {
       issues.push("### Smoke failures");
-      for (const s of run.output.smokeFailures) issues.push(`- ${mdEscape(s)}`);
+      for (const s of run.output!.smokeFailures) issues.push(`- ${mdEscape(s)}`);
     }
-    if (run.output.critiqueResults.length) {
-      const failing = run.output.critiqueResults.filter((r) => !r.passed);
+    if (run.output!.critiqueResults.length) {
+      const failing = run.output!.critiqueResults.filter((r) => !r.passed);
       if (failing.length) {
         issues.push("### Visual QA defects (blocking)");
         for (const r of failing) {
@@ -333,7 +387,7 @@ function writeIssuesMd(runs: RunOutcome[], failed: boolean, abortError?: string)
 
 async function main() {
   console.log("═".repeat(64));
-  console.log(`Picasso V6 E2E — ${MODE.toUpperCase()} mode · ${new Date().toISOString()}`);
+  console.log(`Picasso V7 E2E — ${MODE.toUpperCase()} mode · ${new Date().toISOString()}`);
   console.log("═".repeat(64));
 
   fs.mkdirSync(OUT_DIR, { recursive: true });
@@ -363,7 +417,13 @@ async function main() {
     const b = briefs[i];
     console.log(`\n── Run ${i + 1}/${briefs.length}: ${b.productName}`);
     try {
-      runs.push(await runOnce(b, i + 1));
+      const outcome = await runOnce(b, i + 1);
+      runs.push(outcome);
+      if (outcome.aborted) {
+        exit = 1;
+        console.error("  ABORT: stopping after failed run — not starting another brief.");
+        break;
+      }
     } catch (err) {
       abortError = err instanceof Error ? `${err.stack ?? err.message}\n\n${err.message}` : String(err);
       console.error(`  RUN FAILED: ${err instanceof Error ? err.stack : err}`);

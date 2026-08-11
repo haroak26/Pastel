@@ -16,11 +16,14 @@ export interface DiscoveryOutput {
   creativeSeed: string;
 }
 
+// V7: prose fields carry deterministic defaults so a dropped trailing field
+// can never abort the whole pipeline. productContext/selectedReferences stay
+// required — they drive downstream structure.
 const discoverySchema = z.object({
   productContext: z.enum(["app", "landing", "docs", "social", "unknown"]),
-  contextDescription: z.string().min(10).max(400),
-  selectedReferences: z.array(z.string()).max(2),
-  creativeSeed: z.string().min(4).max(80),
+  contextDescription: z.string().max(400).default("The product's dominant moment is its primary workflow, surfaced immediately on entry."),
+  selectedReferences: z.array(z.string()).max(2).default([]),
+  creativeSeed: z.string().max(80).default("a fresh, product-specific creative angle"),
 });
 
 const DISCOVERY_SYSTEM = `You are the discovery lead of a product-design studio. You read a one-paragraph brief and return the product's true shape and a creative seed.

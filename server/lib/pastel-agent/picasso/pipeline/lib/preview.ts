@@ -41,7 +41,45 @@ function normalizeImports(code: string): string {
     .replace(/from\s+["'](?:@\/|\.\.\/)hooks\/([^"']+)["']/g, (_m, name: string) => `from "./${kebab(name)}"`);
 }
 
-function virtualFsPlugin(files: Record<string, string>, resolvePackage: (id: string) => string) {
+/**
+ * Scan every VFS source for local imports that point at a module which is NOT
+ * in the file set (e.g. a component that imports "./separator" when the
+ * manifest never built a separator). Collects the exact named exports each
+ * importer expects so the stub module can provide them — the UI code is left
+ * untouched, only the missing module gets synthesized.
+ */
+function collectStubExports(vfs: Record<string, string>): Map<string, Set<string>> {
+  const existing = new Set<string>();
+  for (const p of Object.keys(vfs)) {
+    for (const ext of ["", ".tsx", ".jsx", ".ts", ".js", "/index.tsx"]) existing.add(path.posix.normalize(p) + ext);
+  }
+  const stubExports = new Map<string, Set<string>>();
+  const namedRe = /import\s+(?:type\s+)?(?:[\w$]+\s*,?\s*)?\{([\s\S]*?)\}\s*from\s+["'](\.[^"']+)["']/g;
+  for (const [file, code] of Object.entries(vfs)) {
+    const dir = path.posix.dirname(file);
+    let m: RegExpExecArray | null;
+    while ((m = namedRe.exec(code))) {
+      const key = path.posix.normalize(path.posix.join(dir, m[2]));
+      if (existing.has(key)) continue;
+      const names = m[1]
+        .split(",")
+        .map((s) => s.trim())
+        .filter(Boolean)
+        .map((s) => s.split(/\s+as\s+/)[0].trim())
+        .filter((s) => s && s !== "default" && !s.includes(":"));
+      if (!names.length) continue;
+      if (!stubExports.has(key)) stubExports.set(key, new Set());
+      for (const n of names) stubExports.get(key)!.add(n);
+    }
+  }
+  return stubExports;
+}
+
+function virtualFsPlugin(
+  files: Record<string, string>,
+  resolvePackage: (id: string) => string,
+  stubExports: Map<string, Set<string>> = new Map(),
+) {
   const normalized = new Map<string, string>();
   for (const [p, content] of Object.entries(files)) {
     normalized.set(path.posix.normalize(p), content);
@@ -112,7 +150,12 @@ function virtualFsPlugin(files: Record<string, string>, resolvePackage: (id: str
       });
 
       build.onLoad({ filter: /.*/, namespace: "picasso-stub" }, (args: any) => {
+        const key = args.path.replace(/^picasso:/, "");
         const name = path.posix.basename(args.path).replace(/\.[^.]+$/, "");
+        const extra = stubExports.get(key);
+        const named = extra && extra.size
+          ? [...extra].map((n) => `export const ${n} = Stub;`).join("\n")
+          : `export { Stub as ${name} };`;
         return {
           contents: `
 import React from "react";
@@ -120,7 +163,7 @@ const Stub = React.forwardRef((props, ref) =>
   React.createElement("div", { ref, className: props.className, style: props.style }, props.children)
 );
 export default Stub;
-export { Stub as ${name} };
+${named}
 `,
           loader: "jsx",
           resolveDir: "/",
@@ -145,7 +188,6 @@ export async function bundleScreenForPreview(
 ): Promise<string | null> {
   const { build } = await import("esbuild");
   const resolvePackage = (id: string) => _require.resolve(id);
-
   const vfs: Record<string, string> = {
     "src/screen.tsx": normalizeImports(screenCode),
     "src/cn.ts": supportFiles["cn"] ?? `export function cn(...args: any[]) { return args.filter(Boolean).join(" "); }`,
@@ -171,6 +213,8 @@ export async function bundleScreenForPreview(
     vfs[`src/${kebab(name)}.ts`] = normalizeImports(code);
   }
 
+  const stubExports = collectStubExports(vfs);
+
   try {
     const result = await build({
       entryPoints: ["src/__entry__.tsx"],
@@ -182,7 +226,7 @@ export async function bundleScreenForPreview(
       target: "es2020",
       logLevel: "silent",
       define: { "process.env.NODE_ENV": '"production"' },
-      plugins: [virtualFsPlugin(vfs, resolvePackage)],
+      plugins: [virtualFsPlugin(vfs, resolvePackage, stubExports)],
     });
     const text = result.outputFiles?.[0]?.text ?? "";
     return text.length > 100 ? text : null;

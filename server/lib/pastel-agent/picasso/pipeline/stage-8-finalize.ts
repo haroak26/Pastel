@@ -21,6 +21,9 @@ export interface FinalizeInputV2 {
   brandKit?: Record<string, unknown>;
   visualQAResults?: { averageScore: number; blockingDefects: Array<{ screen: string; defects: string[] }> };
   contentReport?: { dataItemCount: number; copyScreenCount: number; hasSlop: boolean };
+  /** V7: stages that degraded instead of aborting ("stage: reason"). A
+   *  degraded run must be visibly distinct from a clean one in the report. */
+  degradations?: string[];
 }
 
 export interface FinalizeReportV2 {
@@ -191,12 +194,15 @@ export async function finalize(input: FinalizeInputV2): Promise<FinalizeReportV2
 function buildReport(input: FinalizeInputV2): FinalizeReportV2 {
   const { brief, tokens, generatedFiles, screenFiles, critiqueResults, manifest } = input;
 
+  const degradations = input.degradations ?? [];
+  const degradedStages = new Set(degradations.map((d) => d.split(":")[0]?.trim()));
+
   const briefValidated = !!brief.productName && !!brief.niche && brief.personality.length > 0;
-  const tokenGatePassed = true; // tokens are schema-validated upstream
-  const componentGatePassed = manifest.entries.length >= 8 && Object.keys(generatedFiles).length >= 6;
-  const screenGatePassed = input.visualQAResults
+  const tokenGatePassed = !degradedStages.has("design");
+  const componentGatePassed = !degradedStages.has("build") && manifest.entries.length >= 8 && Object.keys(generatedFiles).length >= 6;
+  const screenGatePassed = !degradedStages.has("assemble") && (input.visualQAResults
     ? input.visualQAResults.averageScore >= 7 && input.visualQAResults.blockingDefects.length === 0
-    : critiqueResults.filter((r) => r.passed).length >= 1;
+    : critiqueResults.filter((r) => r.passed).length >= 1);
   const antiSlopGatePassed = input.contentReport ? !input.contentReport.hasSlop : true;
 
   const avg = critiqueResults.length
@@ -206,7 +212,7 @@ function buildReport(input: FinalizeInputV2): FinalizeReportV2 {
   const blockingDefects = input.visualQAResults?.blockingDefects.flatMap((b) => b.defects) ?? [];
 
   const lines: string[] = [
-    `# ${brief.productName} — Picasso V6 Report`,
+    `# ${brief.productName} — Picasso V7 Report`,
     ``,
     `**${screenFiles ? Object.keys(screenFiles).length : 0} screens · ${Object.keys(generatedFiles).length} components · ${Object.keys(manifest.entries).length} manifest entries**`,
     ``,
@@ -219,6 +225,20 @@ function buildReport(input: FinalizeInputV2): FinalizeReportV2 {
     `| Screens | ${screenGatePassed ? "PASS" : "FAIL"} |`,
     `| Anti-slop | ${antiSlopGatePassed ? "PASS" : "FAIL"} |`,
     ``,
+  ];
+
+  if (degradations.length) {
+    lines.push(
+      `## Degradations`,
+      ``,
+      `This run did NOT complete cleanly. The following stage(s) degraded and the run continued (or stopped) without those artifacts:`,
+      ``,
+      ...degradations.map((d) => `- ${d}`),
+      ``,
+    );
+  }
+
+  lines.push(
     `## Visual critique`,
     avg > 0 ? `Average: **${avg}/10** — ${passedScreens}/${critiqueResults.length} screens passed.` : `(no visual critique)`,
     ...(blockingDefects.length ? [`Blocking defects: ${blockingDefects.join("; ")}`] : []),
@@ -229,7 +249,7 @@ function buildReport(input: FinalizeInputV2): FinalizeReportV2 {
     `- Fonts: ${tokens.typography.fontFamily.display} / ${tokens.typography.fontFamily.body}`,
     `- Seed: ${tokens.meta.seed}`,
     ``,
-  ];
+  );
 
   return {
     componentCount: Object.keys(generatedFiles).length,

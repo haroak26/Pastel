@@ -32,7 +32,7 @@ export interface ContentOutput {
 
 const contentSchema = z.object({
   data: z.object({
-    itemCount: z.number().min(1),
+    itemCount: z.coerce.number().min(1),
     metrics: z.array(z.object({
       label: z.string(),
       value: z.string(),
@@ -190,12 +190,66 @@ export function validateComponentCode(code: string, entry: ComponentManifestEntr
     errors.push("Byte-identical to the base shadcn component — customize sizing, colours, rounding for this product");
   }
 
+  // V7 divergence bar: primitives (button, input, label…) may stay close to
+  // base — generic chrome is correct. Product-specific molecules/organisms
+  // must visibly diverge: a GoalCard that is 90%+ identical to the base
+  // `card` is a failed customization, not a product component.
+  if (entry.taxonomy === "molecule" || entry.taxonomy === "organism") {
+    const similarity = sourceSimilarity(code, base.source);
+    if (similarity >= 0.9) {
+      errors.push(`Too close to the base shadcn source (${Math.round(similarity * 100)}% similar) — ${entry.taxonomy} components must be visibly customized (sizing, rounding, colour, density)`);
+    }
+    // Theme-slot discipline: only enforced when the base vocabulary supports
+    // it (slot-poor bases like carousel/collapsible/spinner are exempt).
+    const baseSlots = distinctSlotUtilities(base.source);
+    if (baseSlots >= 2) {
+      const codeSlots = distinctSlotUtilities(code);
+      if (codeSlots < Math.min(2, baseSlots)) {
+        errors.push(`Uses too few theme slot utilities (${codeSlots}) for a product-specific ${entry.taxonomy} component`);
+      }
+    }
+  }
+
   // Minimal customisation signal: at least one product slot utility present.
   if (!/(?:bg-primary|text-primary|bg-muted|bg-accent|text-muted-foreground|bg-card|bg-secondary|border-border|ring-ring|rounded|h-8|h-9|h-10|h-11)/.test(code)) {
     errors.push("No theme styling present — use slot utilities from the token snapshot");
   }
 
   return { valid: errors.length === 0, errors };
+}
+
+/** Non-overlapping chunk similarity (0..1) — shared style with stage-6's
+ *  lint gate. Sampling step === chunk length keeps matches bounded by the
+ *  shorter file so the ratio can never exceed 1. */
+function sourceSimilarity(a: string, b: string): number {
+  if (!a || !b) return 0;
+  if (a === b) return 1;
+  const shorter = a.length < b.length ? a : b;
+  const longer = a.length < b.length ? b : a;
+  if (longer.length === 0) return 0;
+  const CHUNK = 32;
+  let matches = 0;
+  let sampled = 0;
+  const seen = new Set<number>();
+  for (let i = 0; i + CHUNK <= shorter.length; i += CHUNK) {
+    const chunk = shorter.slice(i, i + CHUNK);
+    if (chunk.length < 16) continue;
+    sampled += chunk.length;
+    const idx = longer.indexOf(chunk);
+    if (idx >= 0 && !seen.has(idx)) {
+      matches += chunk.length;
+      seen.add(idx);
+    }
+  }
+  if (sampled === 0) return 0;
+  return matches / Math.max(sampled, longer.length);
+}
+
+/** Distinct theme slot utilities (bg-primary, text-muted-foreground, …). */
+function distinctSlotUtilities(code: string): number {
+  return new Set(
+    code.match(/(?:bg|text|border|ring|fill|stroke)-(?:primary|accent|muted|secondary|card|destructive|input|popover|background|foreground)\b/g) ?? [],
+  ).size;
 }
 
 function extractExports(code: string): string[] {
