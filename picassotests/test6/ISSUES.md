@@ -1,32 +1,30 @@
 # Picasso V7 E2E — Issues Report
 
-**Date:** 2026-08-10T21:49:47.482Z · **Mode:** harden · **Max screens:** 3 · **Overall:** FAILURES PRESENT
+**Date:** 2026-08-11T18:51:20.202Z · **Mode:** harden · **Max screens:** 3 · **Overall:** FAILURES PRESENT
 
 Outputs: `output/<runId>/` (docs, screenshots, run-summary.json) · Screenshots are desktop viewport 1440×900.
 
-## e2e-1-1786397271062 — A minimal habit tracker app for desktop
+## e2e-1-1786473149059 — Meridian Inbox
 
-- **Status:** needs_review · 1316.4s · 41 model calls · $0.1028 (10.28 credits)
-- **Screens composed:** 3 (ledger, settings, today)
+- **Status:** needs_review · 1131.1s · 40 model calls · $0.0805 (8.05 credits)
+- **Screens composed:** 3 (conversation-detail, analytics, triage-board)
 - **Screens rendered (E2B):** 0 — none
-- **Anti-slop gate:** PASSED · **Visual QA:** 0.0/10 avg · **passedAll:** false
+- **Anti-slop gate:** FAILED · **Visual QA:** 0.0/10 avg · **passedAll:** false
 
 ## Issues
 ### Render errors (E2B sandbox)
-- ledger: bundle failed
-- settings: bundle failed
-- today: bundle failed
+- conversation-detail: bundle failed
+- analytics: bundle failed
+- triage-board: bundle failed
 ### Smoke failures
-- today
-- ledger
-- settings
-### Visual QA defects (blocking)
-- **ledger** — 0/10 — Screen "ledger" did not render in the sandbox (failing: none)
-- **settings** — 0/10 — Screen "settings" did not render in the sandbox (failing: none)
-- **today** — 0/10 — Screen "today" did not render in the sandbox (failing: none)
+- conversation-detail
+- analytics
+- triage-board
 ### Assertion failures
 - no smoke failures (got 3)
+- anti-slop gate passed
+- composition gate FAILED
 - screens rendered in E2B (0 of 3)
-- no render errors (ledger: bundle failed; settings: bundle failed; today: bundle failed)
+- no render errors (conversation-detail: bundle failed; analytics: bundle failed; triage-board: bundle failed)
 - visual QA passed (0/10)
-- wall time budget (1316.4s < 420s)
+- wall time budget (1131.1s < 960s — latency-aware: 960 = 300 + screens×120 + min(calls×15, 300))

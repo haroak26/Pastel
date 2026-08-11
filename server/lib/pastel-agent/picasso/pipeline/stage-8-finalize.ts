@@ -24,6 +24,15 @@ export interface FinalizeInputV2 {
   /** V7: stages that degraded instead of aborting ("stage: reason"). A
    *  degraded run must be visibly distinct from a clean one in the report. */
   degradations?: string[];
+  /** V8: deterministic gate outcomes + timing for the report. */
+  v8Gates?: {
+    themeGatePassed: boolean;
+    globalsAuditPassed: boolean;
+    compositionGatePassed: boolean;
+    geometryGatePassed: boolean;
+    surfacePolicy: string;
+    timing: { wallSeconds: number; stages: Record<string, number> };
+  };
 }
 
 export interface FinalizeReportV2 {
@@ -38,6 +47,9 @@ export interface FinalizeReportV2 {
     componentGatePassed: boolean;
     screenGatePassed: boolean;
     antiSlopGatePassed: boolean;
+    themeGatePassed?: boolean;
+    globalsAuditPassed?: boolean;
+    compositionGatePassed?: boolean;
   };
   exportPath: string;
   summaryMarkdown: string;
@@ -53,7 +65,6 @@ const PACKAGE_JSON = (name: string) => `{
     "start": "next start"
   },
   "dependencies": {
-    "@base-ui/react": "^1.7.0",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
@@ -211,8 +222,12 @@ function buildReport(input: FinalizeInputV2): FinalizeReportV2 {
   const passedScreens = critiqueResults.filter((r) => r.passed).length;
   const blockingDefects = input.visualQAResults?.blockingDefects.flatMap((b) => b.defects) ?? [];
 
+  const themeGatePassed = input.v8Gates?.themeGatePassed ?? true;
+  const globalsAuditPassed = input.v8Gates?.globalsAuditPassed ?? true;
+  const compositionGatePassed = input.v8Gates?.compositionGatePassed ?? true;
+
   const lines: string[] = [
-    `# ${brief.productName} — Picasso V7 Report`,
+    `# ${brief.productName} — Picasso V8 Report`,
     ``,
     `**${screenFiles ? Object.keys(screenFiles).length : 0} screens · ${Object.keys(generatedFiles).length} components · ${Object.keys(manifest.entries).length} manifest entries**`,
     ``,
@@ -224,8 +239,24 @@ function buildReport(input: FinalizeInputV2): FinalizeReportV2 {
     `| Components | ${componentGatePassed ? "PASS" : "FAIL"} |`,
     `| Screens | ${screenGatePassed ? "PASS" : "FAIL"} |`,
     `| Anti-slop | ${antiSlopGatePassed ? "PASS" : "FAIL"} |`,
+    `| Theme canvas | ${themeGatePassed ? "PASS" : "FAIL"} |`,
+    `| Token-CSS audit | ${globalsAuditPassed ? "PASS" : "FAIL"} |`,
+    `| Composition | ${compositionGatePassed ? "PASS" : "FAIL"} |`,
     ``,
   ];
+
+  if (input.v8Gates) {
+    lines.push(
+      `## V8 run timing`,
+      ``,
+      `Total: **${input.v8Gates.timing.wallSeconds}s** · Surface policy: ${input.v8Gates.surfacePolicy}`,
+      ``,
+      `| Stage | Wall ms |`,
+      `|-------|---------|`,
+      ...Object.entries(input.v8Gates.timing.stages).map(([s, ms]) => `| ${s} | ${ms} |`),
+      ``,
+    );
+  }
 
   if (degradations.length) {
     lines.push(
@@ -257,7 +288,20 @@ function buildReport(input: FinalizeInputV2): FinalizeReportV2 {
     designTokenCount: 64,
     totalFilesExported: Object.keys(generatedFiles).length + Object.keys(screenFiles).length + 2,
     critiqueSummary: { averageScore: avg, passedScreens, totalScreens: critiqueResults.length, blockingDefects },
-    qualityGates: { briefValidated, tokenGatePassed, componentGatePassed, screenGatePassed, antiSlopGatePassed },
+    qualityGates: {
+      briefValidated,
+      tokenGatePassed,
+      componentGatePassed,
+      screenGatePassed,
+      antiSlopGatePassed,
+      ...(input.v8Gates
+        ? {
+            themeGatePassed,
+            globalsAuditPassed,
+            compositionGatePassed,
+          }
+        : {}),
+    },
     exportPath: path.join(OUTPUT_BASE, input.projectId),
     summaryMarkdown: lines.join("\n"),
   };

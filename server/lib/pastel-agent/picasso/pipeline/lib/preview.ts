@@ -15,7 +15,6 @@ const PACKAGE_ALIASES: Record<string, string> = {
   recharts: "recharts-v3",
   "react-day-picker": "react-day-picker-v10",
   "date-fns": "date-fns-v4",
-  "@base-ui/react": "base-ui-react",
 };
 
 export interface PreviewFiles {
@@ -196,9 +195,31 @@ export async function bundleScreenForPreview(
       `import React from "react";`,
       `import { createRoot } from "react-dom/client";`,
       `import * as ScreenModule from "./screen";`,
+      // V8: render diagnostics — an error boundary plus error/rejection
+      // capture so a runtime crash produces an attributable error instead of
+      // a silent blank PNG (IMPROVEMENTS.md #4).
+      `window.__picassoDiagnostics = { errors: [], console: [] };`,
+      `window.addEventListener("error", (e) => { window.__picassoDiagnostics.errors.push("pageerror: " + (e.message || String(e.error || ""))); });`,
+      `window.addEventListener("unhandledrejection", (e) => { window.__picassoDiagnostics.errors.push("unhandledrejection: " + String((e.reason && e.reason.message) || e.reason)); });`,
+      `const originalError = console.error;`,
+      `console.error = (...args) => { try { window.__picassoDiagnostics.console.push(args.map(String).join(" ").slice(0, 500)); } catch {} originalError.apply(console, args); };`,
+      `class ErrorBoundary extends React.Component {`,
+      `  constructor(props) { super(props); this.state = { error: null }; }`,
+      `  static getDerivedStateFromError(error) { return { error }; }`,
+      `  componentDidCatch(error, info) {`,
+      `    try { window.__picassoDiagnostics.errors.push("boundary: " + (error && error.message) + " @ " + (info && info.componentStack || "").slice(0, 300)); } catch {}`,
+      `  }`,
+      `  render() {`,
+      `    if (this.state.error) {`,
+      `      return React.createElement("div", { style: { padding: 24, fontFamily: "monospace", fontSize: 12, color: "#b91c1c", background: "#fff" } },`,
+      `        "RENDER ERROR: " + (this.state.error.message || String(this.state.error)));`,
+      `    }`,
+      `    return this.props.children;`,
+      `  }`,
+      `}`,
       `const Screen = ScreenModule.default || Object.values(ScreenModule).find(v => typeof v === "function") || (() => React.createElement("div", null, "No component found"));`,
       `const el = document.getElementById("root");`,
-      `if (el) { createRoot(el).render(React.createElement(Screen)); }`,
+      `if (el) { createRoot(el).render(React.createElement(ErrorBoundary, null, React.createElement(Screen))); }`,
       `window.__pastelMounted = true;`,
       `if (window.parent && window.parent !== window) {`,
       `  try { window.parent.postMessage({ type: "pastel:mounted" }, "*"); } catch (e) {}`,

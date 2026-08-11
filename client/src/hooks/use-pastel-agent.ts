@@ -18,10 +18,10 @@ function clearClarifyState() {
   try { sessionStorage.removeItem(CLARIFY_KEY); } catch {}
 }
 
-/** V14 pipeline phases — the agent panel timeline. */
-export type AgentPhase = "discovery" | "design" | "brief" | "data" | "wireframe" | "build" | "assemble" | "present" | "review";
+/** V14 pipeline phases — the agent panel timeline. V8 adds wireframe-review. */
+export type AgentPhase = "discovery" | "design" | "brief" | "data" | "wireframe" | "wireframe-review" | "build" | "assemble" | "present" | "review";
 
-export const PHASE_ORDER: AgentPhase[] = ["discovery", "design", "brief", "data", "wireframe", "build", "assemble", "present", "review"];
+export const PHASE_ORDER: AgentPhase[] = ["discovery", "design", "brief", "data", "wireframe", "wireframe-review", "build", "assemble", "present", "review"];
 
 export const PHASE_LABELS: Record<AgentPhase, string> = {
   discovery: "Discovery",
@@ -29,6 +29,7 @@ export const PHASE_LABELS: Record<AgentPhase, string> = {
   brief: "Brief",
   data: "Content & Data",
   wireframe: "Wireframe",
+  "wireframe-review": "Wireframe Review",
   build: "Components",
   assemble: "Assembly",
   present: "Present",
@@ -41,6 +42,7 @@ export const PHASE_DESCRIPTIONS: Record<AgentPhase, string> = {
   brief: "Selecting the reference companies and building the product brief",
   data: "Writing all the page content — metrics, items, reviews, and CTAs",
   wireframe: "Producing page wireframes and the component inventory",
+  "wireframe-review": "Confirming the wireframes before any component work begins",
   build: "Planning and building every component in parallel",
   assemble: "Composing the screens and verifying them in the sandbox",
   present: "Presenting your rendered screens — they're live now",
@@ -111,8 +113,30 @@ export interface SkillState {
   totalPacks: number;
 }
 
+/** V8: wireframe confirmation-gate review payload (mirrors the pipeline's). */
+export interface WireframeReviewPayload {
+  phase: "wireframe-review";
+  screens: Array<{
+    id: string;
+    name: string;
+    route: string;
+    dominantMoment: string;
+    regions: Array<{
+      name: string;
+      role: string;
+      hierarchy: string;
+      purpose: string;
+      components: Array<{ name: string; taxonomy: string; description: string }>;
+    }>;
+  }>;
+  accent: string;
+  radius: string;
+  seed: string;
+  revisionsUsed: number;
+}
+
 interface PastelEvent {
-  type: "phase" | "agent" | "title" | "doc" | "file" | "activity" | "qaroute" | "screens" | "done" | "error";
+  type: "phase" | "agent" | "title" | "doc" | "file" | "activity" | "qaroute" | "screens" | "wireframes" | "done" | "error";
   phase?: AgentPhase;
   status?: "running" | "done" | "error";
   message?: string;
@@ -120,6 +144,7 @@ interface PastelEvent {
   file?: FileItem;
   title?: string;
   screens?: string[];
+  wireframes?: WireframeReviewPayload;
   agent?: string;
   agentStatus?: "pending" | "started" | "completed" | "failed" | "retrying" | "skipped";
   attempt?: number;
@@ -138,6 +163,7 @@ const IDLE_PHASES: Record<AgentPhase, PhaseState> = {
   brief: { status: "idle" },
   data: { status: "idle" },
   wireframe: { status: "idle" },
+  "wireframe-review": { status: "idle" },
   build: { status: "idle" },
   assemble: { status: "idle" },
   present: { status: "idle" },
@@ -188,6 +214,8 @@ export function usePastelAgent(projectId: string | null) {
   const [isRestoring, setIsRestoring] = useState(!!projectId);
   const [originalPrompt, setOriginalPrompt] = useState<string>("");
   const [skills, setSkills] = useState<SkillState>({ loaded: [], loading: null, totalPacks: 0 });
+  // V8 §4.4: pending wireframe review payload (null when not blocked).
+  const [wireframeReview, setWireframeReview] = useState<WireframeReviewPayload | null>(null);
 
   const abortRef = useRef<AbortController | null>(null);
   const restoredRef = useRef(false);
@@ -299,8 +327,17 @@ export function usePastelAgent(projectId: string | null) {
       case "screens":
         if (event.screens) setScreens(event.screens);
         break;
+      case "wireframes":
+        // V8 §4.4: the pipeline is blocked at the confirmation gate until
+        // the user posts approve/revise/cancel.
+        if (event.wireframes) {
+          setWireframeReview(event.wireframes);
+          pushActivity("Wireframes ready for review — approve or request changes before any components are built.");
+        }
+        break;
       case "done":
         setStatus("done");
+        setWireframeReview(null);
         if (event.result?.screens) setScreens(event.result.screens);
         if (event.result?.brandKit) setBrandKit(event.result.brandKit);
         if (event.result?.failedScreens) setFailedScreens(event.result.failedScreens);
@@ -325,7 +362,6 @@ export function usePastelAgent(projectId: string | null) {
         if (!res.ok) return;
         const data = await res.json();
         if (!data.run) return;
-
         setRunId(data.run.id);
         setTitle(data.run.title ?? null);
         setOriginalPrompt(data.run.prompt ?? "");
@@ -463,6 +499,7 @@ export function usePastelAgent(projectId: string | null) {
     setFailedScreens([]);
     setError(null);
     setSkills({ loaded: [], loading: null, totalPacks: 0 });
+    setWireframeReview(null);
     setQuestions(null);
     setAnswers({});
     setAwaitingAnswers(false);
@@ -522,6 +559,7 @@ export function usePastelAgent(projectId: string | null) {
     setFailedScreens([]);
     setError(null);
     setSkills({ loaded: [], loading: null, totalPacks: 0 });
+    setWireframeReview(null);
     setQuestions(null);
     setAnswers({});
     setAwaitingAnswers(false);
@@ -531,6 +569,28 @@ export function usePastelAgent(projectId: string | null) {
     setInspiration("");
     setSecondaryInspiration([]);
   }, []);
+
+  // ── V8 §4.4: wireframe confirmation-gate actions ───────────────────────
+  const sendWireframeDecision = useCallback(async (action: "approve" | "revise" | "cancel", notes?: Record<string, string>) => {
+    if (!runId) return;
+    try {
+      const res = await fetch(`/api/pastel-agent/runs/${runId}/wireframe-decision`, {
+        method: "POST",
+        credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ action, ...(notes ? { notes } : {}) }),
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: "Decision failed" }));
+        throw new Error(err.message || "Decision failed");
+      }
+      if (action === "approve") pushActivity("Wireframes approved — building components.");
+      else if (action === "cancel") pushActivity("Run cancelled at the wireframe review.");
+      else pushActivity("Changes requested — re-architecting the wireframes.");
+    } catch (err: any) {
+      setError(err.message || "Failed to send wireframe decision");
+    }
+  }, [runId, pushActivity]);
 
   const isGenerating = status === "running";
   const activePhase = PHASE_ORDER.find((p) => phases[p].status === "running") ?? null;
@@ -571,6 +631,9 @@ export function usePastelAgent(projectId: string | null) {
     error,
     isRestoring,
     originalPrompt,
+    // V8 §4.4: wireframe confirmation gate
+    wireframeReview,
+    sendWireframeDecision,
     start,
     reset,
   };

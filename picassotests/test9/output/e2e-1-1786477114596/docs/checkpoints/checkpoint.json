@@ -1,0 +1,49 @@
+{
+  "status": "error",
+  "stageReached": "gates",
+  "wallSeconds": 1174.7,
+  "stages": {
+    "discovery": {
+      "status": "done",
+      "wallMs": 3195
+    },
+    "design": {
+      "status": "done",
+      "wallMs": 101614
+    },
+    "wireframe": {
+      "status": "done",
+      "wallMs": 243958
+    },
+    "content": {
+      "status": "done",
+      "wallMs": 152194
+    },
+    "build": {
+      "status": "done",
+      "wallMs": 517176
+    },
+    "screens": {
+      "status": "done",
+      "wallMs": 156210
+    },
+    "screen:inbox": {
+      "status": "degraded",
+      "wallMs": 65785
+    },
+    "screen:conversation-detail": {
+      "status": "degraded",
+      "wallMs": 67381
+    },
+    "screen:analytics": {
+      "status": "degraded",
+      "wallMs": 65346
+    },
+    "gates": {
+      "status": "done",
+      "wallMs": 103
+    }
+  },
+  "startedAt": "2026-08-11T19:38:34.598Z",
+  "updatedAt": "2026-08-11T19:58:09.265Z"
+}

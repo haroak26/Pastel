@@ -1710,7 +1710,9 @@ test("v14 brief: the catalog is the only source of inspiration (no hardcoded fal
 
 test("v14 pipeline: phases + model roles are in the wire contract", async () => {
   const { PHASE_ORDER } = await import("../lib/pastel-agent/types");
-  assert.deepEqual(PHASE_ORDER, ["discovery", "design", "brief", "data", "wireframe", "build", "assemble", "present", "review"]);
+  // V8 (Picasso): the wireframe confirmation gate adds a blocking
+  // `wireframe-review` phase between wireframe and build.
+  assert.deepEqual(PHASE_ORDER, ["discovery", "design", "brief", "data", "wireframe", "wireframe-review", "build", "assemble", "present", "review"]);
   const { designTokensSchema, dataPlanSchema } = await import("../lib/pastel-agent/schemas");
   assert.ok(designTokensSchema, "design-token schema exists");
   assert.ok(dataPlanSchema, "data-plan schema exists");

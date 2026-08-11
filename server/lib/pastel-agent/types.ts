@@ -16,12 +16,13 @@ export type PastelPhase =
   | "brief"
   | "data"
   | "wireframe"
+  | "wireframe-review"
   | "build"
   | "assemble"
   | "review"
   | "present";
 
-export const PHASE_ORDER: PastelPhase[] = ["discovery", "design", "brief", "data", "wireframe", "build", "assemble", "present", "review"];
+export const PHASE_ORDER: PastelPhase[] = ["discovery", "design", "brief", "data", "wireframe", "wireframe-review", "build", "assemble", "present", "review"];
 export type PhaseStatus = "idle" | "running" | "done" | "error";
 
 /** User-supplied visual direction, independent of company inspiration. */
@@ -43,6 +44,7 @@ export interface PastelEvent {
     | "activity"
     | "qaroute"
     | "screens"
+    | "wireframes"
     | "done"
     | "error";
   phase?: PastelPhase;
@@ -57,6 +59,9 @@ export interface PastelEvent {
   agentStatus?: string;
   attempt?: number;
   qaRoute?: { target: string; targetAgent: string; reason: string };
+  /** V8: wireframe confirmation-gate payload (blocked until the client
+   *  posts approve/revise/cancel). */
+  wireframes?: unknown;
 }
 
 // ── Manifest + run metadata ─────────────────────────────────────────────

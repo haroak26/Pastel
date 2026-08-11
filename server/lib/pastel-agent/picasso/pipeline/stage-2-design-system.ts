@@ -6,6 +6,7 @@ import { antiSlopSystemPrompt } from "./anti-slop";
 import { chatJSON, type ChatMessage } from "../../gateway";
 import { MAX_TOKENS_PER_CALL } from "../../gateway";
 import { generateGlobalsCSS, tokenSnapshot, onColor, relativeLuminance } from "./lib/base-components";
+import { enforceNeutralSurfaces, surfacePolicyPrompt, type SurfacePolicy } from "./lib/surface-policy";
 
 // ── Stage 2a: divergent creative directions ─────────────────────────────
 
@@ -195,6 +196,8 @@ export interface EnhancedTokensInput {
   companyContents: Record<string, string>;
   contextDescription: string;
   creativeSeed: string;
+  /** V8: neutral-canvas policy for non-lifestyle products (§6). */
+  surfacePolicy?: SurfacePolicy;
 }
 
 const FORBIDDEN_ACCENTS = new Set(["#3b82f6", "#6366f1", "#8b5cf6", "#4f46e5", "#a78bfa", "#2563eb", "#000000", "#ffffff"]);
@@ -233,6 +236,7 @@ export async function generateEnhancedTokens(
   input: EnhancedTokensInput,
 ): Promise<Tokens> {
   const { brief, direction, stage2Directions, megadesignContent, companyContents, contextDescription, creativeSeed } = input;
+  const policy: SurfacePolicy = input.surfacePolicy ?? "neutral";
 
   const chosen = stage2Directions.find((d) => d.name === direction.name) ?? stage2Directions[0];
 
@@ -272,6 +276,8 @@ export async function generateEnhancedTokens(
         "",
         companyBlocks.slice(0, 6000),
         "",
+        surfacePolicyPrompt(policy),
+        "",
         `Generate the complete tokens JSON now.`,
       ].join("\n"),
     },
@@ -292,7 +298,9 @@ export async function generateEnhancedTokens(
     },
   });
 
-  return result;
+  // V8 §6: deterministic enforcement — a neutral-context run never ships a
+  // tinted canvas even if the model ignored the prompt instruction.
+  return enforceNeutralSurfaces(result, policy);
 }
 
 /** Legacy-compatible wrapper — v6 CSS is shadcn globals. */

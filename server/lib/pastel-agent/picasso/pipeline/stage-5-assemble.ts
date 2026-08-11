@@ -4,6 +4,7 @@ import type { ProductContext } from "./anti-slop";
 import { chatText, MAX_TOKENS_PER_CALL, type ChatMessage } from "../../gateway";
 import { antiSlopSystemPrompt } from "./anti-slop";
 import { tokenSnapshot } from "./lib/base-components";
+import { auditScreenProps, applyPropAutoFix, type PropViolation } from "./lib/prop-validation";
 import { transform } from "esbuild";
 
 export interface ComposeScreenInput {
@@ -214,6 +215,52 @@ export async function composeAllScreens(input: ComposeAllScreensInput): Promise<
 
   await Promise.all(tasks);
   return screens;
+}
+
+// ── V8: prop-contract-gated composition (IMPROVEMENTS.md #3) ─────────────
+
+export interface ComposedScreenV8 {
+  code: string;
+  retries: number;
+  /** Violations that could not be auto-fixed — the screen ships with them
+   *  flagged for the report, never silently. */
+  propViolations: PropViolation[];
+  /** Mounts auto-fixed (empty usages replaced with a safe wrapper). */
+  autoFixed: string[];
+}
+
+/**
+ * Compose a screen and enforce the prop contract before it is persisted:
+ * every usage of a manifest component is checked against its declared
+ * required props; violations trigger a targeted retry ("pass real props or
+ * remove the usage"), and any usage that still cannot be verified is
+ * auto-fixed deterministically (empty usage → safe wrapper) so crash-prone
+ * JSX never ships.
+ */
+export async function composeScreenV8(input: ComposeScreenInput): Promise<ComposedScreenV8> {
+  const propContract = input.propContract;
+  let result = await composeScreenWithRetry(input);
+
+  let audit = auditScreenProps(result.screen, propContract);
+  if (audit.violations.length > 0) {
+    const notes = audit.violations
+      .map((v) => `- ${v.componentName} requires ${v.missingRequired.join(", ")} — pass real props from the screen's data/copy or remove the usage.`)
+      .join("\n");
+    const retried = await composeScreenWithRetry(
+      { ...input, extraContext: `PROP-CONTRACT VIOLATIONS (fix these):\n${notes}` },
+      1,
+    );
+    result = retried;
+    audit = auditScreenProps(retried.screen, propContract);
+  }
+
+  const fixed = applyPropAutoFix(result.screen, audit, propContract);
+  return {
+    code: fixed.code,
+    retries: result.retries,
+    propViolations: fixed.audit.violations,
+    autoFixed: fixed.fixed,
+  };
 }
 
 function cleanScreenOutput(raw: string): string {

@@ -1,0 +1,222 @@
+{
+  "report": [
+    {
+      "componentId": "sort-select",
+      "componentName": "Sort Select",
+      "taxonomy": "atom",
+      "baseComponent": "select",
+      "similarity": 0.74,
+      "floor": 0.65,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "priority-filter",
+      "componentName": "Priority Filter",
+      "taxonomy": "atom",
+      "baseComponent": "select",
+      "similarity": 0.96,
+      "floor": 0.65,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "filter-tabs",
+      "componentName": "Filter Tabs",
+      "taxonomy": "molecule",
+      "baseComponent": "tabs",
+      "similarity": 0.86,
+      "floor": 0.4,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "app-sidebar",
+      "componentName": "App Sidebar",
+      "taxonomy": "organism",
+      "baseComponent": "sidebar",
+      "similarity": 0.88,
+      "floor": null,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "app-topbar",
+      "componentName": "App Topbar",
+      "taxonomy": "organism",
+      "baseComponent": "sidebar",
+      "similarity": 0.76,
+      "floor": null,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "view-toggle",
+      "componentName": "View Toggle",
+      "taxonomy": "atom",
+      "baseComponent": "toggle-group",
+      "similarity": 0.67,
+      "floor": 0.65,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "conversation-table",
+      "componentName": "Conversation Table",
+      "taxonomy": "organism",
+      "baseComponent": "table",
+      "similarity": 0.31,
+      "floor": null,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "bulk-actions",
+      "componentName": "Bulk Actions",
+      "taxonomy": "molecule",
+      "baseComponent": "button-group",
+      "similarity": 0.58,
+      "floor": 0.4,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "conversation-header",
+      "componentName": "Conversation Header",
+      "taxonomy": "molecule",
+      "baseComponent": "card",
+      "similarity": 0.47,
+      "floor": 0.4,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "status-filter",
+      "componentName": "Status Filter",
+      "taxonomy": "atom",
+      "baseComponent": "select",
+      "similarity": 0.96,
+      "floor": 0.65,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "metric-tile",
+      "componentName": "Metric Tile",
+      "taxonomy": "molecule",
+      "baseComponent": "card",
+      "similarity": 0.59,
+      "floor": 0.4,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "detail-panel",
+      "componentName": "Detail Panel",
+      "taxonomy": "organism",
+      "baseComponent": "card",
+      "similarity": 0.89,
+      "floor": null,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "reply-composer",
+      "componentName": "Reply Composer",
+      "taxonomy": "molecule",
+      "baseComponent": "textarea",
+      "similarity": 0.07,
+      "floor": 0.4,
+      "passed": false,
+      "action": "report",
+      "message": "Reply Composer (molecule) is 7% similar to its shadcn base — below the 40% floor."
+    },
+    {
+      "componentId": "team-leaderboard",
+      "componentName": "Team Leaderboard",
+      "taxonomy": "organism",
+      "baseComponent": "table",
+      "similarity": 0.23,
+      "floor": null,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "response-time-chart",
+      "componentName": "Response Time Chart",
+      "taxonomy": "organism",
+      "baseComponent": "chart",
+      "similarity": 0.99,
+      "floor": null,
+      "passed": true,
+      "action": "fell-back-to-base",
+      "message": " — shipped the literal base file with token substitution."
+    },
+    {
+      "componentId": "team-members",
+      "componentName": "Team Members",
+      "taxonomy": "organism",
+      "baseComponent": "table",
+      "similarity": 0.25,
+      "floor": null,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "settings-form",
+      "componentName": "Settings Form",
+      "taxonomy": "organism",
+      "baseComponent": "field",
+      "similarity": 0.53,
+      "floor": null,
+      "passed": true,
+      "action": "pass"
+    },
+    {
+      "componentId": "volume-chart",
+      "componentName": "Volume Chart",
+      "taxonomy": "organism",
+      "baseComponent": "chart",
+      "similarity": 0.99,
+      "floor": null,
+      "passed": true,
+      "action": "fell-back-to-base",
+      "message": " — shipped the literal base file with token substitution."
+    },
+    {
+      "componentId": "message-thread",
+      "componentName": "Message Thread",
+      "taxonomy": "organism",
+      "baseComponent": "message-scroller",
+      "similarity": 0.99,
+      "floor": null,
+      "passed": true,
+      "action": "fell-back-to-base",
+      "message": " — shipped the literal base file with token substitution."
+    },
+    {
+      "componentId": "notification-preferences",
+      "componentName": "Notification Preferences",
+      "taxonomy": "molecule",
+      "baseComponent": "checkbox",
+      "similarity": 0.48,
+      "floor": 0.4,
+      "passed": true,
+      "action": "pass"
+    }
+  ],
+  "provisioned": [
+    "button",
+    "input",
+    "separator",
+    "sheet",
+    "skeleton",
+    "tooltip",
+    "icon-placeholder",
+    "dropdown-menu",
+    "avatar",
+    "toggle",
+    "checkbox",
+    "label"
+  ]
+}

@@ -26,6 +26,92 @@ export interface VisualQAOutput {
   blockingDefects: Array<{ screen: string; defects: string[] }>;
 }
 
+// ── V8: per-screen visual QA (screen-level pipelining §4.1) ──────────────
+//
+// One screen moves through render → vision critique as its own pipeline,
+// running concurrently with every other screen (the caller caps concurrency
+// and serializes sandbox renders through a shared queue — a single E2B
+// sandbox runs one browser at a time).
+
+export interface ScreenVisualQAInput {
+  screenId: string;
+  bundle: string;
+  compiledStyles: string;
+  fonts: string[];
+  brief: Brief;
+  tokens: Tokens;
+  productContext: ProductContext;
+  creativeSeed: string;
+  warmSandbox?: unknown;
+}
+
+export interface ScreenVisualQAOutput {
+  screenshot: Buffer | null;
+  renderErrors: string[];
+  diagnostics: string[];
+  critique: CritiqueResult | null;
+  feedback: { screen: string; strengths: string[]; improvements: string[] } | null;
+}
+
+export async function runScreenVisualQA(input: ScreenVisualQAInput): Promise<ScreenVisualQAOutput> {
+  const { screenId, bundle, compiledStyles, fonts, brief, tokens, productContext, creativeSeed, warmSandbox } = input;
+
+  const html = buildPreviewHtml(screenId, bundle, compiledStyles, fonts);
+  const render = await renderScreen({ html, screenName: screenId, warmSandbox });
+
+  if (!render.screenshot) {
+    return {
+      screenshot: null,
+      renderErrors: render.errors,
+      diagnostics: render.diagnostics,
+      critique: null,
+      feedback: null,
+    };
+  }
+
+  try {
+    const review = await reviewScreen({
+      screenshot: render.screenshot,
+      screenName: screenId,
+      brief,
+      tokens,
+      productContext,
+      creativeSeed,
+    });
+    return {
+      screenshot: render.screenshot,
+      renderErrors: render.errors,
+      diagnostics: render.diagnostics,
+      critique: {
+        scores: review.scores,
+        average: review.average,
+        passed: review.passed,
+        failingDimensions: review.failingDimensions,
+        diagnosis: review.diagnosis,
+        routeTo: review.average < 7 ? "components" : null,
+        affectedIds: [screenId],
+      },
+      feedback: { screen: screenId, strengths: review.strengths, improvements: review.improvements },
+    };
+  } catch (err) {
+    return {
+      screenshot: render.screenshot,
+      renderErrors: render.errors,
+      diagnostics: render.diagnostics,
+      critique: {
+        scores: zeroRubric(),
+        average: 0,
+        passed: false,
+        failingDimensions: [],
+        diagnosis: `Visual review failed: ${err instanceof Error ? err.message : err}`,
+        routeTo: null,
+        affectedIds: [screenId],
+      },
+      feedback: null,
+    };
+  }
+}
+
 /**
  * Visual QA: compile styles once → bundle + HTML per screen → render every
  * screen in the E2B sandbox → vision critique each screenshot.

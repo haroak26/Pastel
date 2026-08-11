@@ -375,7 +375,8 @@ export function generateGlobalsCSS(tokens: Tokens): string {
 export function tokenSnapshot(tokens: Tokens): string {
   const light = deriveSlots(tokens, false);
   const slot = (label: string, value: string) => `  ${label.padEnd(22)} ${value}`;
-  const lines: string[] = [    "## THEME TOKENS (shadcn slots — use these UTILITY CLASSES, never raw hex)",
+  const lines: string[] = [
+    "## THEME TOKENS (shadcn slots — use these UTILITY CLASSES, never raw hex)",
     "",
     "Color utilities: bg-background · text-foreground · bg-card · text-card-foreground · bg-popover · bg-primary · text-primary-foreground · bg-secondary · text-secondary-foreground · bg-muted · text-muted-foreground · bg-accent · text-accent-foreground · bg-destructive · text-destructive-foreground · border-border · bg-border · ring-ring · ring-offset-background · border-input",
     "",
@@ -408,4 +409,63 @@ export function tokenSnapshot(tokens: Tokens): string {
     "- Shadows: shadow-sm/md/lg/xl only on floating/overlay elements and ONE dominant surface.",
   ];
   return lines.join("\n");
+}
+
+// ── V8: token-CSS audit (IMPROVEMENTS.md §5.3) ──────────────────────────
+//
+// Every CSS custom property the vendored base theme declares (its :root /
+// .dark slot blocks) must be emitted by the run's generated globals CSS —
+// no silent fallback to hardcoded base defaults. The v7 run's invisible
+// inputs came from exactly this class of gap: components referenced tokens
+// the generator never wired to the run's palette.
+
+const SLOT_BLOCK_RE = /\{\s*((?:--[a-z0-9-]+\s*:\s*[^;}]+;?\s*)+)\}/g;
+const CUSTOM_PROP_RE = /--([a-z0-9-]+)\s*:/g;
+
+/** Every `--var:` the base theme declares inside its :root / .dark blocks. */
+export function baseThemeVars(): string[] {
+  const file = path.join(BASE_DIR, "theme", "globals.css");
+  const css = fs.readFileSync(file, "utf8");
+  const vars = new Set<string>();
+  const rootIdx = css.indexOf(":root");
+  const darkIdx = css.indexOf(".dark");
+  const segments = [rootIdx, darkIdx].filter((i) => i >= 0);
+  if (segments.length === 0) return [...vars];
+  const start = Math.min(...segments);
+  let m: RegExpExecArray | null;
+  SLOT_BLOCK_RE.lastIndex = start;
+  while ((m = SLOT_BLOCK_RE.exec(css))) {
+    if (m.index < start) continue;
+    if (m.index > css.length) break;
+    const block = m[1];
+    let v: RegExpExecArray | null;
+    CUSTOM_PROP_RE.lastIndex = 0;
+    while ((v = CUSTOM_PROP_RE.exec(block))) vars.add(v[1]);
+  }
+  return [...vars].sort();
+}
+
+export interface GlobalsAuditResult {
+  passed: boolean;
+  /** Theme variables the base declares but the generated CSS omits. */
+  missing: string[];
+  /** Theme variables the generated CSS declares. */
+  present: string[];
+}
+
+/** Diff the generated globals CSS against the base theme's variable set.
+ *  Any gap is a bug — components would silently fall back to base defaults. */
+export function auditGlobalsCSS(globalsCSS: string): GlobalsAuditResult {
+  const expected = baseThemeVars();
+  const present = new Set<string>();
+  let m: RegExpExecArray | null;
+  CUSTOM_PROP_RE.lastIndex = 0;
+  while ((m = CUSTOM_PROP_RE.exec(globalsCSS))) present.add(m[1]);
+
+  const missing = expected.filter((v) => !present.has(v));
+  return {
+    passed: missing.length === 0,
+    missing,
+    present: [...present].sort(),
+  };
 }

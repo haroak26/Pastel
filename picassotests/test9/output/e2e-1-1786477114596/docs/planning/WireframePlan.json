@@ -1,0 +1,296 @@
+{
+  "screens": [
+    {
+      "id": "inbox",
+      "name": "Inbox",
+      "route": "/inbox",
+      "description": "Main triage view of all customer conversations with filters, sorting, and quick actions.",
+      "gridColumns": 12,
+      "dominantMoment": "A dense triage board where each row shows a ticket's status, priority, assignee, and response timer at a glance.",
+      "regions": [
+        {
+          "name": "Topbar",
+          "role": "nav",
+          "purpose": "Global navigation and user actions.",
+          "hierarchy": "supporting",
+          "componentTypes": [
+            {
+              "name": "app-topbar",
+              "taxonomy": "molecule",
+              "description": "Top navigation with logo, search, and user menu."
+            }
+          ]
+        },
+        {
+          "name": "Sidebar",
+          "role": "nav",
+          "purpose": "Navigate between inbox views and manage team settings.",
+          "hierarchy": "supporting",
+          "componentTypes": [
+            {
+              "name": "app-sidebar",
+              "taxonomy": "molecule",
+              "description": "Sidebar with nav items for Inbox, Assigned to me, Unassigned, and Settings."
+            }
+          ]
+        },
+        {
+          "name": "Toolbar",
+          "role": "toolbar",
+          "purpose": "Filter and sort the conversation list.",
+          "hierarchy": "secondary",
+          "componentTypes": [
+            {
+              "name": "filter-tabs",
+              "taxonomy": "molecule",
+              "description": "Tabs for All, Unassigned, Assigned to me, and Mentions."
+            },
+            {
+              "name": "priority-filter",
+              "taxonomy": "molecule",
+              "description": "Dropdown to filter by priority (Urgent, High, Normal, Low)."
+            },
+            {
+              "name": "status-filter",
+              "taxonomy": "molecule",
+              "description": "Dropdown to filter by status (Open, Pending, Resolved)."
+            },
+            {
+              "name": "sort-select",
+              "taxonomy": "molecule",
+              "description": "Sort by Newest, Oldest, Due soon, Priority."
+            },
+            {
+              "name": "view-toggle",
+              "taxonomy": "molecule",
+              "description": "Toggle between list and compact view."
+            }
+          ]
+        },
+        {
+          "name": "Inbox List",
+          "role": "main",
+          "purpose": "Scan and triage conversations.",
+          "hierarchy": "primary",
+          "componentTypes": [
+            {
+              "name": "conversation-table",
+              "taxonomy": "molecule",
+              "description": "Table with columns: checkbox, avatar, customer, subject, status, priority, assignee, due, updated."
+            }
+          ]
+        },
+        {
+          "name": "Quick Action Bar",
+          "role": "sidebar",
+          "purpose": "Assign, change status, or mark priority for selected conversations.",
+          "hierarchy": "secondary",
+          "componentTypes": [
+            {
+              "name": "bulk-actions",
+              "taxonomy": "molecule",
+              "description": "Buttons for Assign, Status, Priority, and Delete when rows are selected."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "conversation-detail",
+      "name": "Conversation Detail",
+      "route": "/conversations/:id",
+      "description": "Detailed view of a single conversation with message thread, response composer, and metadata.",
+      "gridColumns": 12,
+      "dominantMoment": "The full message thread with a prominent response composer at the bottom.",
+      "regions": [
+        {
+          "name": "Topbar",
+          "role": "nav",
+          "purpose": "Global navigation and user actions.",
+          "hierarchy": "supporting",
+          "componentTypes": [
+            {
+              "name": "app-topbar",
+              "taxonomy": "molecule",
+              "description": "Top navigation with logo, search, and user menu."
+            }
+          ]
+        },
+        {
+          "name": "Conversation Header",
+          "role": "content",
+          "purpose": "Show subject, customer, and key metadata.",
+          "hierarchy": "primary",
+          "componentTypes": [
+            {
+              "name": "conversation-header",
+              "taxonomy": "molecule",
+              "description": "Header with avatar, customer name, email, subject, and status badges."
+            }
+          ]
+        },
+        {
+          "name": "Message Thread",
+          "role": "main",
+          "purpose": "Read the entire conversation history.",
+          "hierarchy": "primary",
+          "componentTypes": [
+            {
+              "name": "message-thread",
+              "taxonomy": "molecule",
+              "description": "Vertical list of messages with sender, timestamp, and body."
+            }
+          ]
+        },
+        {
+          "name": "Reply Composer",
+          "role": "content",
+          "purpose": "Write and send a response.",
+          "hierarchy": "primary",
+          "componentTypes": [
+            {
+              "name": "reply-composer",
+              "taxonomy": "molecule",
+              "description": "Textarea with formatting toolbar and send button."
+            }
+          ]
+        },
+        {
+          "name": "Details Panel",
+          "role": "sidebar",
+          "purpose": "Manage assignment, status, priority, and view related tickets.",
+          "hierarchy": "secondary",
+          "componentTypes": [
+            {
+              "name": "detail-panel",
+              "taxonomy": "molecule",
+              "description": "Panel with assignee select, status select, priority select, tags, and related conversations."
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "analytics",
+      "name": "Analytics",
+      "route": "/analytics",
+      "description": "Team performance metrics and response time trends.",
+      "gridColumns": 12,
+      "dominantMoment": "A large response time metric with a trend chart.",
+      "regions": [
+        {
+          "name": "Topbar",
+          "role": "nav",
+          "purpose": "Global navigation and user actions.",
+          "hierarchy": "supporting",
+          "componentTypes": [
+            {
+              "name": "app-topbar",
+              "taxonomy": "molecule",
+              "description": "Top navigation with logo, search, and user menu."
+            }
+          ]
+        },
+        {
+          "name": "Sidebar",
+          "role": "nav",
+          "purpose": "Navigate between inbox views and manage team settings.",
+          "hierarchy": "supporting",
+          "componentTypes": [
+            {
+              "name": "app-sidebar",
+              "taxonomy": "molecule",
+              "description": "Sidebar with nav items for Inbox, Assigned to me, Unassigned, and Settings."
+            }
+          ]
+        },
+        {
+          "name": "Metric Tiles",
+          "role": "content",
+          "purpose": "Show key KPIs at a glance.",
+          "hierarchy": "secondary",
+          "componentTypes": [
+            {
+              "name": "metric-tile",
+              "taxonomy": "molecule",
+              "description": "Tiles for Avg First Response, Avg Resolution Time, Tickets Resolved, and Customer Satisfaction."
+            }
+          ]
+        },
+        {
+          "name": "Response Time Chart",
+          "role": "main",
+          "purpose": "Visualize response time trends over time.",
+          "hierarchy": "primary",
+          "componentTypes": [
+            {
+              "name": "response-time-chart",
+              "taxonomy": "molecule",
+              "description": "Line chart showing first response time over the last 30 days."
+            }
+          ]
+        },
+        {
+          "name": "Volume Chart",
+          "role": "content",
+          "purpose": "Visualize ticket volume by status.",
+          "hierarchy": "secondary",
+          "componentTypes": [
+            {
+              "name": "volume-chart",
+              "taxonomy": "molecule",
+              "description": "Bar chart showing tickets created vs resolved per day."
+            }
+          ]
+        },
+        {
+          "name": "Team Leaderboard",
+          "role": "content",
+          "purpose": "Compare agent performance.",
+          "hierarchy": "secondary",
+          "componentTypes": [
+            {
+              "name": "team-leaderboard",
+              "taxonomy": "molecule",
+              "description": "Table of agents with resolved count, avg response, and satisfaction."
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "globalRegions": [
+    {
+      "name": "Topbar",
+      "role": "nav",
+      "purpose": "Global navigation and user actions.",
+      "hierarchy": "supporting",
+      "componentTypes": [
+        {
+          "name": "app-topbar",
+          "taxonomy": "molecule",
+          "description": "Top navigation with logo, search, and user menu."
+        }
+      ]
+    },
+    {
+      "name": "Sidebar",
+      "role": "nav",
+      "purpose": "Navigate between inbox views and manage team settings.",
+      "hierarchy": "supporting",
+      "componentTypes": [
+        {
+          "name": "app-sidebar",
+          "taxonomy": "molecule",
+          "description": "Sidebar with nav items for Inbox, Assigned to me, Unassigned, and Settings."
+        }
+      ]
+    }
+  ],
+  "breakpoints": {
+    "sm": "640px",
+    "md": "768px",
+    "lg": "1024px",
+    "xl": "1280px"
+  }
+}

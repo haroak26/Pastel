@@ -1,0 +1,43 @@
+{
+  "colorRules": {
+    "accentUsage": "The accent (#E8570C) is a spotlight: use it only for interactive states, active nav items, primary buttons, the active focus ring, and the primary data line in charts. It should never cover large surfaces or be used as a card background. Interactive accent (#D24E0B) is reserved for hover and pressed states on accent surfaces.",
+    "semanticUsage": "Semantic colors (success, warning, danger) are strictly for meaningful statuses: priority labels, response timer urgency, success/error toasts, and trend direction in analytics. They must be muted enough to not compete with the accent and should never be used as decoration.",
+    "neutralUsage": "Neutrals carry the chrome: page backgrounds, sidebar fills, borders, text layers, table row separators, and hover fills. Use bg-muted for secondary surfaces, bg-background for primary content, text-muted-foreground for metadata, and border-border for subtle structure. Neutrals keep the interface calm so the accent and semantic colors can speak.",
+    "forbiddenPatterns": [
+      "No accent-colored card backgrounds or large accent-filled surfaces.",
+      "No accent gradients or any gradient walls.",
+      "No semantic colors on static, non-informational elements.",
+      "No secondary buttons with accent text without a border or outline."
+    ]
+  },
+  "typographyRules": {
+    "displayUsage": "Space Grotesk is for display type: page titles, metric values, and empty-state headings. Use it sparingly to give the interface a technical, console-like confidence. Not for body copy or UI labels.",
+    "bodyUsage": "Onest is the workhorse for all body copy, table rows, buttons, inputs, navigation labels, and any text that needs to be read quickly. It keeps dense content legible and neutral.",
+    "monoUsage": "JetBrains Mono is for data that needs precise scanning: timestamps, ticket IDs, response time counts, email addresses, and chart tooltip values. It signals machine-readability and dispatcher precision.",
+    "weightRules": "Space Grotesk: 500 for headings, 600 for the primary metric value only. Onest: 400 for default body, 500 for nav items, selected tabs, and column headers, 600 for row-level primary actions. JetBrains Mono: 400 only.",
+    "sizeRules": "Use text-xs for metadata, table headers, and mono timestamps. text-sm for table cells, filters, and body copy. text-base for input text, text-lg for conversation subject lines and section titles, text-2xl for page titles, and text-3xl for metric tiles. Keep display sizes tracking-tight, body sizes tracking-normal."
+  },
+  "spacingRules": {
+    "sectionMargins": "Page-level sections use p-6 with gap-6 between distinct groups. Cards and panels use p-4. Filters and toolbar rows use p-3. Use 4px increments but alternate 4/6/8 to create visual rhythm and hierarchy rather than uniform gaps.",
+    "componentPadding": "Table rows are h-12 with px-4. Inputs and selects are h-9 to h-10 with px-3. Buttons h-9 with px-4. Message rows use p-3 and rounded-lg. The composer textarea uses p-3 with a min-h-32. Cards use p-4, and the accordion rows use h-10.",
+    "rhythmDescription": "The layout feels like a control board: dense rows and tight tables are punctuated by calmer, padded filter bars and generous whitespace around the primary action. Sidebar and topbar provide a stable frame while the content area breathes through alternating compact and roomy sections."
+  },
+  "motionRules": {
+    "transitions": "Use the standard cubic-bezier(0.4, 0, 0.2, 1) for all transitions. Hover and active states on buttons, rows, and nav items use swift 120ms. Dropdowns, selects, tooltips, and toggles open at base 200ms. Screen-level shifts, background palette changes, and chart data updates use slow 400ms.",
+    "easing": "The universal easing is cubic-bezier(0.4, 0, 0.2, 1). Do not use bouncy, elastic, or spring easings. Keep all motion subdued and functional.",
+    "duration": "Swift = 120ms for micro-interactions (row hover, icon color change, focus ring). Base = 200ms for interactive surfaces (dropdown, filter select, toggle group). Slow = 400ms for state transitions between inbox and detail, chart animations, and bulk action feedback."
+  },
+  "signatureMoves": [
+    "Dispatch glow: When a ticket is assigned via the inline quick action, the row flashes a 200ms primary-colored background (accent at 15% opacity) that fades back to neutral, signaling that the triage action registered.",
+    "Timer pulse: Response-timer timestamps in the inbox and detail use JetBrains Mono. When a ticket is within 1 hour of breaching the SLA, the timestamp gently pulses in semantic danger color using a 120ms opacity step—a blinking beacon without being a wash.",
+    "Filter perch: Active tab in the Filter Tabs component sits elevated above the muted background with a subtle shadow and a 2px accent underline bar, as if a module has clicked into its console slot.",
+    "Priority edge: Every conversation row carries a 2px left border strip in the priority semantic color (e.g., critical red, high amber, normal green). This turns the inbox list into a dispatch board where urgency is readable at a glance."
+  ],
+  "antiPatterns": [
+    "Stock shadcn look: Avoid default light-gray palette with a purple accent and generic white cards. The accent must stay orange and the typography must lead with Space Grotesk, not default system fonts.",
+    "Accent washes: No large accent-bg sections, full-width accent banners, or accent-tinted card backgrounds. Accent is a spotlight, not a floodlight.",
+    "Gradient walls: Do not use any gradients on backgrounds, buttons, cards, or charts. Keep it flat and solid.",
+    "Template copy: Avoid lorem ipsum and generic 'Your App' text. Replace every label, empty state, and tooltip with specific support-console microcopy like 'Unassigned tickets' and 'Response timer resets on reply'."
+  ],
+  "generatedAt": "2026-08-11T19:44:23.368Z"
+}

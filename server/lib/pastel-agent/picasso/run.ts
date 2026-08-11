@@ -1,10 +1,12 @@
-import { emitEvent, updateRun, persistFile, persistDoc } from "../run-store";
+import { emitEvent, updateRun, persistFile, persistDoc, getRunState } from "../run-store";
 import type { AgentManifest, PastelPhase, PhaseStatus, VisualReference } from "../types";
 import { setUsageSink, type UsageRecord } from "../gateway";
 import { ledgerFromUsage } from "../lib/ledger";
 import * as creditService from "../../credit-service";
 import type { Brief } from "./pipeline/types";
 import { runPicassoPipeline } from "./pipeline/orchestrator";
+import { registerPendingWireframeReview } from "./wireframe-gate";
+import type { ResumeLoaders } from "./pipeline/lib/resume";
 import { bundleScreenForPreview, compileStylesForRun } from "./pipeline/lib/preview";
 import { clearWarmSandbox } from "./pipeline/lib/sandbox-render";
 import { listCompanySlugs } from "./pipeline/knowledge";
@@ -23,6 +25,8 @@ export interface PicassoLoopOptions {
   maxCredits?: number;
   holdAmount?: number;
   visualReference?: VisualReference;
+  /** V8 §4.3: resume a previously-killed run from its persisted artifacts. */
+  resume?: boolean;
 }
 
 const NICHE_KEYWORDS: Array<[Brief["niche"], string[]]> = [
@@ -143,6 +147,74 @@ async function persistGeneratedFile(runId: string, path: string, content: string
   }
 }
 
+// ═══════════════════════════════════════════════════════════════════════
+// V8 §4.3: kill-handler state — the currently active run writes a partial
+// summary (status "killed", furthest stage, calls, cost) and releases its
+// credit hold instead of losing that data entirely.
+// ═══════════════════════════════════════════════════════════════════════
+
+interface ActiveRunRef {
+  runId: string;
+  usage: UsageRecord[];
+  holdId?: string;
+  userId?: string;
+  statusRef: { status: "running" | "done" | "done_needs_review" | "error" };
+}
+
+let activeRunRef: ActiveRunRef | null = null;
+
+function installKillHandler(): () => void {
+  const handler = (signal: string) => {
+    const ref = activeRunRef;
+    console.warn(`[picasso] received ${signal} — writing partial run summary and releasing holds`);
+    if (!ref) {
+      process.exit(1);
+      return;
+    }
+    try {
+      const ledger = ledgerFromUsage(ref.usage);
+      updateRun(ref.runId, {
+        status: "error",
+        phase: "interrupted",
+        error: `Run interrupted by ${signal} — partial artifacts preserved; resume with the same runId.`,
+      }).catch(() => {});
+      emitEvent(ref.runId, { type: "error", message: `Run interrupted by ${signal} — partial artifacts preserved.` });
+      if (ref.holdId && ref.userId) {
+        creditService.releaseHold(ref.holdId, 0).catch(() => {});
+      }
+      console.log(`[picasso] run ${ref.runId}: killed at ${(ledger.totalDollars).toFixed(4)} spent across ${ledger.entries.length} call(s) — nothing charged to the hold`);
+    } catch (err) {
+      console.error("[picasso] kill handler error:", err);
+    } finally {
+      setUsageSink(null);
+      clearWarmSandbox();
+      process.exit(1);
+    }
+  };
+  process.on("SIGTERM", handler);
+  process.on("SIGINT", handler);
+  return () => {
+    process.off("SIGTERM", handler);
+    process.off("SIGINT", handler);
+  };
+}
+
+/** DB-backed resume loaders — read a run's persisted docs/files. */
+function resumeLoadersFor(runId: string): ResumeLoaders {
+  return {
+    async loadDoc(path) {
+      const state = await getRunState(runId).catch(() => null);
+      const doc = state?.docs.find((d) => d.path === path);
+      return doc?.content ?? null;
+    },
+    async loadFile(path) {
+      const state = await getRunState(runId).catch(() => null);
+      const file = state?.files.find((f) => f.path === path);
+      return file?.content ?? null;
+    },
+  };
+}
+
 export async function startPicassoAgentLoop(
   runId: string,
   prompt: string,
@@ -156,6 +228,8 @@ export async function startPicassoAgentLoop(
   setUsageSink((rec) => usage.push(rec));
 
   const statusRef: { status: "running" | "done" | "done_needs_review" | "error" } = { status: "running" };
+  activeRunRef = { runId, usage, holdId, userId, statusRef };
+  const uninstallKillHandler = installKillHandler();
 
   try {
     const brief = buildBrief(prompt, answers);
@@ -168,6 +242,17 @@ export async function startPicassoAgentLoop(
     const output = await runPicassoPipeline(brief, {
       projectId: projectKey,
       mode: isDraft ? "draft" : "harden",
+      // V8 §4.3: resume the same runId from its persisted stage artifacts.
+      ...(opts?.resume ? { resume: resumeLoadersFor(runId) } : {}),
+      // V8 §4.4: the hard wireframe confirmation gate — the run blocks here
+      // until the client posts approve/revise/cancel (or the timeout fires).
+      confirmWireframes: (payload) => {
+        emitEvent(runId, { type: "wireframes", wireframes: payload });
+        return registerPendingWireframeReview(runId, payload);
+      },
+      onCheckpoint: (stats) => {
+        if (stats.stageReached) updateRun(runId, { phase: stats.stageReached }).catch(() => {});
+      },
       hooks: {
         emit: (type, payload) => {
           if (type === "phase") {
@@ -185,6 +270,17 @@ export async function startPicassoAgentLoop(
         persistFile: (p, kind, content) => persistGeneratedFile(runId, p, content),
       },
     });
+
+    // ══ V8 §4.4: cancelled at the wireframe gate — refund the hold, mark the
+    // run, and stop. No further spend and no screens to preview. ══
+    if (output.cancelled) {
+      statusRef.status = "error";
+      emitActivity(runId, "Run cancelled during wireframe review — the credit hold was released, nothing was charged.");
+      await updateRun(runId, { status: "error", error: "Cancelled by user during wireframe review" });
+      emitEvent(runId, { type: "error", message: "Run cancelled — wireframe review declined." });
+      await settleCredits(runId, "error", usage, holdId, userId, opts?.holdAmount);
+      return;
+    }
 
     // ══ PREVIEW BUNDLES (compiled CSS + per-screen JS) ══
     try {
@@ -232,6 +328,12 @@ export async function startPicassoAgentLoop(
         "docs/planning/CopyPlan.json",
         "docs/review/SmokeTestResults.json",
         "docs/review/AntiSlopGate.json",
+        "docs/review/ThemeGate.json",
+        "docs/review/GlobalsAudit.json",
+        "docs/review/CompositionGate.json",
+        "docs/review/GeometryGate.json",
+        "docs/review/ComponentFidelity.json",
+        "docs/review/Timing.json",
         "docs/review/CritiqueResults.json",
         "docs/review/FinalReport.md",
       ],
@@ -261,6 +363,7 @@ export async function startPicassoAgentLoop(
         brief: "done",
         data: "done",
         wireframe: "done",
+        "wireframe-review": "done",
         review: output.passedAll ? "done" : "error",
         build: "done",
         assemble: "done",
@@ -308,6 +411,8 @@ export async function startPicassoAgentLoop(
   } finally {
     setUsageSink(null);
     clearWarmSandbox();
+    activeRunRef = null;
+    uninstallKillHandler();
   }
 }
 

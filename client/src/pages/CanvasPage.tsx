@@ -10,6 +10,7 @@ import { CanvasPromptInput } from "@/components/CanvasPromptInput";
 import { CanvasDropdown } from "@/components/CanvasDropdown";
 import { usePastelAgent } from "@/hooks/use-pastel-agent";
 import { AgentRunCard } from "@/components/agent/AgentRunCard";
+import { WireframeReviewPanel } from "@/components/agent/WireframeReviewPanel";
 import { CompanyGallery } from "@/components/agent/CompanyGallery";
 import { ScreenPreview } from "@/components/agent/ScreenPreview";
 import { ScreenPanel } from "@/components/agent/ScreenPanel";
@@ -148,6 +149,9 @@ export default function CanvasPage() {
     submitAnswers,
     skipClarify,
     reset,
+    // V8 §4.4: wireframe confirmation gate
+    wireframeReview,
+    sendWireframeDecision,
   } = agent;
 
   // Clarify flow: pick an inspiration company first, then the question wizard.
@@ -1132,7 +1136,14 @@ export default function CanvasPage() {
                   transition={{ duration: 0.3, ease: [0.22, 1, 0.36, 1] }}
                 >
                   <div className="max-w-[580px] w-full">
-                    {hasSession && (
+                    {hasSession && wireframeReview && (
+                      <WireframeReviewPanel
+                        review={wireframeReview}
+                        onDecision={sendWireframeDecision}
+                      />
+                    )}
+
+                    {hasSession && !wireframeReview && (
                       <AgentRunCard
                         status={status}
                         phases={phases}

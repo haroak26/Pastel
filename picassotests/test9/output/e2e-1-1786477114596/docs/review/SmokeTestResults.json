@@ -1,0 +1,14 @@
+[
+  {
+    "screen": "analytics",
+    "passed": false
+  },
+  {
+    "screen": "inbox",
+    "passed": false
+  },
+  {
+    "screen": "conversation-detail",
+    "passed": false
+  }
+]

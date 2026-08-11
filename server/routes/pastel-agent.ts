@@ -208,6 +208,42 @@ export function registerPastelAgentRoutes(app: Express) {
     });
   });
 
+  // ── Wireframe confirmation gate decision (V8 §4.4) ─────────────────────
+  // The pipeline blocks in the `wireframe-review` phase until the client
+  // posts approve / revise / cancel here. Revisions are bounded; a cancel
+  // refunds the credit hold (the run's `startPicassoAgentLoop` handles that).
+  const wireframeDecisionSchema = z.object({
+    action: z.enum(["approve", "revise", "cancel"]),
+    notes: z.record(z.string()).optional(),
+  });
+
+  app.post("/api/pastel-agent/runs/:runId/wireframe-decision", requireAuth, async (req: Request, res: Response) => {
+    try {
+      const parsed = wireframeDecisionSchema.safeParse(req.body);
+      if (!parsed.success) {
+        return res.status(400).json({ message: "Invalid decision", errors: parsed.error.issues });
+      }
+      const runId = String(req.params.runId);
+      const { resolveWireframeReview, getPendingWireframeReview } = await import("../lib/pastel-agent/picasso/wireframe-gate");
+
+      if (!getPendingWireframeReview(runId)) {
+        return res.status(409).json({ message: "No wireframe review is pending for this run (already decided or timed out)." });
+      }
+
+      const decision = parsed.data.action === "revise"
+        ? { action: "revise" as const, notes: parsed.data.notes ?? {} }
+        : { action: parsed.data.action as "approve" | "cancel" };
+      const resolved = resolveWireframeReview(runId, decision);
+      if (!resolved) {
+        return res.status(409).json({ message: "Wireframe review already resolved." });
+      }
+      return res.json({ ok: true, action: parsed.data.action });
+    } catch (err: any) {
+      console.error("[pastel-agent] wireframe decision error:", err?.message || err);
+      return res.status(500).json({ message: err?.message || "Internal error" });
+    }
+  });
+
   // ── Project agent state (restore after refresh / new tab) ───────────
   app.get("/api/pastel-agent/projects/:projectId/state", async (req: Request, res: Response) => {
     try {

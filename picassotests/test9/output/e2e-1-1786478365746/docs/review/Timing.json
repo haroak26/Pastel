@@ -1,0 +1,14 @@
+{
+  "wallSeconds": 1211,
+  "stages": {
+    "discovery": 6487,
+    "design": 102240,
+    "wireframe": 278398,
+    "content": 71825,
+    "build": 483483,
+    "screens": 267897,
+    "screen:triage-queue": 267897,
+    "screen:conversation-detail": 267893,
+    "gates": 42
+  }
+}

@@ -1,8 +1,10 @@
+"use client"
+
 import * as React from "react"
 import { Checkbox as CheckboxPrimitive } from "radix-ui"
 
 import { cn } from "@/lib/utils"
-import { CheckIcon } from "lucide-react"
+import { IconPlaceholder } from "./icon-placeholder"
 
 function Checkbox({
   className,
@@ -21,7 +23,12 @@ function Checkbox({
         data-slot="checkbox-indicator"
         className="grid place-content-center text-current transition-none [&>svg]:size-3.5"
       >
-        <CheckIcon
+        <IconPlaceholder
+          lucide="CheckIcon"
+          tabler="IconCheck"
+          hugeicons="Tick02Icon"
+          phosphor="CheckIcon"
+          remixicon="RiCheckLine"
         />
       </CheckboxPrimitive.Indicator>
     </CheckboxPrimitive.Root>

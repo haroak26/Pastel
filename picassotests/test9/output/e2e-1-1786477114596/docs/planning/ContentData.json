@@ -1,0 +1,322 @@
+{
+  "itemCount": 188,
+  "metrics": [
+    {
+      "label": "Open conversations",
+      "value": "23",
+      "unit": "current",
+      "delta": "+4"
+    },
+    {
+      "label": "SLA at risk",
+      "value": "4",
+      "unit": "tickets",
+      "delta": "+1"
+    },
+    {
+      "label": "Avg first response",
+      "value": "2h 41m",
+      "unit": "30d",
+      "delta": "-18m"
+    },
+    {
+      "label": "SLA compliance",
+      "value": "94%",
+      "unit": "30d",
+      "delta": "+2%"
+    }
+  ],
+  "items": [
+    {
+      "id": "tkt-1001",
+      "subject": "Unable to reset password after update",
+      "customerName": "Sam Reyes",
+      "customerEmail": "sam@reyes.co",
+      "status": "open",
+      "priority": "high",
+      "assignee": "Avery Park",
+      "channel": "email",
+      "createdAt": "2025-03-14T09:12:00Z",
+      "dueAt": "2025-03-14T15:12:00Z"
+    },
+    {
+      "id": "tkt-1002",
+      "subject": "Can I get a refund for last month?",
+      "customerName": "Priya Patel",
+      "customerEmail": "priya@patel.dev",
+      "status": "pending",
+      "priority": "normal",
+      "assignee": "Jordan Lee",
+      "channel": "email",
+      "createdAt": "2025-03-13T16:20:00Z",
+      "dueAt": "2025-03-14T22:20:00Z"
+    },
+    {
+      "id": "tkt-1003",
+      "subject": "API 403 error in production",
+      "customerName": "Devon King",
+      "customerEmail": "devon@kinglabs.io",
+      "status": "open",
+      "priority": "critical",
+      "assignee": "Casey Morgan",
+      "channel": "chat",
+      "createdAt": "2025-03-14T13:15:00Z",
+      "dueAt": "2025-03-14T16:15:00Z"
+    },
+    {
+      "id": "tkt-1004",
+      "subject": "Feature request: dark mode",
+      "customerName": "Alexis Chen",
+      "customerEmail": "alexis@design.io",
+      "status": "resolved",
+      "priority": "low",
+      "assignee": "Morgan Price",
+      "channel": "twitter",
+      "createdAt": "2025-03-12T11:00:00Z",
+      "resolvedAt": "2025-03-13T09:30:00Z"
+    },
+    {
+      "id": "tkt-1005",
+      "subject": "Payment failed but card charged",
+      "customerName": "Taylor Kim",
+      "customerEmail": "taylor@kims.co",
+      "status": "open",
+      "priority": "high",
+      "assignee": "Avery Park",
+      "channel": "email",
+      "createdAt": "2025-03-14T08:45:00Z",
+      "dueAt": "2025-03-14T14:45:00Z"
+    },
+    {
+      "id": "tkt-1006",
+      "subject": "Where is my order?",
+      "customerName": "Jordan Smith",
+      "customerEmail": "jordan@smithmail.com",
+      "status": "pending",
+      "priority": "normal",
+      "assignee": "Jordan Lee",
+      "channel": "chat",
+      "createdAt": "2025-03-14T12:30:00Z",
+      "dueAt": "2025-03-14T20:30:00Z"
+    }
+  ],
+  "screens": {
+    "inbox": {
+      "conversationTable": [
+        {
+          "id": "tkt-1001",
+          "customer": "Sam Reyes",
+          "subject": "Unable to reset password after update",
+          "status": "open",
+          "priority": "high",
+          "assignee": "Avery Park",
+          "timer": "42m left"
+        },
+        {
+          "id": "tkt-1002",
+          "customer": "Priya Patel",
+          "subject": "Can I get a refund for last month?",
+          "status": "pending",
+          "priority": "normal",
+          "assignee": "Jordan Lee",
+          "timer": "7h 50m left"
+        },
+        {
+          "id": "tkt-1003",
+          "customer": "Devon King",
+          "subject": "API 403 error in production",
+          "status": "open",
+          "priority": "critical",
+          "assignee": "Casey Morgan",
+          "timer": "1h 45m left"
+        },
+        {
+          "id": "tkt-1004",
+          "customer": "Alexis Chen",
+          "subject": "Feature request: dark mode",
+          "status": "resolved",
+          "priority": "low",
+          "assignee": "Morgan Price",
+          "timer": "–"
+        },
+        {
+          "id": "tkt-1005",
+          "customer": "Taylor Kim",
+          "subject": "Payment failed but card charged",
+          "status": "open",
+          "priority": "high",
+          "assignee": "Avery Park",
+          "timer": "15m left"
+        },
+        {
+          "id": "tkt-1006",
+          "customer": "Jordan Smith",
+          "subject": "Where is my order?",
+          "status": "pending",
+          "priority": "normal",
+          "assignee": "Jordan Lee",
+          "timer": "6h 0m left"
+        }
+      ],
+      "bulkActions": [
+        "Assign to",
+        "Mark status",
+        "Set priority"
+      ]
+    },
+    "conversation-detail": {
+      "thread": [
+        {
+          "from": "Sam Reyes",
+          "type": "customer",
+          "timestamp": "2025-03-14T09:12:00Z",
+          "body": "I've tried resetting my password twice after updating to v2.4, but I never receive the reset email. My account is locked now."
+        },
+        {
+          "from": "Avery Park",
+          "type": "reply",
+          "timestamp": "2025-03-14T09:48:00Z",
+          "body": "Hi Sam, thanks for flagging. Can you confirm your username and check your spam folder? I'll also re-trigger the reset email from our side."
+        },
+        {
+          "from": "Sam Reyes",
+          "type": "customer",
+          "timestamp": "2025-03-14T10:05:00Z",
+          "body": "Just checked spam — nothing there. Username is sreyes."
+        },
+        {
+          "from": "Avery Park",
+          "type": "reply",
+          "timestamp": "2025-03-14T14:22:00Z",
+          "body": "I've manually triggered the reset email again and confirmed it left our server. It should arrive within a few minutes. Let me know if it doesn't show up."
+        }
+      ],
+      "details": {
+        "assignee": "Avery Park",
+        "status": "open",
+        "priority": "high",
+        "created": "2025-03-14T09:12:00Z",
+        "lastUpdated": "2025-03-14T14:22:00Z",
+        "relatedTickets": [
+          {
+            "id": "tkt-1005",
+            "subject": "Payment failed but card charged"
+          }
+        ]
+      }
+    },
+    "analytics": {
+      "metricTiles": [
+        {
+          "label": "Open",
+          "value": "23",
+          "delta": "+4 today"
+        },
+        {
+          "label": "Resolved (30d)",
+          "value": "147",
+          "delta": "+12%"
+        },
+        {
+          "label": "Avg first response",
+          "value": "2h 41m",
+          "delta": "-18m vs last week"
+        },
+        {
+          "label": "SLA compliance",
+          "value": "94%",
+          "delta": "+2%"
+        }
+      ],
+      "responseTimeChart": [
+        {
+          "date": "2025-02-27",
+          "avgResponseHrs": 3.8
+        },
+        {
+          "date": "2025-02-28",
+          "avgResponseHrs": 3.6
+        },
+        {
+          "date": "2025-03-01",
+          "avgResponseHrs": 3.9
+        },
+        {
+          "date": "2025-03-02",
+          "avgResponseHrs": 3.5
+        },
+        {
+          "date": "2025-03-03",
+          "avgResponseHrs": 3.2
+        },
+        {
+          "date": "2025-03-04",
+          "avgResponseHrs": 3.4
+        },
+        {
+          "date": "2025-03-05",
+          "avgResponseHrs": 3.1
+        },
+        {
+          "date": "2025-03-06",
+          "avgResponseHrs": 2.9
+        },
+        {
+          "date": "2025-03-07",
+          "avgResponseHrs": 3
+        },
+        {
+          "date": "2025-03-08",
+          "avgResponseHrs": 2.7
+        },
+        {
+          "date": "2025-03-09",
+          "avgResponseHrs": 2.8
+        },
+        {
+          "date": "2025-03-10",
+          "avgResponseHrs": 2.6
+        },
+        {
+          "date": "2025-03-11",
+          "avgResponseHrs": 2.5
+        },
+        {
+          "date": "2025-03-12",
+          "avgResponseHrs": 2.5
+        }
+      ],
+      "volumeChart": {
+        "open": 23,
+        "pending": 18,
+        "resolved": 147
+      },
+      "teamLeaderboard": [
+        {
+          "agent": "Avery Park",
+          "resolved": 38,
+          "avgResponseHrs": "2h 12m",
+          "satisfaction": "98%"
+        },
+        {
+          "agent": "Jordan Lee",
+          "resolved": 31,
+          "avgResponseHrs": "2h 55m",
+          "satisfaction": "95%"
+        },
+        {
+          "agent": "Casey Morgan",
+          "resolved": 27,
+          "avgResponseHrs": "3h 20m",
+          "satisfaction": "96%"
+        },
+        {
+          "agent": "Morgan Price",
+          "resolved": 22,
+          "avgResponseHrs": "4h 05m",
+          "satisfaction": "97%"
+        }
+      ]
+    }
+  }
+}

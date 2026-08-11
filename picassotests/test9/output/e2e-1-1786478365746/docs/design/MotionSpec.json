@@ -1,0 +1,27 @@
+{
+  "character": "swift",
+  "durations": {
+    "fast": "120ms",
+    "base": "200ms",
+    "slow": "400ms"
+  },
+  "easing": "cubic-bezier(0.2, 0.0, 0, 1.0)",
+  "interactionRules": {
+    "hover": {
+      "enabled": true,
+      "duration": "120ms"
+    },
+    "focus": {
+      "enabled": true,
+      "ring": "#626262"
+    },
+    "enter": {
+      "enabled": true,
+      "style": "fade"
+    },
+    "press": {
+      "enabled": true,
+      "translate": "translate-y-px"
+    }
+  }
+}

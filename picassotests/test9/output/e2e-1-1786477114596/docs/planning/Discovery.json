@@ -1,0 +1,17 @@
+{
+  "productContext": "app",
+  "contextDescription": "Support agents and product managers triage a live queue of customer conversations, prioritizing by urgency and assigning threads to teammates before response timers expire. The dominant moment is the inbox list: a scannable, lightly-colored triage board where each ticket's status, priority, and assignee are instantly readable.",
+  "selectedReferences": [
+    {
+      "slug": "linear",
+      "name": "linear",
+      "tagline": "Keyboard-first minimalism, dense but calm — productivity tools"
+    },
+    {
+      "slug": "mercury",
+      "name": "mercury",
+      "tagline": "Fintech trust, precise data-typography, restrained accent"
+    }
+  ],
+  "creativeSeed": "dispatch console clarity"
+}

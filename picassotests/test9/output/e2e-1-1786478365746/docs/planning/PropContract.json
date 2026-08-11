@@ -1,0 +1,328 @@
+{
+  "generatedAt": "2026-08-11T20:05:52.873Z",
+  "entries": [
+    {
+      "componentId": "topbar",
+      "componentName": "Topbar",
+      "props": {
+        "items": {
+          "type": "{label:string, href:string}[]",
+          "required": true,
+          "description": "Navigation items"
+        }
+      },
+      "importPath": "./topbar"
+    },
+    {
+      "componentId": "sidebar",
+      "componentName": "Sidebar",
+      "props": {
+        "items": {
+          "type": "{label:string, icon:string, href:string}[]",
+          "required": true,
+          "description": "Nav items"
+        }
+      },
+      "importPath": "./sidebar"
+    },
+    {
+      "componentId": "filter-tabs",
+      "componentName": "FilterTabs",
+      "props": {
+        "tabs": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Tab items"
+        }
+      },
+      "importPath": "./filter-tabs"
+    },
+    {
+      "componentId": "priority-filter",
+      "componentName": "PriorityFilter",
+      "props": {
+        "options": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Priority options"
+        }
+      },
+      "importPath": "./priority-filter"
+    },
+    {
+      "componentId": "assignee-filter",
+      "componentName": "AssigneeFilter",
+      "props": {
+        "options": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Assignee options"
+        }
+      },
+      "importPath": "./assignee-filter"
+    },
+    {
+      "componentId": "ticket-table",
+      "componentName": "TicketTable",
+      "props": {
+        "tickets": {
+          "type": "{id:string, priority:string, subject:string, customer:string, status:string, assignee:string, timer:string}[]",
+          "required": true,
+          "description": "Ticket data"
+        }
+      },
+      "importPath": "./ticket-table"
+    },
+    {
+      "componentId": "ticket-row-actions",
+      "componentName": "TicketRowActions",
+      "props": {
+        "ticketId": {
+          "type": "string",
+          "required": true,
+          "description": "Ticket ID"
+        }
+      },
+      "importPath": "./ticket-row-actions"
+    },
+    {
+      "componentId": "priority-badge",
+      "componentName": "PriorityBadge",
+      "props": {
+        "priority": {
+          "type": "string",
+          "required": true,
+          "description": "Priority level"
+        }
+      },
+      "importPath": "./priority-badge"
+    },
+    {
+      "componentId": "status-badge",
+      "componentName": "StatusBadge",
+      "props": {
+        "status": {
+          "type": "string",
+          "required": true,
+          "description": "Status"
+        }
+      },
+      "importPath": "./status-badge"
+    },
+    {
+      "componentId": "timer-badge",
+      "componentName": "TimerBadge",
+      "props": {
+        "timeLeft": {
+          "type": "string",
+          "required": true,
+          "description": "Time remaining"
+        }
+      },
+      "importPath": "./timer-badge"
+    },
+    {
+      "componentId": "queue-empty",
+      "componentName": "QueueEmpty",
+      "props": {
+        "title": {
+          "type": "string",
+          "required": true,
+          "description": "Title"
+        },
+        "description": {
+          "type": "string",
+          "required": true,
+          "description": "Description"
+        }
+      },
+      "importPath": "./queue-empty"
+    },
+    {
+      "componentId": "assign-dialog",
+      "componentName": "AssignDialog",
+      "props": {
+        "open": {
+          "type": "boolean",
+          "required": false,
+          "description": "Controlled open state"
+        }
+      },
+      "importPath": "./assign-dialog"
+    },
+    {
+      "componentId": "thread-title",
+      "componentName": "ThreadTitle",
+      "props": {
+        "subject": {
+          "type": "string",
+          "required": true,
+          "description": "Subject"
+        },
+        "customer": {
+          "type": "string",
+          "required": true,
+          "description": "Customer name"
+        }
+      },
+      "importPath": "./thread-title"
+    },
+    {
+      "componentId": "quick-actions",
+      "componentName": "QuickActions",
+      "props": {
+        "actions": {
+          "type": "{label:string, value:string}[]",
+          "required": true,
+          "description": "Actions"
+        }
+      },
+      "importPath": "./quick-actions"
+    },
+    {
+      "componentId": "message-list",
+      "componentName": "MessageList",
+      "props": {
+        "messages": {
+          "type": "{id:string, sender:string, content:string, timestamp:string}[]",
+          "required": true,
+          "description": "Messages"
+        }
+      },
+      "importPath": "./message-list"
+    },
+    {
+      "componentId": "message-item",
+      "componentName": "MessageItem",
+      "props": {
+        "sender": {
+          "type": "string",
+          "required": true,
+          "description": "Sender name"
+        },
+        "content": {
+          "type": "string",
+          "required": true,
+          "description": "Message body"
+        },
+        "timestamp": {
+          "type": "string",
+          "required": true,
+          "description": "ISO timestamp"
+        }
+      },
+      "importPath": "./message-item"
+    },
+    {
+      "componentId": "internal-note",
+      "componentName": "InternalNote",
+      "props": {
+        "author": {
+          "type": "string",
+          "required": true,
+          "description": "Author"
+        },
+        "content": {
+          "type": "string",
+          "required": true,
+          "description": "Note body"
+        },
+        "timestamp": {
+          "type": "string",
+          "required": true,
+          "description": "ISO timestamp"
+        }
+      },
+      "importPath": "./internal-note"
+    },
+    {
+      "componentId": "reply-textarea",
+      "componentName": "ReplyTextarea",
+      "props": {
+        "placeholder": {
+          "type": "string",
+          "required": false,
+          "description": "Placeholder text"
+        }
+      },
+      "importPath": "./reply-textarea"
+    },
+    {
+      "componentId": "send-button",
+      "componentName": "SendButton",
+      "props": {
+        "label": {
+          "type": "string",
+          "required": true,
+          "description": "Button label"
+        }
+      },
+      "importPath": "./send-button"
+    },
+    {
+      "componentId": "note-toggle",
+      "componentName": "NoteToggle",
+      "props": {
+        "options": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Toggle options"
+        }
+      },
+      "importPath": "./note-toggle"
+    },
+    {
+      "componentId": "assignee-select",
+      "componentName": "AssigneeSelect",
+      "props": {
+        "options": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Assignee options"
+        }
+      },
+      "importPath": "./assignee-select"
+    },
+    {
+      "componentId": "tag-input",
+      "componentName": "TagInput",
+      "props": {
+        "tags": {
+          "type": "string[]",
+          "required": false,
+          "description": "Current tags"
+        }
+      },
+      "importPath": "./tag-input"
+    },
+    {
+      "componentId": "sla-timer",
+      "componentName": "SlaTimer",
+      "props": {
+        "value": {
+          "type": "number",
+          "required": true,
+          "description": "Progress value (0-100)"
+        },
+        "deadline": {
+          "type": "string",
+          "required": true,
+          "description": "ISO deadline"
+        }
+      },
+      "importPath": "./sla-timer"
+    },
+    {
+      "componentId": "customer-info",
+      "componentName": "CustomerInfo",
+      "props": {
+        "customer": {
+          "type": "{name:string, email:string, company?:string}",
+          "required": true,
+          "description": "Customer details"
+        }
+      },
+      "importPath": "./customer-info"
+    }
+  ]
+}

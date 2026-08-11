@@ -1,0 +1,13 @@
+{
+  "productName": "Meridian Inbox",
+  "description": "A shared support inbox for small product teams to triage customer emails and tickets into assigned conversations with reply statuses, priority labels and response timers.",
+  "audience": "Customer support agents and product managers at small startups",
+  "niche": "other",
+  "personality": [
+    "clean",
+    "professional"
+  ],
+  "density": "dense",
+  "mode": "light",
+  "platform": "web"
+}

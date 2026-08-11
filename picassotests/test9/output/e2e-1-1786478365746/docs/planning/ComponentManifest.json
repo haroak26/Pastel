@@ -1,0 +1,683 @@
+{
+  "generatedAt": "2026-08-11T20:05:52.872Z",
+  "entries": [
+    {
+      "id": "topbar",
+      "name": "Topbar",
+      "taxonomy": "organism",
+      "description": "Global top navigation bar.",
+      "baseComponent": "navigation-menu",
+      "customization": "Use h-14 height, border-b border-border, background bg-background with subtle shadow-sm. Brand mark on left, center search trigger (input-group with icon), right side avatar with dropdown menu. Font size text-sm, font-medium. Accent color on active nav item.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "items": {
+          "type": "{label:string, href:string}[]",
+          "required": true,
+          "description": "Navigation items"
+        }
+      }
+    },
+    {
+      "id": "sidebar",
+      "name": "Sidebar",
+      "taxonomy": "organism",
+      "description": "Sidebar navigation for app sections.",
+      "baseComponent": "sidebar",
+      "customization": "Width w-64, border-r border-border, bg-background. Use space-y-1 for nav items, each item h-9 rounded-md px-3 text-sm font-medium. Active item has bg-primary text-primary-foreground. Icons use text-muted-foreground. Collapsible on mobile.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "items": {
+          "type": "{label:string, icon:string, href:string}[]",
+          "required": true,
+          "description": "Nav items"
+        }
+      }
+    },
+    {
+      "id": "filter-tabs",
+      "name": "FilterTabs",
+      "taxonomy": "organism",
+      "description": "Tabs to filter the queue by status.",
+      "baseComponent": "tabs",
+      "customization": "Use default tabs with h-9 trigger, rounded-md, bg-muted text-muted-foreground. Active tab bg-background shadow-sm. Border border-border. Font size text-sm font-medium. Use data-state=active for styling.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "tabs": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Tab items"
+        }
+      }
+    },
+    {
+      "id": "priority-filter",
+      "name": "PriorityFilter",
+      "taxonomy": "atom",
+      "description": "Select to filter by priority.",
+      "baseComponent": "select",
+      "customization": "Use h-9, rounded-md, border-border bg-background text-sm. Font-medium. Icon on right. Use ring-ring on focus.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "options": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Priority options"
+        }
+      }
+    },
+    {
+      "id": "assignee-filter",
+      "name": "AssigneeFilter",
+      "taxonomy": "atom",
+      "description": "Select to filter by assignee.",
+      "baseComponent": "select",
+      "customization": "Use h-9, rounded-md, border-border bg-background text-sm. Font-medium. Icon on right. Use ring-ring on focus.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "options": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Assignee options"
+        }
+      }
+    },
+    {
+      "id": "ticket-table",
+      "name": "TicketTable",
+      "taxonomy": "organism",
+      "description": "Table displaying the queue of tickets.",
+      "baseComponent": "table",
+      "customization": "Use TableHeader with bg-muted text-xs font-medium text-muted-foreground. Rows h-12 border-b border-border. Hover bg-accent. Font size text-sm. First column priority badge, then subject, customer, status, assignee, timer. Use sticky header.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "tickets": {
+          "type": "{id:string, priority:string, subject:string, customer:string, status:string, assignee:string, timer:string}[]",
+          "required": true,
+          "description": "Ticket data"
+        }
+      }
+    },
+    {
+      "id": "ticket-row-actions",
+      "name": "TicketRowActions",
+      "taxonomy": "molecule",
+      "description": "Dropdown menu for row actions.",
+      "baseComponent": "dropdown-menu",
+      "customization": "Trigger is icon button size h-8 w-8 rounded-md hover:bg-accent. Menu items h-9 px-3 text-sm font-medium, rounded-md. Separator between groups. Use text-destructive for destructive actions.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "ticketId": {
+          "type": "string",
+          "required": true,
+          "description": "Ticket ID"
+        }
+      }
+    },
+    {
+      "id": "priority-badge",
+      "name": "PriorityBadge",
+      "taxonomy": "atom",
+      "description": "Badge showing priority level.",
+      "baseComponent": "badge",
+      "customization": "Use rounded-full, px-2 py-0.5 text-xs font-semibold. Color variants: urgent bg-destructive text-destructive-foreground, high bg-orange-100 text-orange-800, medium bg-yellow-100 text-yellow-800, low bg-muted text-muted-foreground.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {
+        "priority": [
+          "urgent",
+          "high",
+          "medium",
+          "low"
+        ]
+      },
+      "props": {
+        "priority": {
+          "type": "string",
+          "required": true,
+          "description": "Priority level"
+        }
+      }
+    },
+    {
+      "id": "status-badge",
+      "name": "StatusBadge",
+      "taxonomy": "atom",
+      "description": "Badge showing conversation status.",
+      "baseComponent": "badge",
+      "customization": "Use rounded-md, px-2 py-0.5 text-xs font-medium. Color variants: new bg-blue-100 text-blue-800, open bg-green-100 text-green-800, pending bg-yellow-100 text-yellow-800, resolved bg-muted text-muted-foreground.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {
+        "status": [
+          "new",
+          "open",
+          "pending",
+          "resolved"
+        ]
+      },
+      "props": {
+        "status": {
+          "type": "string",
+          "required": true,
+          "description": "Status"
+        }
+      }
+    },
+    {
+      "id": "timer-badge",
+      "name": "TimerBadge",
+      "taxonomy": "atom",
+      "description": "Badge showing response timer urgency.",
+      "baseComponent": "badge",
+      "customization": "Use rounded-md, px-2 py-0.5 text-xs font-mono. For urgent timers, bg-destructive text-destructive-foreground. For normal, bg-muted text-muted-foreground. Show remaining time.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {
+        "urgency": [
+          "normal",
+          "urgent"
+        ]
+      },
+      "props": {
+        "timeLeft": {
+          "type": "string",
+          "required": true,
+          "description": "Time remaining"
+        }
+      }
+    },
+    {
+      "id": "queue-empty",
+      "name": "QueueEmpty",
+      "taxonomy": "organism",
+      "description": "Empty state for the queue.",
+      "baseComponent": "empty",
+      "customization": "Use flex flex-col items-center justify-center py-16. Icon in rounded-full bg-muted p-4. Title text-lg font-heading. Description text-sm text-muted-foreground max-w-sm text-center. Button mt-4.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "title": {
+          "type": "string",
+          "required": true,
+          "description": "Title"
+        },
+        "description": {
+          "type": "string",
+          "required": true,
+          "description": "Description"
+        }
+      }
+    },
+    {
+      "id": "assign-dialog",
+      "name": "AssignDialog",
+      "taxonomy": "molecule",
+      "description": "Dialog for bulk assigning conversations.",
+      "baseComponent": "dialog",
+      "customization": "Use fixed overlay bg-black/50, dialog content max-w-sm rounded-lg bg-background p-6 shadow-lg. Title font-heading text-lg. Use h-10 primary button for confirm and h-10 outline button for cancel.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "open": {
+          "type": "boolean",
+          "required": false,
+          "description": "Controlled open state"
+        }
+      }
+    },
+    {
+      "id": "thread-title",
+      "name": "ThreadTitle",
+      "taxonomy": "molecule",
+      "description": "Displays conversation subject and customer name.",
+      "baseComponent": "card",
+      "customization": "Use bg-transparent border-0 shadow-none p-0. Subject text-xl font-heading. Customer name text-sm text-muted-foreground.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "subject": {
+          "type": "string",
+          "required": true,
+          "description": "Subject"
+        },
+        "customer": {
+          "type": "string",
+          "required": true,
+          "description": "Customer name"
+        }
+      }
+    },
+    {
+      "id": "quick-actions",
+      "name": "QuickActions",
+      "taxonomy": "molecule",
+      "description": "Actions to change status or assign.",
+      "baseComponent": "button-group",
+      "customization": "Use h-9 buttons with rounded-md border border-border bg-background. Active state bg-primary text-primary-foreground. Use icons for statuses.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "actions": {
+          "type": "{label:string, value:string}[]",
+          "required": true,
+          "description": "Actions"
+        }
+      }
+    },
+    {
+      "id": "message-list",
+      "name": "MessageList",
+      "taxonomy": "organism",
+      "description": "List of messages in a conversation.",
+      "baseComponent": "scroll-area",
+      "customization": "MessageList (product-specific): use the 6px radius language (rounded-* family) for corners, #C2410C accent only on the active/primary state with #9A3412 on interactive hover, standard control heights (h-9/h-10) with padding from the spacing scale, and type at \"DM Sans\", sans-serif weights with \"Space Grotesk\", sans-serif reserved for display moments.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "messages": {
+          "type": "{id:string, sender:string, content:string, timestamp:string}[]",
+          "required": true,
+          "description": "Messages"
+        }
+      }
+    },
+    {
+      "id": "message-item",
+      "name": "MessageItem",
+      "taxonomy": "molecule",
+      "description": "Single message in the thread.",
+      "baseComponent": "message",
+      "customization": "Use flex gap-3. Avatar size h-9 w-9 rounded-full. Content in bg-card rounded-lg p-4 border border-border. Sender name text-sm font-medium. Timestamp text-xs text-muted-foreground. Body text-sm leading-relaxed.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "sender": {
+          "type": "string",
+          "required": true,
+          "description": "Sender name"
+        },
+        "content": {
+          "type": "string",
+          "required": true,
+          "description": "Message body"
+        },
+        "timestamp": {
+          "type": "string",
+          "required": true,
+          "description": "ISO timestamp"
+        }
+      }
+    },
+    {
+      "id": "internal-note",
+      "name": "InternalNote",
+      "taxonomy": "molecule",
+      "description": "Internal note message.",
+      "baseComponent": "message",
+      "customization": "Use bg-accent border-accent rounded-lg p-4. Add a small label 'Internal note' with icon. Text size sm. Use dashed border to differentiate.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "author": {
+          "type": "string",
+          "required": true,
+          "description": "Author"
+        },
+        "content": {
+          "type": "string",
+          "required": true,
+          "description": "Note body"
+        },
+        "timestamp": {
+          "type": "string",
+          "required": true,
+          "description": "ISO timestamp"
+        }
+      }
+    },
+    {
+      "id": "reply-textarea",
+      "name": "ReplyTextarea",
+      "taxonomy": "molecule",
+      "description": "Textarea for composing reply.",
+      "baseComponent": "textarea",
+      "customization": "Use min-h-[120px] rounded-md border-border bg-background p-3 text-sm. Focus ring ring-ring. Placeholder text-muted-foreground.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "placeholder": {
+          "type": "string",
+          "required": false,
+          "description": "Placeholder text"
+        }
+      }
+    },
+    {
+      "id": "send-button",
+      "name": "SendButton",
+      "taxonomy": "atom",
+      "description": "Primary button to send reply.",
+      "baseComponent": "button",
+      "customization": "Use h-10 px-4 rounded-md bg-primary text-primary-foreground font-medium. Hover bg-primary/90. Focus ring ring-ring. Disabled opacity-50.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "label": {
+          "type": "string",
+          "required": true,
+          "description": "Button label"
+        }
+      }
+    },
+    {
+      "id": "note-toggle",
+      "name": "NoteToggle",
+      "taxonomy": "molecule",
+      "description": "Toggle between public reply and internal note.",
+      "baseComponent": "toggle-group",
+      "customization": "Use h-9 rounded-md border border-border bg-background. Active item bg-primary text-primary-foreground. Use icons.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "options": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Toggle options"
+        }
+      }
+    },
+    {
+      "id": "assignee-select",
+      "name": "AssigneeSelect",
+      "taxonomy": "atom",
+      "description": "Select to change assignee.",
+      "baseComponent": "select",
+      "customization": "Use h-9 w-full rounded-md border-border bg-background text-sm. Font-medium. Icon on right.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "options": {
+          "type": "{value:string, label:string}[]",
+          "required": true,
+          "description": "Assignee options"
+        }
+      }
+    },
+    {
+      "id": "tag-input",
+      "name": "TagInput",
+      "taxonomy": "molecule",
+      "description": "Input to add or remove tags.",
+      "baseComponent": "input-group",
+      "customization": "Use h-9 rounded-md border-border bg-background. Tag chips appear inside with remove icon. Use flex-wrap.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "tags": {
+          "type": "string[]",
+          "required": false,
+          "description": "Current tags"
+        }
+      }
+    },
+    {
+      "id": "sla-timer",
+      "name": "SlaTimer",
+      "taxonomy": "molecule",
+      "description": "Progress bar showing SLA deadline.",
+      "baseComponent": "progress",
+      "customization": "Use h-2 rounded-full bg-muted. Indicator bg-primary. If overdue, bg-destructive. Show text with remaining time.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "value": {
+          "type": "number",
+          "required": true,
+          "description": "Progress value (0-100)"
+        },
+        "deadline": {
+          "type": "string",
+          "required": true,
+          "description": "ISO deadline"
+        }
+      }
+    },
+    {
+      "id": "customer-info",
+      "name": "CustomerInfo",
+      "taxonomy": "molecule",
+      "description": "Customer details such as email and company.",
+      "baseComponent": "card",
+      "customization": "Use bg-card rounded-lg border border-border p-4. Title text-sm font-medium. Details text-sm text-muted-foreground. Use avatar with initials.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "customer": {
+          "type": "{name:string, email:string, company?:string}",
+          "required": true,
+          "description": "Customer details"
+        }
+      }
+    }
+  ]
+}

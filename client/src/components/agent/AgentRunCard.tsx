@@ -26,6 +26,7 @@ const RUNNING_TITLES: Record<AgentPhase, string> = {
   brief: "Brief — selecting references & building the brief",
   data: "Content & Data — writing metrics, items, and reviews",
   wireframe: "Wireframe — producing page wireframes",
+  "wireframe-review": "Wireframe Review — awaiting your approval before building",
   build: "Components — planning and building in parallel",
   assemble: "Assembly — composing screens & verifying",
   present: "Presenting — your screens are live",

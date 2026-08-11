@@ -2,7 +2,7 @@ import type { Brief, Tokens, LayoutPlan, ComponentsManifest, ComponentManifestEn
 import type { BrandKit } from "./stage-3-wireframe";
 import { chatText, chatJSON, MAX_TOKENS_PER_CALL, type ChatMessage } from "../../gateway";
 import { antiSlopSystemPrompt } from "./anti-slop";
-import { loadBaseComponent, rewriteBaseImports, tokenSnapshot, kebab, type BaseComponentInfo } from "./lib/base-components";
+import { loadBaseComponent, rewriteBaseImports, tokenSnapshot, kebab, baseComponentNames, type BaseComponentInfo } from "./lib/base-components";
 import pLimit from "p-limit";
 import { z } from "zod";
 
@@ -146,12 +146,17 @@ export interface GenerateComponentInput {
   extraContext?: string;
 }
 
+export interface GenerateComponentResult {
+  code: string;
+  fidelity: FidelityVerdict;
+}
+
 const COMPONENT_SYSTEM = `You are a senior product engineer editing production shadcn components for a specific product. You receive the COMPLETE source of a base shadcn component and you REWRITE it into a custom component for this product. The user gets the code you write — it must be complete, correct, and unmistakably this product's.
 
 ## Rules
 1. START from the provided base source. Keep its structure, accessibility, exports and API. Change what the customization instructions demand.
 2. Output the COMPLETE file — the user does not see any other file. Never output "…rest unchanged".
-3. Self-contained: imports may only be npm packages (react, radix-ui, lucide-react, class-variance-authority, clsx, tailwind-merge, cmdk, input-otp, vaul, sonner, embla-carousel-react, next-themes, recharts, react-day-picker, date-fns, react-resizable-panels, @base-ui/react) or relative siblings (./cn, ./button, ./use-mobile). NEVER "@/" aliases, NEVER imports from "shadcn" packages.
+3. Self-contained: imports may only be npm packages (react, radix-ui, lucide-react, class-variance-authority, clsx, tailwind-merge, cmdk, input-otp, vaul, sonner, embla-carousel-react, next-themes, recharts, react-day-picker, date-fns, react-resizable-panels) or relative siblings (./cn, ./button, ./use-mobile). NEVER "@/" aliases, NEVER imports from "shadcn" packages, NEVER "@base-ui" or "@shadcn" imports.
 4. Styling: use ONLY the theme slot utilities and token values from the token snapshot (bg-primary, text-muted-foreground, rounded-lg, h-9…). NO raw hex/rgb/hsl/oklch, NO default Tailwind palette colours (gray/blue/etc.), NO gradients.
 5. Customization MUST be visible: remap colours to the product slots, adjust sizes/heights and rounding per the instructions, use the accent where the instructions say, tune density and padding. If the output is byte-identical to the base, it is a failure.
 6. Keep all exports the base file exported (same names) so existing importers keep working.
@@ -172,6 +177,9 @@ export function validateComponentCode(code: string, entry: ComponentManifestEntr
   }
   if (/from\s+["'](?:shadcn|@shadcn\/[a-z-]+)["']/.test(code)) {
     errors.push("Import from the shadcn package — component source must be inlined");
+  }
+  if (/from\s+["']@base-ui\//.test(code)) {
+    errors.push("Import from @base-ui — component source must be inlined");
   }
   if (/#[0-9a-fA-F]{3,8}\b/.test(code)) {
     errors.push("Raw hex colour literal — use theme slot utilities");
@@ -252,6 +260,80 @@ function distinctSlotUtilities(code: string): number {
   ).size;
 }
 
+// ── V8: taxonomy-tiered shadcn-fidelity floors ───────────────────────────
+//
+// The customization contract has a FLOOR per taxonomy tier (never a
+// scored-after-the-fact report): a primitive that comes out 22% similar to
+// its shadcn base (like the v7 run's `reminder-switch`) is a build failure,
+// not a creative choice. Floors are env-tunable (PASTEL_SIM_FLOOR_*).
+
+export type ComponentTaxonomy = "primitive" | "atom" | "molecule" | "organism";
+
+export interface SimilarityFloor {
+  /** Minimum chunk similarity to the base source (0..1). null = no floor. */
+  floor: number | null;
+  /** Action when a component lands under the floor. */
+  action: "reject" | "retry" | "report";
+}
+
+export const TAXONOMY_SIMILARITY_FLOORS: Record<ComponentTaxonomy, SimilarityFloor> = {
+  primitive: { floor: floorFromEnv("PASTEL_SIM_FLOOR_PRIMITIVE", 0.85), action: "reject" },
+  atom: { floor: floorFromEnv("PASTEL_SIM_FLOOR_ATOM", 0.65), action: "retry" },
+  molecule: { floor: floorFromEnv("PASTEL_SIM_FLOOR_MOLECULE", 0.40), action: "report" },
+  organism: { floor: null, action: "report" },
+};
+
+function floorFromEnv(name: string, fallback: number): number {
+  const raw = Number(process.env[name]);
+  return Number.isFinite(raw) && raw >= 0 && raw <= 1 ? raw : fallback;
+}
+
+export interface FidelityVerdict {
+  componentId: string;
+  componentName: string;
+  taxonomy: ComponentTaxonomy;
+  baseComponent: string;
+  similarity: number;
+  floor: number | null;
+  passed: boolean;
+  /** What happened when the floor was violated. */
+  action: "pass" | "retried" | "fell-back-to-base" | "warning" | "report" | "reject" | "retry";
+  message?: string;
+}
+
+/** V8: chunk-similarity gate against the taxonomy floor table. */
+export function checkSimilarityFloor(
+  code: string,
+  entry: { id: string; name: string; taxonomy: ComponentTaxonomy },
+  base: BaseComponentInfo,
+): FidelityVerdict {
+  const rule = TAXONOMY_SIMILARITY_FLOORS[entry.taxonomy] ?? { floor: null, action: "report" as const };
+  const similarity = sourceSimilarity(code, base.source);
+  if (rule.floor === null || similarity >= rule.floor) {
+    return {
+      componentId: entry.id,
+      componentName: entry.name,
+      taxonomy: entry.taxonomy,
+      baseComponent: base.name,
+      similarity: Math.round(similarity * 100) / 100,
+      floor: rule.floor,
+      passed: true,
+      action: "pass",
+    };
+  }
+  return {
+    componentId: entry.id,
+    componentName: entry.name,
+    taxonomy: entry.taxonomy,
+    baseComponent: base.name,
+    similarity: Math.round(similarity * 100) / 100,
+    floor: rule.floor,
+    passed: false,
+    action: rule.action,
+    message: `${entry.name} (${entry.taxonomy}) is ${(similarity * 100).toFixed(0)}% similar to its shadcn base — below the ${(rule.floor * 100).toFixed(0)}% floor.`,
+  };
+}
+
 function extractExports(code: string): string[] {
   const out: string[] = [];
   const named = code.match(/export \{\s*([^}]+)\s*\}/g) ?? [];
@@ -321,10 +403,22 @@ function componentPrompt(
 }
 
 export async function generateComponent(input: GenerateComponentInput): Promise<string> {
+  return (await generateComponentWithFidelity(input)).code;
+}
+
+/** V8: generateComponent + the taxonomy-fidelity gate. A primitive under its
+ *  similarity floor is retried once with a stricter prompt, then falls back
+ *  to the literal base file (token substitution only) — a low-fidelity
+ *  primitive never ships. */
+export async function generateComponentWithFidelity(input: GenerateComponentInput): Promise<GenerateComponentResult> {
   const { entry, tokens, brief, creativeSeed, baseSources, extraContext } = input;
   const base = baseSources[entry.baseComponent] ?? loadBaseComponent(entry.baseComponent);
   if (!base) {
-    return fallbackStub(entry);
+    return { code: fallbackStub(entry), fidelity: {
+      componentId: entry.id, componentName: entry.name, taxonomy: entry.taxonomy,
+      baseComponent: entry.baseComponent, similarity: 0, floor: null, passed: false,
+      action: "fell-back-to-base", message: `Base component "${entry.baseComponent}" not found — stub emitted`,
+    } };
   }
 
   const model = "builderCustom" as const;
@@ -344,24 +438,54 @@ export async function generateComponent(input: GenerateComponentInput): Promise<
     return rewriteBaseImports(cleanComponentOutput(raw));
   };
 
-  let code = await attempt();
-  const validation = validateComponentCode(code, entry, base);
-  if (!validation.valid) {
-    const errorContext = validation.errors.map((e) => `- ${e}`).join("\n");
-    console.warn(`[stage-4] ${entry.name} validation failed: ${validation.errors.join("; ")}. Retrying…`);
+  const stricterPrompt = `The previous generation diverged too far from the base file. For a ${entry.taxonomy} component you must preserve the base's DOM structure and Tailwind utility classes BYTE-FOR-BYTE — change ONLY the CSS custom-property values (theme slot utilities like bg-primary, text-muted-foreground, border-input, rounded-*, h-*) that the customization demands. Do not restructure the JSX, do not rename classes, do not rewrite the component.`;
+
+  let code = await attempt(extraContext);
+  let validation = validateComponentCode(code, entry, base);
+  let floor = checkSimilarityFloor(code, entry, base);
+  let fellBack = false;
+
+  const gate = (): boolean => validation.valid && floor.passed;
+  if (!gate()) {
+    const errorContext = [
+      ...(validation.valid ? [] : validation.errors),
+      ...(floor.passed ? [] : [floor.message ?? ""]),
+    ].filter(Boolean).map((e) => `- ${e}`).join("\n");
+    console.warn(`[stage-4] ${entry.name} failed validation/fidelity (${(floor.similarity * 100).toFixed(0)}% vs base): ${validation.errors.join("; ") || floor.message}. Retrying…`);
     try {
-      code = await attempt(`The previous generation failed. Fix these issues:\n${errorContext}`);
-      const re = validateComponentCode(code, entry, base);
-      if (!re.valid) {
-        console.warn(`[stage-4] ${entry.name} retry failed: ${re.errors.join("; ")}. Falling back to customized base.`);
-        return customizeBaseFallback(base.source, entry);
+      code = await attempt(
+        `${errorContext ? `Fix these issues:\n${errorContext}\n` : ""}${floor.passed ? "" : `${stricterPrompt}\n`}`,
+      );
+      validation = validateComponentCode(code, entry, base);
+      const reFloor = checkSimilarityFloor(code, entry, base);
+      floor = reFloor;
+      if (!validation.valid) {
+        console.warn(`[stage-4] ${entry.name} retry failed: ${validation.errors.join("; ")}. Falling back to customized base.`);
+        code = customizeBaseFallback(base.source, entry);
+        fellBack = true;
+        floor = checkSimilarityFloor(code, entry, base);
+      } else if (!reFloor.passed && reFloor.action === "reject") {
+        console.warn(`[stage-4] ${entry.name} retry still below the ${entry.taxonomy} floor (${(reFloor.similarity * 100).toFixed(0)}%) — shipping the literal base file with token substitution only.`);
+        code = customizeBaseFallback(base.source, entry);
+        fellBack = true;
+        floor = checkSimilarityFloor(code, entry, base);
       }
     } catch (err) {
       console.error(`[stage-4] ${entry.name} retry errored: ${err instanceof Error ? err.message : err}`);
-      return customizeBaseFallback(base.source, entry);
+      code = customizeBaseFallback(base.source, entry);
+      fellBack = true;
+      floor = checkSimilarityFloor(code, entry, base);
     }
   }
-  return code;
+
+  return {
+    code,
+    fidelity: {
+      ...floor,
+      action: fellBack ? "fell-back-to-base" : gate() ? "pass" : floor.action === "reject" ? "fell-back-to-base" : floor.action === "retry" ? "warning" : "report",
+      message: fellBack ? `${floor.message ?? ""} — shipped the literal base file with token substitution.` : floor.message,
+    },
+  };
 }
 
 /** Last-resort: emit the base source with imports rewritten + an accent touch,
@@ -387,13 +511,18 @@ export { ${entry.name} }
 `;
 }
 
+export interface GenerateAllResult {
+  components: Record<string, string>;
+  fidelity: FidelityVerdict[];
+}
+
 export async function generateAllComponents(
   manifest: ComponentsManifest,
   tokens: Tokens,
   brief: Brief,
   creativeSeed: string,
-  concurrency = 4,
-): Promise<Record<string, string>> {
+  concurrency = 6,
+): Promise<GenerateAllResult> {
   const baseSources: Record<string, BaseComponentInfo> = {};
   for (const e of manifest.entries) {
     if (!baseSources[e.baseComponent]) {
@@ -403,9 +532,11 @@ export async function generateAllComponents(
   }
 
   const limit = pLimit(concurrency);
+  const fidelity: FidelityVerdict[] = [];
   const tasks = manifest.entries.map((entry) =>
     limit(async () => {
-      const code = await generateComponent({ entry, tokens, brief, creativeSeed, baseSources });
+      const { code, fidelity: verdict } = await generateComponentWithFidelity({ entry, tokens, brief, creativeSeed, baseSources });
+      fidelity.push(verdict);
       return { id: entry.id, code };
     }),
   );
@@ -415,10 +546,73 @@ export async function generateAllComponents(
   for (const { id, code } of results) {
     if (code) components[id] = code;
   }
-  return components;
+  return { components, fidelity };
 }
 
-/** Support files the generated code may reference (cn, use-mobile). */
+// ── V8: dependency closure (IMPROVEMENTS.md #2) ─────────────────────────
+//
+// After components are generated, scan every file for relative sibling
+// imports ("./separator", "./cn", …). Any sibling that is not a manifest id
+// and not a support file is provisioned from the vendored base library as a
+// literal base file (imports rewritten) — closing the import graph that
+// killed 100% of the tested v7 run's screens ("No matching export … for
+// import Separator"). The bundler stub remains only as a last-resort
+// fallback for bases that genuinely do not exist.
+
+/** Relative sibling imports ("from "./x"") a file requests, without extensions. */
+export function scanSiblingImports(code: string): string[] {
+  const out: string[] = [];
+  const re = /from\s+["']\.\/([^"']+)["']/g;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(code))) {
+    const name = m[1].replace(/\.(?:tsx|ts|jsx|js)$/, "").trim();
+    if (!name || name === ".") continue;
+    out.push(name);
+  }
+  return out;
+}
+
+export const SUPPORT_SIBLINGS = new Set(["cn", "use-mobile"]);
+
+export interface DependencyClosureResult {
+  components: Record<string, string>;
+  /** Manifest ids of the base files provisioned to close the graph. */
+  provisioned: string[];
+}
+
+export function closeDependencyGraph(
+  components: Record<string, string>,
+  manifest: ComponentsManifest,
+): DependencyClosureResult {
+  const result: Record<string, string> = { ...components };
+  const provisioned: string[] = [];
+  const manifestIds = new Set(manifest.entries.map((e) => e.id));
+  const baseNames = new Set(baseComponentNames());
+
+  let changed = true;
+  while (changed) {
+    changed = false;
+    for (const code of Object.values(result)) {
+      for (const sibling of scanSiblingImports(code)) {
+        if (SUPPORT_SIBLINGS.has(sibling)) continue;
+        if (manifestIds.has(sibling)) continue;
+        if (result[sibling] !== undefined) continue;
+        if (!baseNames.has(sibling)) continue; // bundler stub covers the rest
+        const base = loadBaseComponent(sibling);
+        if (!base) continue;
+        result[sibling] = rewriteBaseImports(base.source);
+        provisioned.push(sibling);
+        changed = true;
+      }
+    }
+  }
+  return { components: result, provisioned };
+}
+
+/** Support files the generated code may reference (cn, use-mobile).
+ *  V8: use-mobile is always provisioned — screens and components may
+ *  reference it, and per-screen pipelines smoke-test before every screen is
+ *  composed, so support files must not depend on the full screen set. */
 export function supportFiles(components: Record<string, string>, screens: Record<string, string>): Record<string, string> {
   const files: Record<string, string> = {
     "cn": `import { clsx, type ClassValue } from "clsx"
@@ -428,11 +622,7 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs))
 }
 `,
-  };
-  const all = { ...components, ...screens };
-  const needsMobile = Object.values(all).some((code) => /from\s+["']\.\/use-mobile["']/.test(code));
-  if (needsMobile) {
-    files["use-mobile"] = `import * as React from "react"
+    "use-mobile": `import * as React from "react"
 
 const MOBILE_BREAKPOINT = 768
 
@@ -451,8 +641,8 @@ export function useIsMobile() {
 
   return !!isMobile
 }
-`;
-  }
+`,
+  };
   return files;
 }
 

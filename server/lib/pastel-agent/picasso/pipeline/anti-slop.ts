@@ -115,6 +115,7 @@ const PALETTE_RE = /\b(?:bg|text|border|ring|fill|stroke|from|to|via)-(?:slate|g
 const GRADIENT_RE = /\b(?:bg-gradient-to-[a-z]+|bg-linear-to-[a-z]+|bg-radial|bg-conic)\b/g;
 const ALIAS_IMPORT_RE = /from\s+["']@\//g;
 const SHADCN_PACKAGE_RE = /from\s+["'](?:shadcn|@shadcn\/[a-z-]+)["']/g;
+const BASE_UI_PACKAGE_RE = /from\s+["']@base-ui\//g;
 const PLACEHOLDER_IMG_RE = /placeholder\.com|via\.placeholder|dummyimage|picsum|placehold\.co/g;
 const COPY_IMPORT_RE = /from\s+["'](?:@|\.\/)copy["']/g;
 
@@ -217,7 +218,17 @@ export function detectSlopViolations(
       severity: "high",
       file,
       description: `Import from the shadcn package — components must be inlined, never imported`,
-      fix: "Copy the component source into the file",
+      fix: "Rewrite the import into the file or use a sibling component",
+    });
+  }
+
+  if (BASE_UI_PACKAGE_RE.test(code)) {
+    violations.push({
+      id: "base-ui-import",
+      severity: "high",
+      file,
+      description: `Import from @base-ui — components must be inlined, never imported`,
+      fix: "Rewrite the import into the file or use a sibling component",
     });
   }
 

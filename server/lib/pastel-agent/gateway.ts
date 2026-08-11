@@ -81,11 +81,17 @@ export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
 } as const;
 
 const TRUNCATION_SCALE = 2.5;
-const MAX_TRUNCATION_RETRIES = 1;
+const MAX_TRUNCATION_RETRIES = 2;
 
-/** Per-role ceiling for truncation escalation. */
+/** Per-role ceiling for truncation escalation. Deepseek-v4-flash truncates
+ *  at the base budget; it needs real headroom or screens/components ship
+ *  mid-expression (unterminated regexes, unclosed JSX tags). */
 const ESCALATION_CAP: Partial<Record<ModelRole, number>> = {
-  wireframe: 16000,
+  wireframe: 32000,
+  compose: 24000,
+  assemble: 24000,
+  builderCustom: 24000,
+  repair: 24000,
 };
 
 function escalationCap(role: ModelRole): number {
@@ -107,11 +113,14 @@ export function isTruncated(response: ChatResponse): boolean {
 
 function thinkingConfig(role?: ModelRole): ThinkingConfig | Record<string, unknown> | undefined {
   const raw = process.env.PASTEL_THINKING_BUDGET;
-  if (raw === "off") return { type: "disabled" };
-  if (role && LIGHT_ROLES.has(role) && raw === undefined) return undefined;
+  // Default: thinking OFF for every role. Cheap models burn their output
+  // budget on thinking blocks (deepseek returned only thinking content),
+  // which doubles every call. Set PASTEL_THINKING_BUDGET to a positive
+  // number to enable reasoning.
+  if (raw === "off" || raw === undefined || raw === "") return { type: "disabled" };
   const budget = Number(raw);
   if (Number.isFinite(budget) && budget > 0) return { type: "enabled", budget_tokens: Math.floor(budget) };
-  return { type: "enabled", budget_tokens: DEFAULT_THINKING_BUDGET };
+  return { type: "disabled" };
 }
 
 /** Roles that don't support reasoning/thinking config — Luna models.
@@ -286,8 +295,8 @@ export function isTransientError(message: string): boolean {
   return /429|\b5\d{2}\b|rate.?limit|overloaded|request timed?\s*out|timeout|ETIMEDOUT|ECONNRESET|ECONNREFUSED|EAI_AGAIN|fetch failed|socket hang up|temporarily unavailable|service unavailable|bad gateway|gateway timeout/i.test(message);
 }
 
-const MAX_TOTAL_ATTEMPTS = 3;
-const RETRY_DELAYS_MS = [800, 2000];
+const MAX_TOTAL_ATTEMPTS = 4;
+const RETRY_DELAYS_MS = [800, 2000, 5000];
 
 export async function chat(
   messages: ChatMessage[],

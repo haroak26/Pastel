@@ -128,3 +128,23 @@ export type { SandboxRenderOptions, SandboxRenderResult } from "./pipeline/lib/s
 
 // Preview tooling
 export { bundleScreenForPreview, compileStylesForRun, buildPreviewHtml } from "./pipeline/lib/preview";
+
+// V8 — reliability + fidelity + gates
+export { closeDependencyGraph, scanSiblingImports, checkSimilarityFloor, TAXONOMY_SIMILARITY_FLOORS } from "./pipeline/stage-4-build";
+export type { FidelityVerdict, GenerateAllResult, DependencyClosureResult } from "./pipeline/stage-4-build";
+export { composeScreenV8 } from "./pipeline/stage-5-assemble";
+export type { ComposedScreenV8 } from "./pipeline/stage-5-assemble";
+export { auditScreenProps, applyPropAutoFix } from "./pipeline/lib/prop-validation";
+export type { PropViolation, ScreenPropAudit } from "./pipeline/lib/prop-validation";
+export { classifySurfacePolicy, enforceNeutralSurfaces, assertNeutralCanvas, surfacePolicyPrompt } from "./pipeline/lib/surface-policy";
+export type { SurfacePolicy, NeutralCanvasGateResult } from "./pipeline/lib/surface-policy";
+export { auditGlobalsCSS } from "./pipeline/lib/base-components";
+export type { GlobalsAuditResult } from "./pipeline/lib/base-components";
+export { runCompositionGate, auditScreenComposition, auditEmptySections } from "./pipeline/checks/composition";
+export type { CompositionGateResult, CompositionViolation } from "./pipeline/checks/composition";
+export { runGeometryGate, auditScreenGeometry } from "./pipeline/checks/geometry";
+export type { GeometryGateResult, GeometryViolation } from "./pipeline/checks/geometry";
+export { buildWireframeReview } from "./pipeline/lib/wireframe-review";
+export type { WireframeReviewPayload, WireframeDecision } from "./pipeline/lib/wireframe-review";
+export { loadResumableArtifacts } from "./pipeline/lib/resume";
+export type { ResumeLoaders, ResumedArtifacts } from "./pipeline/lib/resume";

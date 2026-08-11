@@ -186,6 +186,87 @@ V7 is verified by:
   `ALL ASSERTIONS PASSED` and `ISSUES.md` reporting
   `**Overall:** ALL ASSERTIONS PASSED`.
 
+## Picasso V8 - Parallel Framework, Wireframe Gate, Fidelity Contract
+
+V8 is the speed + reliability + fidelity upgrade for the Picasso pipeline
+(`server/lib/pastel-agent/picasso/pipeline/`), built against the reproduced
+`agentv7` E2E defects (`picassotests/agentv7/DIAGNOSIS.md` +
+`IMPROVEMENTS.md`). The V7 degradation machinery is kept; V8 adds:
+
+### New
+
+- **Parallel framework** (`orchestrator.ts`): per-screen pipelines —
+  compose → smoke runs concurrently for all screens (cap 4), then
+  render → visual QA concurrently for all screens (renders serialized
+  through the one E2B sandbox). Component build stays capped at 6. The
+  only forced serialization is the one-time Tailwind CSS compile between
+  the two screen passes (the content glob needs the final screen sources).
+- **Wireframe confirmation gate** (`lib/wireframe-review.ts`,
+  `wireframe-gate.ts`): a hard blocking checkpoint after architecture and
+  before any build work. New `wireframe-review` phase + `wireframes` SSE
+  event; the client posts approve/revise/cancel to
+  `POST /api/pastel-agent/runs/:runId/wireframe-decision`. Revisions are a
+  bounded re-architecture call (no re-run of discovery/tokens); cancel
+  refunds the credit hold; `PASTEL_WIREFRAME_REVIEW_TIMEOUT_MS` (10 min)
+  auto-cancels a silent run. Approval is checkpointed so a kill/resume
+  re-enters the gate without re-paying architecture model calls.
+- **Enforced shadcn fidelity floors** (`stage-4-build.ts`): the
+  chunk-similarity metric from COMPONENT_ANALYSIS.md is now a build-time
+  gate — primitive ≥ 85% (reject → stricter retry → literal-base fallback),
+  atom ≥ 65% (retry), molecule ≥ 40% (report), organism none (report).
+  Env-tunable (`PASTEL_SIM_FLOOR_*`); verdicts in
+  `docs/review/ComponentFidelity.json`.
+- **Neutral-canvas law** (`lib/surface-policy.ts`): app/workspace/dashboard/
+  utility/software contexts get deterministic near-neutral grey surfaces and
+  a near-white background (`enforceNeutralSurfaces`), plus a static
+  `assertNeutralCanvas` gate (chroma + luminance + input-border visibility)
+  that fails the run out of range. Lifestyle/editorial/consumer-brand briefs
+  keep the warm canvas as a deliberate choice.
+- **Dependency closure** (`stage-4-build.ts`): generated files' relative
+  sibling imports are scanned and missing bases are provisioned from the
+  vendored library — the `./separator` bundle-killer that failed 100% of
+  the tested v7 run's screens is fixed at the source, not by the bundler
+  stub.
+- **Prop-contract validation** (`lib/prop-validation.ts`): composed screens
+  are checked against the manifest's declared required props before they
+  are persisted; violations retry the compose, and unverifiable empty
+  usages are auto-fixed to safe `data-mount` wrappers — the v7
+  WeekStrip/HabitRow/LedgerSwitch runtime crashes can't ship.
+- **Render diagnostics**: error boundary + `pageerror`/`console.error`
+  capture in the preview bundle, forwarded through the sandbox render into
+  `renderDiagnostics` (a crash is attributable, never a silent blank PNG),
+  plus screenshot retry-on-blank (one re-render under the 5 KB threshold).
+- **Checkpoint/resume**: `docs/checkpoints/checkpoint.json` after every
+  stage; SIGTERM/SIGINT writes a partial `run-summary.json` (status
+  "killed"); `resume: { loadDoc, loadFile }` skips completed stages
+  (DB-backed in `run.ts`, `PASTEL_E2E_RESUME` in the harness). A fully
+  checkpointed run resumes with zero model calls (unit-tested).
+- **Deterministic composition gate** (`checks/composition.ts`): duplicate
+  chrome mounts + duplicate literal labels in a sibling block (the
+  "Today / Today" defect) and empty/placeholder sections (the empty grey
+  box) — blocking. **Geometry gate** (`checks/geometry.ts`): overflow
+  widths, inline fonts, rhythm uniformity — advisory until calibrated.
+- **Timing**: per-stage wall time in the output, `docs/review/Timing.json`
+  and `run-summary.json`; the E2E harness's fixed 420s wall assertion is
+  replaced by a latency-aware budget
+  (`300 + screens×120 + min(calls×15, 300)` seconds, overridable).
+
+### Acceptance
+
+V8 is verified by:
+
+- `server/tests/picasso-v8.test.ts` — 27 unit tests: dependency closure,
+  prop-contract audit/auto-fix, token-CSS completeness audit, surface
+  policy, fidelity floors + fallback, gate approve/cancel/revision,
+  checkpoint resume (0 calls; re-gate without re-pay), per-stage timing,
+  end-to-end neutral-canvas + closure.
+- Existing suites stay green (pastel v6/v15/v16/v17/v22/sandbox + picasso
+  v7 — 166 tests). The `pastel-v6` phase-order assertion was updated for
+  the deliberate `wireframe-review` wire-contract addition.
+- The three-brief E2E protocol (`picassotests/test6/e2e-run.ts`): software
+  context, lifestyle context, data-dense context — pending (not yet run on
+  v8).
+
 ## v6 - Knowledge-Base Pipeline
 
 - Introduced the company knowledge base under `knowledge/companies/`.

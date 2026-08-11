@@ -105,7 +105,7 @@ const BASE_DESCRIPTIONS: Record<string, string> = {
   "empty": "Empty-state block (no results, no items yet).",
   "item": "List item container (compound list rows).",
   "marker": "Progress marker (steps, milestones).",
-  "combobox": "Searchable combobox (base-ui) — pick a record from a large list.",
+  "combobox": "Searchable combobox — pick a record from a large list.",
   "questionnaire": "Multi-step guided form (onboarding, checkout steps).",
 };
 
@@ -330,6 +330,9 @@ export interface WireframeInput {
   productContext: ProductContext;
   creativeSeed: string;
   contextDescription: string;
+  /** V8: bounded re-architecture notes from the wireframe confirmation gate
+   *  revision round-trip — never a full pipeline restart. */
+  revisionNotes?: string;
 }
 
 // ── Deterministic prose healing (Call A post-parse) ─────────────────────
@@ -416,6 +419,13 @@ function structureMessages(input: WireframeInput): ChatMessage[] {
   const designLaws = loadAllDesignLaws();
   const componentLaws = loadAllComponentLaws();
   const contextRules = contextCompositionRules(productContext);
+  const revisionBlock = input.revisionNotes
+    ? [
+        "",
+        `## REVISION NOTES FROM THE USER (incorporate ALL of these)`,
+        input.revisionNotes,
+      ].join("\n")
+    : "";
 
   return [
     { role: "system", content: WIREFRAME_SYSTEM },
@@ -459,6 +469,7 @@ function structureMessages(input: WireframeInput): ChatMessage[] {
         `- globalRegions: chrome shared by all screens (topbar, sidebar, nav) with component slots.`,
         `- components: 10-24 entries. Each: id (kebab, referenced by slots), name (product-specific), taxonomy, description, baseComponent (EXACT name from the available list), customization (a precise design-review note naming at least TWO of: control heights/sizing, corner radius language, colour/accent placement, font weight or scale, density — never a vague genre description), states (default/hover/focus/active/disabled/loading/empty/error), variants (optional map of variant-name → option list), props (map: prop-name → {type, required, description} — types are TS types like string, number, boolean, {name:string}[]; date props MUST be typed string (ISO), never Date).`,
         `- Every slot ref must exist in components. Every baseComponent must exist in the available list.`,
+        revisionBlock,
         "",
         `Generate the complete wireframe + component manifest JSON now.`,
       ].join("\n"),

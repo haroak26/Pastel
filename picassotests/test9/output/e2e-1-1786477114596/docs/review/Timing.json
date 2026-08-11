@@ -1,0 +1,15 @@
+{
+  "wallSeconds": 1175,
+  "stages": {
+    "discovery": 3195,
+    "design": 101614,
+    "wireframe": 243958,
+    "content": 152194,
+    "build": 517176,
+    "screens": 156210,
+    "screen:inbox": 65785,
+    "screen:conversation-detail": 67381,
+    "screen:analytics": 65346,
+    "gates": 103
+  }
+}

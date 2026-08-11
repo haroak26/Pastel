@@ -1,0 +1,650 @@
+{
+  "generatedAt": "2026-08-11T19:44:23.367Z",
+  "entries": [
+    {
+      "id": "app-topbar",
+      "name": "App Topbar",
+      "taxonomy": "organism",
+      "description": "Global top navigation with logo, search, and user menu.",
+      "baseComponent": "sidebar",
+      "customization": "Height h-14, border-b, bg-background, logo on left, search in center, user menu on right. Use rounded-md for search input, no shadow.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "userName": {
+          "type": "string",
+          "required": true,
+          "description": "Name of the current user."
+        },
+        "userEmail": {
+          "type": "string",
+          "required": true,
+          "description": "Email of the current user."
+        }
+      }
+    },
+    {
+      "id": "app-sidebar",
+      "name": "App Sidebar",
+      "taxonomy": "organism",
+      "description": "Sidebar navigation for app sections.",
+      "baseComponent": "sidebar",
+      "customization": "W-64, bg-muted/50, border-r, p-4. Nav items with icons and labels, active item bg-primary text-primary-foreground. Use rounded-md for item hover.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "activeItem": {
+          "type": "string",
+          "required": true,
+          "description": "ID of the active nav item."
+        },
+        "items": {
+          "type": "{id: string; label: string; icon: React.ReactNode}[]",
+          "required": true,
+          "description": "List of navigation items."
+        }
+      }
+    },
+    {
+      "id": "filter-tabs",
+      "name": "Filter Tabs",
+      "taxonomy": "molecule",
+      "description": "Tabs to filter the conversation list.",
+      "baseComponent": "tabs",
+      "customization": "Use TabsList with bg-muted, p-1, rounded-md. Active tab bg-background shadow-sm. Text-sm font-medium.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "tabs": {
+          "type": "{id: string; label: string; count: number}[]",
+          "required": true,
+          "description": "List of tabs with counts."
+        },
+        "activeTab": {
+          "type": "string",
+          "required": true,
+          "description": "ID of the active tab."
+        }
+      }
+    },
+    {
+      "id": "priority-filter",
+      "name": "Priority Filter",
+      "taxonomy": "atom",
+      "description": "Dropdown to filter by priority.",
+      "baseComponent": "select",
+      "customization": "h-9, rounded-md, border-border, bg-background, text-sm. Use SelectTrigger with chevron icon.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "value": {
+          "type": "string",
+          "required": false,
+          "description": "Selected priority value."
+        },
+        "onChange": {
+          "type": "(value: string) => void",
+          "required": true,
+          "description": "Callback when priority changes."
+        }
+      }
+    },
+    {
+      "id": "status-filter",
+      "name": "Status Filter",
+      "taxonomy": "atom",
+      "description": "Dropdown to filter by status.",
+      "baseComponent": "select",
+      "customization": "h-9, rounded-md, border-border, bg-background, text-sm. Use SelectTrigger with chevron icon.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "value": {
+          "type": "string",
+          "required": false,
+          "description": "Selected status value."
+        },
+        "onChange": {
+          "type": "(value: string) => void",
+          "required": true,
+          "description": "Callback when status changes."
+        }
+      }
+    },
+    {
+      "id": "sort-select",
+      "name": "Sort Select",
+      "taxonomy": "atom",
+      "description": "Dropdown to sort the list.",
+      "baseComponent": "select",
+      "customization": "h-9, rounded-md, border-border, bg-background, text-sm. Use SelectTrigger with chevron icon.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "value": {
+          "type": "string",
+          "required": true,
+          "description": "Current sort value."
+        },
+        "onChange": {
+          "type": "(value: string) => void",
+          "required": true,
+          "description": "Callback when sort changes."
+        }
+      }
+    },
+    {
+      "id": "view-toggle",
+      "name": "View Toggle",
+      "taxonomy": "atom",
+      "description": "Toggle between list and compact view.",
+      "baseComponent": "toggle-group",
+      "customization": "Use ToggleGroup with two ToggleGroupItems, h-9, rounded-md, border-border. Active item bg-muted.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "value": {
+          "type": "string",
+          "required": true,
+          "description": "Current view mode: 'list' or 'compact'."
+        },
+        "onChange": {
+          "type": "(value: string) => void",
+          "required": true,
+          "description": "Callback when view changes."
+        }
+      }
+    },
+    {
+      "id": "conversation-table",
+      "name": "Conversation Table",
+      "taxonomy": "organism",
+      "description": "Table of conversations with columns for selection, customer, subject, status, priority, assignee, due, and updated.",
+      "baseComponent": "table",
+      "customization": "Header row bg-muted, text-xs font-medium text-muted-foreground. Data rows h-12, border-b, hover:bg-muted/50. Use rounded-md on container. Font size text-sm.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "conversations": {
+          "type": "{id: string; customerName: string; customerEmail: string; subject: string; status: string; priority: string; assignee: string; due: string; updated: string}[]",
+          "required": true,
+          "description": "List of conversations to display."
+        },
+        "selectedIds": {
+          "type": "string[]",
+          "required": false,
+          "description": "IDs of selected rows."
+        }
+      }
+    },
+    {
+      "id": "bulk-actions",
+      "name": "Bulk Actions",
+      "taxonomy": "molecule",
+      "description": "Actions for selected conversations.",
+      "baseComponent": "button-group",
+      "customization": "Use ButtonGroup with buttons h-9, rounded-md, border-border. Primary button bg-primary text-primary-foreground.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "selectedCount": {
+          "type": "number",
+          "required": true,
+          "description": "Number of selected conversations."
+        },
+        "onAssign": {
+          "type": "() => void",
+          "required": true,
+          "description": "Opens assign dialog."
+        },
+        "onStatusChange": {
+          "type": "() => void",
+          "required": true,
+          "description": "Opens status change dialog."
+        },
+        "onPriorityChange": {
+          "type": "() => void",
+          "required": true,
+          "description": "Opens priority change dialog."
+        }
+      }
+    },
+    {
+      "id": "conversation-header",
+      "name": "Conversation Header",
+      "taxonomy": "molecule",
+      "description": "Header with customer info and subject.",
+      "baseComponent": "card",
+      "customization": "Conversation Header (product-specific): use the 6px radius language (rounded-* family) for corners, #E8570C accent only on the active/primary state with #D24E0B on interactive hover, standard control heights (h-9/h-10) with padding from the spacing scale, and type at \"Onest\", sans-serif weights with \"Space Grotesk\", sans-serif reserved for display moments.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "customerName": {
+          "type": "string",
+          "required": true,
+          "description": "Customer's name."
+        },
+        "customerEmail": {
+          "type": "string",
+          "required": true,
+          "description": "Customer's email."
+        },
+        "subject": {
+          "type": "string",
+          "required": true,
+          "description": "Subject of the conversation."
+        },
+        "status": {
+          "type": "string",
+          "required": true,
+          "description": "Current status."
+        },
+        "priority": {
+          "type": "string",
+          "required": true,
+          "description": "Current priority."
+        }
+      }
+    },
+    {
+      "id": "message-thread",
+      "name": "Message Thread",
+      "taxonomy": "organism",
+      "description": "Vertical list of messages in the conversation.",
+      "baseComponent": "message-scroller",
+      "customization": "Use MessageScroller with message rows, each with avatar, name, timestamp, and body. Messages bg-muted, rounded-lg, max-w-[75%]. Own messages bg-primary text-primary-foreground.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "messages": {
+          "type": "{id: string; sender: string; body: string; timestamp: string; isOwn: boolean}[]",
+          "required": true,
+          "description": "List of messages."
+        }
+      }
+    },
+    {
+      "id": "reply-composer",
+      "name": "Reply Composer",
+      "taxonomy": "molecule",
+      "description": "Composer for writing a reply.",
+      "baseComponent": "textarea",
+      "customization": "Use Textarea with min-h-32, rounded-md, border-border, p-3. Attach toolbar with formatting buttons. Send button h-10 bg-primary text-primary-foreground.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "onSend": {
+          "type": "(content: string) => void",
+          "required": true,
+          "description": "Callback when reply is sent."
+        },
+        "placeholder": {
+          "type": "string",
+          "required": false,
+          "description": "Placeholder text."
+        }
+      }
+    },
+    {
+      "id": "detail-panel",
+      "name": "Detail Panel",
+      "taxonomy": "organism",
+      "description": "Panel with conversation metadata and actions.",
+      "baseComponent": "card",
+      "customization": "Detail Panel (product-specific): use the 6px radius language (rounded-* family) for corners, #E8570C accent only on the active/primary state with #D24E0B on interactive hover, standard control heights (h-9/h-10) with padding from the spacing scale, and type at \"Onest\", sans-serif weights with \"Space Grotesk\", sans-serif reserved for display moments.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "conversationId": {
+          "type": "string",
+          "required": true,
+          "description": "ID of the conversation."
+        },
+        "assignees": {
+          "type": "{id: string; name: string}[]",
+          "required": true,
+          "description": "List of possible assignees."
+        },
+        "statusOptions": {
+          "type": "string[]",
+          "required": true,
+          "description": "Possible statuses."
+        },
+        "priorityOptions": {
+          "type": "string[]",
+          "required": true,
+          "description": "Possible priorities."
+        }
+      }
+    },
+    {
+      "id": "metric-tile",
+      "name": "Metric Tile",
+      "taxonomy": "molecule",
+      "description": "Tile displaying a key metric.",
+      "baseComponent": "card",
+      "customization": "Card with p-4, rounded-md, bg-card. Metric value text-3xl font-heading. Label text-sm text-muted-foreground. Trend indicator with icon.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "label": {
+          "type": "string",
+          "required": true,
+          "description": "Label for the metric."
+        },
+        "value": {
+          "type": "string",
+          "required": true,
+          "description": "Value to display."
+        },
+        "trend": {
+          "type": "string",
+          "required": false,
+          "description": "Trend indicator (e.g., +12%)."
+        }
+      }
+    },
+    {
+      "id": "response-time-chart",
+      "name": "Response Time Chart",
+      "taxonomy": "organism",
+      "description": "Line chart showing first response time over time.",
+      "baseComponent": "chart",
+      "customization": "Use chart with line type, h-64, rounded-md, bg-card. Use primary color for line, muted for grid. Tooltip with bg-popover border-border.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "data": {
+          "type": "{date: string; avgResponseTime: number}[]",
+          "required": true,
+          "description": "Data points for the chart."
+        }
+      }
+    },
+    {
+      "id": "volume-chart",
+      "name": "Volume Chart",
+      "taxonomy": "organism",
+      "description": "Bar chart showing ticket volume by day.",
+      "baseComponent": "chart",
+      "customization": "Use chart with bar type, h-64, rounded-md, bg-card. Use primary for created, muted for resolved. Tooltip with bg-popover border-border.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "data": {
+          "type": "{date: string; created: number; resolved: number}[]",
+          "required": true,
+          "description": "Data points for the chart."
+        }
+      }
+    },
+    {
+      "id": "team-leaderboard",
+      "name": "Team Leaderboard",
+      "taxonomy": "organism",
+      "description": "Table of team members with performance metrics.",
+      "baseComponent": "table",
+      "customization": "Header row bg-muted, text-xs font-medium text-muted-foreground. Data rows h-12, border-b, hover:bg-muted/50. Use avatar, name, resolved count, avg response, satisfaction.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "members": {
+          "type": "{id: string; name: string; resolved: number; avgResponse: string; satisfaction: number}[]",
+          "required": true,
+          "description": "List of team members."
+        }
+      }
+    },
+    {
+      "id": "settings-form",
+      "name": "Settings Form",
+      "taxonomy": "organism",
+      "description": "Form for editing team settings.",
+      "baseComponent": "field",
+      "customization": "Use Field wrapper with Label, Input, and Description. Inputs h-10, rounded-md, border-border. Use max-w-md for form width.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "teamName": {
+          "type": "string",
+          "required": true,
+          "description": "Team name."
+        },
+        "email": {
+          "type": "string",
+          "required": true,
+          "description": "Support email."
+        },
+        "replyTo": {
+          "type": "string",
+          "required": true,
+          "description": "Reply-to email."
+        },
+        "timezone": {
+          "type": "string",
+          "required": true,
+          "description": "Timezone."
+        }
+      }
+    },
+    {
+      "id": "notification-preferences",
+      "name": "Notification Preferences",
+      "taxonomy": "molecule",
+      "description": "Checkboxes for notification settings.",
+      "baseComponent": "checkbox",
+      "customization": "Use Checkbox with Label. Rows with h-10, border-b, p-2. Checkbox accent-primary.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "emailNotifications": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether email notifications are enabled."
+        },
+        "pushNotifications": {
+          "type": "boolean",
+          "required": true,
+          "description": "Whether push notifications are enabled."
+        }
+      }
+    },
+    {
+      "id": "team-members",
+      "name": "Team Members",
+      "taxonomy": "organism",
+      "description": "Table of team members with roles.",
+      "baseComponent": "table",
+      "customization": "Header row bg-muted, text-xs font-medium text-muted-foreground. Data rows h-12, border-b, hover:bg-muted/50. Use avatar, name, email, role select, actions.",
+      "states": [
+        "default",
+        "hover",
+        "focus",
+        "active",
+        "disabled",
+        "loading",
+        "empty",
+        "error"
+      ],
+      "variants": {},
+      "props": {
+        "members": {
+          "type": "{id: string; name: string; email: string; role: string}[]",
+          "required": true,
+          "description": "List of team members."
+        }
+      }
+    }
+  ]
+}

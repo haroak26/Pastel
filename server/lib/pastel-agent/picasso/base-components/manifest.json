@@ -1,987 +1,1075 @@
 {
-  "style": "radix-nova",
-  "preset": "b0",
-  "generated": "2026-08-10T16:02:47.604Z",
-  "runtimeDependencies": [
+ "style": "radix-nova",
+ "preset": "b0",
+ "generated": "2026-08-11T17:49:20.512Z",
+ "runtimeDependencies": [
+  "@/hooks/use-mobile",
+  "@/lib/utils",
+  "class-variance-authority",
+  "cmdk",
+  "input-otp",
+  "lucide-react",
+  "next-themes",
+  "radix-ui",
+  "react",
+  "react-dom",
+  "react-resizable-panels",
+  "recharts",
+  "sonner",
+  "vaul"
+ ],
+ "components": [
+  {
+   "name": "accordion",
+   "file": "accordion.tsx",
+   "path": "ui/accordion.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [],
+   "lines": 98
+  },
+  {
+   "name": "alert",
+   "file": "alert.tsx",
+   "path": "ui/alert.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 77
+  },
+  {
+   "name": "alert-dialog",
+   "file": "alert-dialog.tsx",
+   "path": "ui/alert-dialog.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "@/components/ui/button"
+   ],
+   "siblingImports": [
+    "cn",
+    "button"
+   ],
+   "exports": [
+    "export {\n  AlertDialog,\n  AlertDialogAction,\n  AlertDialogCancel,\n  AlertDialogContent,\n  AlertDialogDescription,\n  AlertDialogFooter,\n  AlertDialogHeader,\n  AlertDialogMedia,\n  AlertDialogOverlay,\n  AlertDialogPortal,\n  AlertDialogTitle,\n  AlertDialogTrigger,\n}"
+   ],
+   "lines": 200
+  },
+  {
+   "name": "aspect-ratio",
+   "file": "aspect-ratio.tsx",
+   "path": "ui/aspect-ratio.tsx",
+   "imports": [
+    "radix-ui"
+   ],
+   "siblingImports": [],
+   "exports": [],
+   "lines": 12
+  },
+  {
+   "name": "attachment",
+   "file": "attachment.tsx",
+   "path": "ui/attachment.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils",
+    "@/components/ui/button"
+   ],
+   "siblingImports": [
+    "cn",
+    "button"
+   ],
+   "exports": [
+    "export {\n  Attachment,\n  AttachmentGroup,\n  AttachmentMedia,\n  AttachmentContent,\n  AttachmentTitle,\n  AttachmentDescription,\n  AttachmentActions,\n  AttachmentAction,\n  AttachmentTrigger,\n}"
+   ],
+   "lines": 205
+  },
+  {
+   "name": "avatar",
+   "file": "avatar.tsx",
+   "path": "ui/avatar.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [
+    "export {\n  Avatar,\n  AvatarImage,\n  AvatarFallback,\n  AvatarGroup,\n  AvatarGroupCount,\n  AvatarBadge,\n}"
+   ],
+   "lines": 113
+  },
+  {
+   "name": "badge",
+   "file": "badge.tsx",
+   "path": "ui/badge.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 50
+  },
+  {
+   "name": "breadcrumb",
+   "file": "breadcrumb.tsx",
+   "path": "ui/breadcrumb.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  Breadcrumb,\n  BreadcrumbList,\n  BreadcrumbItem,\n  BreadcrumbLink,\n  BreadcrumbPage,\n  BreadcrumbSeparator,\n  BreadcrumbEllipsis,\n}"
+   ],
+   "lines": 135
+  },
+  {
+   "name": "bubble",
+   "file": "bubble.tsx",
+   "path": "ui/bubble.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 126
+  },
+  {
+   "name": "button",
+   "file": "button.tsx",
+   "path": "ui/button.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 68
+  },
+  {
+   "name": "button-group",
+   "file": "button-group.tsx",
+   "path": "ui/button-group.tsx",
+   "imports": [
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils",
+    "@/components/ui/separator"
+   ],
+   "siblingImports": [
+    "cn",
+    "separator"
+   ],
+   "exports": [
+    "export {\n  ButtonGroup,\n  ButtonGroupSeparator,\n  ButtonGroupText,\n  buttonGroupVariants,\n}"
+   ],
+   "lines": 84
+  },
+  {
+   "name": "calendar",
+   "file": "calendar.tsx",
+   "path": "ui/calendar.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils",
+    "@/components/ui/button",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "button",
+    "icon-placeholder"
+   ],
+   "exports": [],
+   "lines": 247
+  },
+  {
+   "name": "card",
+   "file": "card.tsx",
+   "path": "ui/card.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [
+    "export {\n  Card,\n  CardHeader,\n  CardFooter,\n  CardTitle,\n  CardAction,\n  CardDescription,\n  CardContent,\n}"
+   ],
+   "lines": 104
+  },
+  {
+   "name": "carousel",
+   "file": "carousel.tsx",
+   "path": "ui/carousel.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils",
+    "@/components/ui/button",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "button",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  type CarouselApi,\n  Carousel,\n  CarouselContent,\n  CarouselItem,\n  CarouselPrevious,\n  CarouselNext,\n  useCarousel,\n}"
+   ],
+   "lines": 257
+  },
+  {
+   "name": "chart",
+   "file": "chart.tsx",
+   "path": "ui/chart.tsx",
+   "imports": [
+    "react",
+    "recharts",
+    "recharts",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [
+    "export {\n  ChartContainer,\n  ChartTooltip,\n  ChartTooltipContent,\n  ChartLegend,\n  ChartLegendContent,\n  ChartStyle,\n}"
+   ],
+   "lines": 374
+  },
+  {
+   "name": "checkbox",
+   "file": "checkbox.tsx",
+   "path": "ui/checkbox.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [],
+   "lines": 39
+  },
+  {
+   "name": "collapsible",
+   "file": "collapsible.tsx",
+   "path": "ui/collapsible.tsx",
+   "imports": [
+    "radix-ui"
+   ],
+   "siblingImports": [],
+   "exports": [],
+   "lines": 34
+  },
+  {
+   "name": "combobox",
+   "file": "combobox.tsx",
+   "path": "ui/combobox.tsx",
+   "imports": [
+    "react",
+    "react-dom",
+    "@/lib/utils",
+    "@/components/ui/button",
+    "lucide-react"
+   ],
+   "siblingImports": [
+    "cn",
+    "button"
+   ],
+   "exports": [
+    "export {\n  Combobox,\n  ComboboxInput,\n  ComboboxContent,\n  ComboboxList,\n  ComboboxItem,\n  ComboboxGroup,\n  ComboboxLabel,\n  ComboboxCollection,\n  ComboboxEmpty,\n  ComboboxSeparator,\n  ComboboxChips,\n  ComboboxChip,\n  ComboboxChipsInput,\n  ComboboxTrigger,\n  ComboboxValue,\n  ComboboxClear,\n  useComboboxAnchor,\n}"
+   ],
+   "lines": 1219
+  },
+  {
+   "name": "command",
+   "file": "command.tsx",
+   "path": "ui/command.tsx",
+   "imports": [
+    "react",
+    "cmdk",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  Command,\n  CommandDialog,\n  CommandInput,\n  CommandList,\n  CommandEmpty,\n  CommandGroup,\n  CommandItem,\n  CommandShortcut,\n  CommandSeparator,\n}"
+   ],
+   "lines": 210
+  },
+  {
+   "name": "context-menu",
+   "file": "context-menu.tsx",
+   "path": "ui/context-menu.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  ContextMenu,\n  ContextMenuTrigger,\n  ContextMenuContent,\n  ContextMenuItem,\n  ContextMenuCheckboxItem,\n  ContextMenuRadioItem,\n  ContextMenuLabel,\n  ContextMenuSeparator,\n  ContextMenuShortcut,\n  ContextMenuGroup,\n  ContextMenuPortal,\n  ContextMenuSub,\n  ContextMenuSubContent,\n  ContextMenuSubTrigger,\n  ContextMenuRadioGroup,\n}"
+   ],
+   "lines": 287
+  },
+  {
+   "name": "dialog",
+   "file": "dialog.tsx",
+   "path": "ui/dialog.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "@/components/ui/button",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "button",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  Dialog,\n  DialogClose,\n  DialogContent,\n  DialogDescription,\n  DialogFooter,\n  DialogHeader,\n  DialogOverlay,\n  DialogPortal,\n  DialogTitle,\n  DialogTrigger,\n}"
+   ],
+   "lines": 174
+  },
+  {
+   "name": "direction",
+   "file": "direction.tsx",
+   "path": "ui/direction.tsx",
+   "imports": [
+    "react",
+    "radix-ui"
+   ],
+   "siblingImports": [],
+   "exports": [],
+   "lines": 23
+  },
+  {
+   "name": "drawer",
+   "file": "drawer.tsx",
+   "path": "ui/drawer.tsx",
+   "imports": [
+    "react",
+    "vaul",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [
+    "export {\n  Drawer,\n  DrawerPortal,\n  DrawerOverlay,\n  DrawerTrigger,\n  DrawerClose,\n  DrawerContent,\n  DrawerHeader,\n  DrawerFooter,\n  DrawerTitle,\n  DrawerDescription,\n}"
+   ],
+   "lines": 135
+  },
+  {
+   "name": "dropdown-menu",
+   "file": "dropdown-menu.tsx",
+   "path": "ui/dropdown-menu.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  DropdownMenu,\n  DropdownMenuPortal,\n  DropdownMenuTrigger,\n  DropdownMenuContent,\n  DropdownMenuGroup,\n  DropdownMenuLabel,\n  DropdownMenuItem,\n  DropdownMenuCheckboxItem,\n  DropdownMenuRadioGroup,\n  DropdownMenuRadioItem,\n  DropdownMenuSeparator,\n  DropdownMenuShortcut,\n  DropdownMenuSub,\n  DropdownMenuSubTrigger,\n  DropdownMenuSubContent,\n}"
+   ],
+   "lines": 293
+  },
+  {
+   "name": "empty",
+   "file": "empty.tsx",
+   "path": "ui/empty.tsx",
+   "imports": [
+    "class-variance-authority",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [
+    "export {\n  Empty,\n  EmptyHeader,\n  EmptyTitle,\n  EmptyDescription,\n  EmptyContent,\n  EmptyMedia,\n}"
+   ],
+   "lines": 105
+  },
+  {
+   "name": "field",
+   "file": "field.tsx",
+   "path": "ui/field.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "@/lib/utils",
+    "@/components/ui/label",
+    "@/components/ui/separator"
+   ],
+   "siblingImports": [
+    "cn",
+    "label",
+    "separator"
+   ],
+   "exports": [
+    "export {\n  Field,\n  FieldLabel,\n  FieldDescription,\n  FieldError,\n  FieldGroup,\n  FieldLegend,\n  FieldSeparator,\n  FieldSet,\n  FieldContent,\n  FieldTitle,\n}"
+   ],
+   "lines": 239
+  },
+  {
+   "name": "hover-card",
+   "file": "hover-card.tsx",
+   "path": "ui/hover-card.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 45
+  },
+  {
+   "name": "icon-placeholder",
+   "file": "icon-placeholder.tsx",
+   "path": "ui/icon-placeholder.tsx",
+   "imports": [
+    "react",
+    "lucide-react"
+   ],
+   "siblingImports": [],
+   "exports": [],
+   "lines": 29
+  },
+  {
+   "name": "input",
+   "file": "input.tsx",
+   "path": "ui/input.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 20
+  },
+  {
+   "name": "input-group",
+   "file": "input-group.tsx",
+   "path": "ui/input-group.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "@/lib/utils",
+    "@/components/ui/button",
+    "@/components/ui/input",
+    "@/components/ui/textarea"
+   ],
+   "siblingImports": [
+    "cn",
+    "button",
+    "input",
+    "textarea"
+   ],
+   "exports": [
+    "export {\n  InputGroup,\n  InputGroupAddon,\n  InputGroupButton,\n  InputGroupText,\n  InputGroupInput,\n  InputGroupTextarea,\n}"
+   ],
+   "lines": 157
+  },
+  {
+   "name": "input-otp",
+   "file": "input-otp.tsx",
+   "path": "ui/input-otp.tsx",
+   "imports": [
+    "react",
+    "input-otp",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [],
+   "lines": 93
+  },
+  {
+   "name": "item",
+   "file": "item.tsx",
+   "path": "ui/item.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils",
+    "@/components/ui/separator"
+   ],
+   "siblingImports": [
+    "cn",
+    "separator"
+   ],
+   "exports": [
+    "export {\n  Item,\n  ItemMedia,\n  ItemContent,\n  ItemActions,\n  ItemGroup,\n  ItemSeparator,\n  ItemTitle,\n  ItemDescription,\n  ItemHeader,\n  ItemFooter,\n}"
+   ],
+   "lines": 197
+  },
+  {
+   "name": "kbd",
+   "file": "kbd.tsx",
+   "path": "ui/kbd.tsx",
+   "imports": [
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 27
+  },
+  {
+   "name": "label",
+   "file": "label.tsx",
+   "path": "ui/label.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 25
+  },
+  {
+   "name": "marker",
+   "file": "marker.tsx",
+   "path": "ui/marker.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 70
+  },
+  {
+   "name": "menubar",
+   "file": "menubar.tsx",
+   "path": "ui/menubar.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  Menubar,\n  MenubarPortal,\n  MenubarMenu,\n  MenubarTrigger,\n  MenubarContent,\n  MenubarGroup,\n  MenubarSeparator,\n  MenubarLabel,\n  MenubarItem,\n  MenubarShortcut,\n  MenubarCheckboxItem,\n  MenubarRadioGroup,\n  MenubarRadioItem,\n  MenubarSub,\n  MenubarSubTrigger,\n  MenubarSubContent,\n}"
+   ],
+   "lines": 304
+  },
+  {
+   "name": "message",
+   "file": "message.tsx",
+   "path": "ui/message.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [
+    "export {\n  MessageGroup,\n  Message,\n  MessageAvatar,\n  MessageContent,\n  MessageFooter,\n  MessageHeader,\n}"
+   ],
+   "lines": 93
+  },
+  {
+   "name": "message-scroller",
+   "file": "message-scroller.tsx",
+   "path": "ui/message-scroller.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils",
+    "@/components/ui/button",
+    "lucide-react"
+   ],
+   "siblingImports": [
+    "cn",
+    "button"
+   ],
+   "exports": [
+    "export {\n  MessageScrollerProvider,\n  MessageScroller,\n  MessageScrollerViewport,\n  MessageScrollerContent,\n  MessageScrollerItem,\n  MessageScrollerButton,\n  useMessageScroller,\n  useMessageScrollerScrollable,\n  useMessageScrollerVisibility,\n}"
+   ],
+   "lines": 1786
+  },
+  {
+   "name": "native-select",
+   "file": "native-select.tsx",
+   "path": "ui/native-select.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [],
+   "lines": 71
+  },
+  {
+   "name": "navigation-menu",
+   "file": "navigation-menu.tsx",
+   "path": "ui/navigation-menu.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  NavigationMenu,\n  NavigationMenuList,\n  NavigationMenuItem,\n  NavigationMenuContent,\n  NavigationMenuTrigger,\n  NavigationMenuLink,\n  NavigationMenuIndicator,\n  NavigationMenuViewport,\n  navigationMenuTriggerStyle,\n}"
+   ],
+   "lines": 173
+  },
+  {
+   "name": "pagination",
+   "file": "pagination.tsx",
+   "path": "ui/pagination.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils",
+    "@/components/ui/button",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "button",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  Pagination,\n  PaginationContent,\n  PaginationEllipsis,\n  PaginationItem,\n  PaginationLink,\n  PaginationNext,\n  PaginationPrevious,\n}"
+   ],
+   "lines": 151
+  },
+  {
+   "name": "popover",
+   "file": "popover.tsx",
+   "path": "ui/popover.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [
+    "export {\n  Popover,\n  PopoverAnchor,\n  PopoverContent,\n  PopoverDescription,\n  PopoverHeader,\n  PopoverTitle,\n  PopoverTrigger,\n}"
+   ],
+   "lines": 90
+  },
+  {
+   "name": "progress",
+   "file": "progress.tsx",
+   "path": "ui/progress.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 32
+  },
+  {
+   "name": "questionnaire",
+   "file": "questionnaire.tsx",
+   "path": "ui/questionnaire.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils",
+    "@/components/ui/button",
+    "lucide-react"
+   ],
+   "siblingImports": [
+    "cn",
+    "button"
+   ],
+   "exports": [
+    "export {\n  Questionnaire,\n  QuestionnaireActions,\n  QuestionnaireChoice,\n  QuestionnaireChoiceDescription,\n  QuestionnaireChoices,\n  QuestionnaireDescription,\n  QuestionnaireError,\n  QuestionnaireInput,\n  QuestionnaireItem,\n  QuestionnaireNext,\n  QuestionnairePrevious,\n  QuestionnaireProgress,\n  QuestionnaireSkip,\n  QuestionnaireSubmit,\n  QuestionnaireTitle,\n}"
+   ],
+   "lines": 2053
+  },
+  {
+   "name": "radio-group",
+   "file": "radio-group.tsx",
+   "path": "ui/radio-group.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 45
+  },
+  {
+   "name": "resizable",
+   "file": "resizable.tsx",
+   "path": "ui/resizable.tsx",
+   "imports": [
+    "react-resizable-panels",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 51
+  },
+  {
+   "name": "scroll-area",
+   "file": "scroll-area.tsx",
+   "path": "ui/scroll-area.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 56
+  },
+  {
+   "name": "select",
+   "file": "select.tsx",
+   "path": "ui/select.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  Select,\n  SelectContent,\n  SelectGroup,\n  SelectItem,\n  SelectLabel,\n  SelectScrollDownButton,\n  SelectScrollUpButton,\n  SelectSeparator,\n  SelectTrigger,\n  SelectValue,\n}"
+   ],
+   "lines": 222
+  },
+  {
+   "name": "separator",
+   "file": "separator.tsx",
+   "path": "ui/separator.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 29
+  },
+  {
+   "name": "sheet",
+   "file": "sheet.tsx",
+   "path": "ui/sheet.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils",
+    "@/components/ui/button",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "button",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  Sheet,\n  SheetTrigger,\n  SheetClose,\n  SheetContent,\n  SheetHeader,\n  SheetFooter,\n  SheetTitle,\n  SheetDescription,\n}"
+   ],
+   "lines": 153
+  },
+  {
+   "name": "sidebar",
+   "file": "sidebar.tsx",
+   "path": "ui/sidebar.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
     "@/hooks/use-mobile",
     "@/lib/utils",
-    "@base-ui/react",
-    "@shadcn/react",
-    "class-variance-authority",
-    "cmdk",
-    "input-otp",
-    "lucide-react",
-    "next-themes",
-    "radix-ui",
+    "@/components/ui/button",
+    "@/components/ui/input",
+    "@/components/ui/separator",
+    "@/components/ui/skeleton",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "use-mobile",
+    "cn",
+    "button",
+    "input",
+    "separator",
+    "skeleton",
+    "icon-placeholder"
+   ],
+   "exports": [
+    "export {\n  Sidebar,\n  SidebarContent,\n  SidebarFooter,\n  SidebarGroup,\n  SidebarGroupAction,\n  SidebarGroupContent,\n  SidebarGroupLabel,\n  SidebarHeader,\n  SidebarInput,\n  SidebarInset,\n  SidebarMenu,\n  SidebarMenuAction,\n  SidebarMenuBadge,\n  SidebarMenuButton,\n  SidebarMenuItem,\n  SidebarMenuSkeleton,\n  SidebarMenuSub,\n  SidebarMenuSubButton,\n  SidebarMenuSubItem,\n  SidebarProvider,\n  SidebarRail,\n  SidebarSeparator,\n  SidebarTrigger,\n  useSidebar,\n}"
+   ],
+   "lines": 710
+  },
+  {
+   "name": "skeleton",
+   "file": "skeleton.tsx",
+   "path": "ui/skeleton.tsx",
+   "imports": [
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 14
+  },
+  {
+   "name": "slider",
+   "file": "slider.tsx",
+   "path": "ui/slider.tsx",
+   "imports": [
     "react",
-    "react-resizable-panels",
-    "recharts",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 60
+  },
+  {
+   "name": "sonner",
+   "file": "sonner.tsx",
+   "path": "ui/sonner.tsx",
+   "imports": [
+    "next-themes",
     "sonner",
-    "vaul"
-  ],
-  "components": [
-    {
-      "name": "accordion",
-      "file": "accordion.tsx",
-      "path": "ui/accordion.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Accordion, AccordionItem, AccordionTrigger, AccordionContent }"
-      ],
-      "lines": 80
-    },
-    {
-      "name": "alert-dialog",
-      "file": "alert-dialog.tsx",
-      "path": "ui/alert-dialog.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export {\n  AlertDialog,\n  AlertDialogAction,\n  AlertDialogCancel,\n  AlertDialogContent,\n  AlertDialogDescription,\n  AlertDialogFooter,\n  AlertDialogHeader,\n  AlertDialogMedia,\n  AlertDialogOverlay,\n  AlertDialogPortal,\n  AlertDialogTitle,\n  AlertDialogTrigger,\n}"
-      ],
-      "lines": 198
-    },
-    {
-      "name": "alert",
-      "file": "alert.tsx",
-      "path": "ui/alert.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Alert, AlertTitle, AlertDescription, AlertAction }"
-      ],
-      "lines": 77
-    },
-    {
-      "name": "aspect-ratio",
-      "file": "aspect-ratio.tsx",
-      "path": "ui/aspect-ratio.tsx",
-      "imports": [
-        "radix-ui"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { AspectRatio }"
-      ],
-      "lines": 12
-    },
-    {
-      "name": "attachment",
-      "file": "attachment.tsx",
-      "path": "ui/attachment.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export {\n  Attachment,\n  AttachmentGroup,\n  AttachmentMedia,\n  AttachmentContent,\n  AttachmentTitle,\n  AttachmentDescription,\n  AttachmentActions,\n  AttachmentAction,\n  AttachmentTrigger,\n}"
-      ],
-      "lines": 205
-    },
-    {
-      "name": "avatar",
-      "file": "avatar.tsx",
-      "path": "ui/avatar.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Avatar,\n  AvatarImage,\n  AvatarFallback,\n  AvatarGroup,\n  AvatarGroupCount,\n  AvatarBadge,\n}"
-      ],
-      "lines": 111
-    },
-    {
-      "name": "badge",
-      "file": "badge.tsx",
-      "path": "ui/badge.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Badge, badgeVariants }"
-      ],
-      "lines": 50
-    },
-    {
-      "name": "breadcrumb",
-      "file": "breadcrumb.tsx",
-      "path": "ui/breadcrumb.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Breadcrumb,\n  BreadcrumbList,\n  BreadcrumbItem,\n  BreadcrumbLink,\n  BreadcrumbPage,\n  BreadcrumbSeparator,\n  BreadcrumbEllipsis,\n}"
-      ],
-      "lines": 123
-    },
-    {
-      "name": "bubble",
-      "file": "bubble.tsx",
-      "path": "ui/bubble.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { BubbleGroup, Bubble, BubbleContent, BubbleReactions }"
-      ],
-      "lines": 126
-    },
-    {
-      "name": "button-group",
-      "file": "button-group.tsx",
-      "path": "ui/button-group.tsx",
-      "imports": [
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [
-        "separator"
-      ],
-      "exports": [
-        "export {\n  ButtonGroup,\n  ButtonGroupSeparator,\n  ButtonGroupText,\n  buttonGroupVariants,\n}"
-      ],
-      "lines": 84
-    },
-    {
-      "name": "button",
-      "file": "button.tsx",
-      "path": "ui/button.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Button, buttonVariants }"
-      ],
-      "lines": 68
-    },
-    {
-      "name": "calendar",
-      "file": "calendar.tsx",
-      "path": "ui/calendar.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export { Calendar, CalendarDayButton }"
-      ],
-      "lines": 223
-    },
-    {
-      "name": "card",
-      "file": "card.tsx",
-      "path": "ui/card.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Card,\n  CardHeader,\n  CardFooter,\n  CardTitle,\n  CardAction,\n  CardDescription,\n  CardContent,\n}"
-      ],
-      "lines": 104
-    },
-    {
-      "name": "carousel",
-      "file": "carousel.tsx",
-      "path": "ui/carousel.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export {\n  type CarouselApi,\n  Carousel,\n  CarouselContent,\n  CarouselItem,\n  CarouselPrevious,\n  CarouselNext,\n  useCarousel,\n}"
-      ],
-      "lines": 241
-    },
-    {
-      "name": "chart",
-      "file": "chart.tsx",
-      "path": "ui/chart.tsx",
-      "imports": [
-        "react",
-        "recharts",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  ChartContainer,\n  ChartTooltip,\n  ChartTooltipContent,\n  ChartLegend,\n  ChartLegendContent,\n  ChartStyle,\n}"
-      ],
-      "lines": 374
-    },
-    {
-      "name": "checkbox",
-      "file": "checkbox.tsx",
-      "path": "ui/checkbox.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Checkbox }"
-      ],
-      "lines": 32
-    },
-    {
-      "name": "collapsible",
-      "file": "collapsible.tsx",
-      "path": "ui/collapsible.tsx",
-      "imports": [
-        "radix-ui"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Collapsible, CollapsibleTrigger, CollapsibleContent }"
-      ],
-      "lines": 34
-    },
-    {
-      "name": "combobox",
-      "file": "combobox.tsx",
-      "path": "ui/combobox.tsx",
-      "imports": [
-        "react",
-        "@base-ui/react",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export {\n  Combobox,\n  ComboboxInput,\n  ComboboxContent,\n  ComboboxList,\n  ComboboxItem,\n  ComboboxGroup,\n  ComboboxLabel,\n  ComboboxCollection,\n  ComboboxEmpty,\n  ComboboxSeparator,\n  ComboboxChips,\n  ComboboxChip,\n  ComboboxChipsInput,\n  ComboboxTrigger,\n  ComboboxValue,\n  useComboboxAnchor,\n}"
-      ],
-      "lines": 300
-    },
-    {
-      "name": "command",
-      "file": "command.tsx",
-      "path": "ui/command.tsx",
-      "imports": [
-        "react",
-        "cmdk",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Command,\n  CommandDialog,\n  CommandInput,\n  CommandList,\n  CommandEmpty,\n  CommandGroup,\n  CommandItem,\n  CommandShortcut,\n  CommandSeparator,\n}"
-      ],
-      "lines": 194
-    },
-    {
-      "name": "context-menu",
-      "file": "context-menu.tsx",
-      "path": "ui/context-menu.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  ContextMenu,\n  ContextMenuTrigger,\n  ContextMenuContent,\n  ContextMenuItem,\n  ContextMenuCheckboxItem,\n  ContextMenuRadioItem,\n  ContextMenuLabel,\n  ContextMenuSeparator,\n  ContextMenuShortcut,\n  ContextMenuGroup,\n  ContextMenuPortal,\n  ContextMenuSub,\n  ContextMenuSubContent,\n  ContextMenuSubTrigger,\n  ContextMenuRadioGroup,\n}"
-      ],
-      "lines": 262
-    },
-    {
-      "name": "dialog",
-      "file": "dialog.tsx",
-      "path": "ui/dialog.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export {\n  Dialog,\n  DialogClose,\n  DialogContent,\n  DialogDescription,\n  DialogFooter,\n  DialogHeader,\n  DialogOverlay,\n  DialogPortal,\n  DialogTitle,\n  DialogTrigger,\n}"
-      ],
-      "lines": 169
-    },
-    {
-      "name": "direction",
-      "file": "direction.tsx",
-      "path": "ui/direction.tsx",
-      "imports": [
-        "react",
-        "radix-ui"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { DirectionProvider, useDirection }"
-      ],
-      "lines": 23
-    },
-    {
-      "name": "drawer",
-      "file": "drawer.tsx",
-      "path": "ui/drawer.tsx",
-      "imports": [
-        "react",
-        "vaul",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Drawer,\n  DrawerPortal,\n  DrawerOverlay,\n  DrawerTrigger,\n  DrawerClose,\n  DrawerContent,\n  DrawerHeader,\n  DrawerFooter,\n  DrawerTitle,\n  DrawerDescription,\n}"
-      ],
-      "lines": 133
-    },
-    {
-      "name": "dropdown-menu",
-      "file": "dropdown-menu.tsx",
-      "path": "ui/dropdown-menu.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  DropdownMenu,\n  DropdownMenuPortal,\n  DropdownMenuTrigger,\n  DropdownMenuContent,\n  DropdownMenuGroup,\n  DropdownMenuLabel,\n  DropdownMenuItem,\n  DropdownMenuCheckboxItem,\n  DropdownMenuRadioGroup,\n  DropdownMenuRadioItem,\n  DropdownMenuSeparator,\n  DropdownMenuShortcut,\n  DropdownMenuSub,\n  DropdownMenuSubTrigger,\n  DropdownMenuSubContent,\n}"
-      ],
-      "lines": 270
-    },
-    {
-      "name": "empty",
-      "file": "empty.tsx",
-      "path": "ui/empty.tsx",
-      "imports": [
-        "class-variance-authority",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Empty,\n  EmptyHeader,\n  EmptyTitle,\n  EmptyDescription,\n  EmptyContent,\n  EmptyMedia,\n}"
-      ],
-      "lines": 105
-    },
-    {
-      "name": "field",
-      "file": "field.tsx",
-      "path": "ui/field.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "@/lib/utils"
-      ],
-      "siblingImports": [
-        "label",
-        "separator"
-      ],
-      "exports": [
-        "export {\n  Field,\n  FieldLabel,\n  FieldDescription,\n  FieldError,\n  FieldGroup,\n  FieldLegend,\n  FieldSeparator,\n  FieldSet,\n  FieldContent,\n  FieldTitle,\n}"
-      ],
-      "lines": 239
-    },
-    {
-      "name": "hover-card",
-      "file": "hover-card.tsx",
-      "path": "ui/hover-card.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { HoverCard, HoverCardTrigger, HoverCardContent }"
-      ],
-      "lines": 43
-    },
-    {
-      "name": "input-group",
-      "file": "input-group.tsx",
-      "path": "ui/input-group.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "@/lib/utils"
-      ],
-      "siblingImports": [
-        "button",
-        "input",
-        "textarea"
-      ],
-      "exports": [
-        "export {\n  InputGroup,\n  InputGroupAddon,\n  InputGroupButton,\n  InputGroupText,\n  InputGroupInput,\n  InputGroupTextarea,\n}"
-      ],
-      "lines": 155
-    },
-    {
-      "name": "input-otp",
-      "file": "input-otp.tsx",
-      "path": "ui/input-otp.tsx",
-      "imports": [
-        "react",
-        "input-otp",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { InputOTP, InputOTPGroup, InputOTPSlot, InputOTPSeparator }"
-      ],
-      "lines": 88
-    },
-    {
-      "name": "input",
-      "file": "input.tsx",
-      "path": "ui/input.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Input }"
-      ],
-      "lines": 20
-    },
-    {
-      "name": "item",
-      "file": "item.tsx",
-      "path": "ui/item.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [
-        "separator"
-      ],
-      "exports": [
-        "export {\n  Item,\n  ItemMedia,\n  ItemContent,\n  ItemActions,\n  ItemGroup,\n  ItemSeparator,\n  ItemTitle,\n  ItemDescription,\n  ItemHeader,\n  ItemFooter,\n}"
-      ],
-      "lines": 197
-    },
-    {
-      "name": "kbd",
-      "file": "kbd.tsx",
-      "path": "ui/kbd.tsx",
-      "imports": [
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Kbd, KbdGroup }"
-      ],
-      "lines": 27
-    },
-    {
-      "name": "label",
-      "file": "label.tsx",
-      "path": "ui/label.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Label }"
-      ],
-      "lines": 23
-    },
-    {
-      "name": "marker",
-      "file": "marker.tsx",
-      "path": "ui/marker.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Marker, MarkerIcon, MarkerContent, markerVariants }"
-      ],
-      "lines": 70
-    },
-    {
-      "name": "menubar",
-      "file": "menubar.tsx",
-      "path": "ui/menubar.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Menubar,\n  MenubarPortal,\n  MenubarMenu,\n  MenubarTrigger,\n  MenubarContent,\n  MenubarGroup,\n  MenubarSeparator,\n  MenubarLabel,\n  MenubarItem,\n  MenubarShortcut,\n  MenubarCheckboxItem,\n  MenubarRadioGroup,\n  MenubarRadioItem,\n  MenubarSub,\n  MenubarSubTrigger,\n  MenubarSubContent,\n}"
-      ],
-      "lines": 281
-    },
-    {
-      "name": "message-scroller",
-      "file": "message-scroller.tsx",
-      "path": "ui/message-scroller.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export {\n  MessageScrollerProvider,\n  MessageScroller,\n  MessageScrollerViewport,\n  MessageScrollerContent,\n  MessageScrollerItem,\n  MessageScrollerButton,\n  useMessageScroller,\n  useMessageScrollerScrollable,\n  useMessageScrollerVisibility,\n}"
-      ],
-      "lines": 130
-    },
-    {
-      "name": "message",
-      "file": "message.tsx",
-      "path": "ui/message.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  MessageGroup,\n  Message,\n  MessageAvatar,\n  MessageContent,\n  MessageFooter,\n  MessageHeader,\n}"
-      ],
-      "lines": 93
-    },
-    {
-      "name": "native-select",
-      "file": "native-select.tsx",
-      "path": "ui/native-select.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { NativeSelect, NativeSelectOptGroup, NativeSelectOption }"
-      ],
-      "lines": 62
-    },
-    {
-      "name": "navigation-menu",
-      "file": "navigation-menu.tsx",
-      "path": "ui/navigation-menu.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  NavigationMenu,\n  NavigationMenuList,\n  NavigationMenuItem,\n  NavigationMenuContent,\n  NavigationMenuTrigger,\n  NavigationMenuLink,\n  NavigationMenuIndicator,\n  NavigationMenuViewport,\n  navigationMenuTriggerStyle,\n}"
-      ],
-      "lines": 165
-    },
-    {
-      "name": "pagination",
-      "file": "pagination.tsx",
-      "path": "ui/pagination.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export {\n  Pagination,\n  PaginationContent,\n  PaginationEllipsis,\n  PaginationItem,\n  PaginationLink,\n  PaginationNext,\n  PaginationPrevious,\n}"
-      ],
-      "lines": 130
-    },
-    {
-      "name": "popover",
-      "file": "popover.tsx",
-      "path": "ui/popover.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Popover,\n  PopoverAnchor,\n  PopoverContent,\n  PopoverDescription,\n  PopoverHeader,\n  PopoverTitle,\n  PopoverTrigger,\n}"
-      ],
-      "lines": 88
-    },
-    {
-      "name": "progress",
-      "file": "progress.tsx",
-      "path": "ui/progress.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Progress }"
-      ],
-      "lines": 32
-    },
-    {
-      "name": "questionnaire",
-      "file": "questionnaire.tsx",
-      "path": "ui/questionnaire.tsx",
-      "imports": [
-        "react",
-        "@shadcn/react",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export {\n  Questionnaire,\n  QuestionnaireActions,\n  QuestionnaireChoice,\n  QuestionnaireChoiceDescription,\n  QuestionnaireChoices,\n  QuestionnaireDescription,\n  QuestionnaireError,\n  QuestionnaireInput,\n  QuestionnaireItem,\n  QuestionnaireNext,\n  QuestionnairePrevious,\n  QuestionnaireProgress,\n  QuestionnaireSkip,\n  QuestionnaireSubmit,\n  QuestionnaireTitle,\n}"
-      ],
-      "lines": 325
-    },
-    {
-      "name": "radio-group",
-      "file": "radio-group.tsx",
-      "path": "ui/radio-group.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { RadioGroup, RadioGroupItem }"
-      ],
-      "lines": 43
-    },
-    {
-      "name": "resizable",
-      "file": "resizable.tsx",
-      "path": "ui/resizable.tsx",
-      "imports": [
-        "react-resizable-panels",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { ResizableHandle, ResizablePanel, ResizablePanelGroup }"
-      ],
-      "lines": 51
-    },
-    {
-      "name": "scroll-area",
-      "file": "scroll-area.tsx",
-      "path": "ui/scroll-area.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { ScrollArea, ScrollBar }"
-      ],
-      "lines": 54
-    },
-    {
-      "name": "select",
-      "file": "select.tsx",
-      "path": "ui/select.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Select,\n  SelectContent,\n  SelectGroup,\n  SelectItem,\n  SelectLabel,\n  SelectScrollDownButton,\n  SelectScrollUpButton,\n  SelectSeparator,\n  SelectTrigger,\n  SelectValue,\n}"
-      ],
-      "lines": 193
-    },
-    {
-      "name": "separator",
-      "file": "separator.tsx",
-      "path": "ui/separator.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Separator }"
-      ],
-      "lines": 27
-    },
-    {
-      "name": "sheet",
-      "file": "sheet.tsx",
-      "path": "ui/sheet.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [
-        "button"
-      ],
-      "exports": [
-        "export {\n  Sheet,\n  SheetTrigger,\n  SheetClose,\n  SheetContent,\n  SheetHeader,\n  SheetFooter,\n  SheetTitle,\n  SheetDescription,\n}"
-      ],
-      "lines": 146
-    },
-    {
-      "name": "sidebar",
-      "file": "sidebar.tsx",
-      "path": "ui/sidebar.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/hooks/use-mobile",
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [
-        "button",
-        "input",
-        "separator",
-        "skeleton"
-      ],
-      "exports": [
-        "export {\n  Sidebar,\n  SidebarContent,\n  SidebarFooter,\n  SidebarGroup,\n  SidebarGroupAction,\n  SidebarGroupContent,\n  SidebarGroupLabel,\n  SidebarHeader,\n  SidebarInput,\n  SidebarInset,\n  SidebarMenu,\n  SidebarMenuAction,\n  SidebarMenuBadge,\n  SidebarMenuButton,\n  SidebarMenuItem,\n  SidebarMenuSkeleton,\n  SidebarMenuSub,\n  SidebarMenuSubButton,\n  SidebarMenuSubItem,\n  SidebarProvider,\n  SidebarRail,\n  SidebarSeparator,\n  SidebarTrigger,\n  useSidebar,\n}"
-      ],
-      "lines": 701
-    },
-    {
-      "name": "skeleton",
-      "file": "skeleton.tsx",
-      "path": "ui/skeleton.tsx",
-      "imports": [
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Skeleton }"
-      ],
-      "lines": 14
-    },
-    {
-      "name": "slider",
-      "file": "slider.tsx",
-      "path": "ui/slider.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Slider }"
-      ],
-      "lines": 60
-    },
-    {
-      "name": "sonner",
-      "file": "sonner.tsx",
-      "path": "ui/sonner.tsx",
-      "imports": [
-        "next-themes",
-        "sonner",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Toaster }"
-      ],
-      "lines": 48
-    },
-    {
-      "name": "spinner",
-      "file": "spinner.tsx",
-      "path": "ui/spinner.tsx",
-      "imports": [
-        "@/lib/utils",
-        "lucide-react"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Spinner }"
-      ],
-      "lines": 11
-    },
-    {
-      "name": "switch",
-      "file": "switch.tsx",
-      "path": "ui/switch.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Switch }"
-      ],
-      "lines": 34
-    },
-    {
-      "name": "table",
-      "file": "table.tsx",
-      "path": "ui/table.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export {\n  Table,\n  TableHeader,\n  TableBody,\n  TableFooter,\n  TableHead,\n  TableRow,\n  TableCell,\n  TableCaption,\n}"
-      ],
-      "lines": 115
-    },
-    {
-      "name": "tabs",
-      "file": "tabs.tsx",
-      "path": "ui/tabs.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Tabs, TabsList, TabsTrigger, TabsContent, tabsListVariants }"
-      ],
-      "lines": 91
-    },
-    {
-      "name": "textarea",
-      "file": "textarea.tsx",
-      "path": "ui/textarea.tsx",
-      "imports": [
-        "react",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Textarea }"
-      ],
-      "lines": 19
-    },
-    {
-      "name": "toggle-group",
-      "file": "toggle-group.tsx",
-      "path": "ui/toggle-group.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [
-        "toggle"
-      ],
-      "exports": [
-        "export { ToggleGroup, ToggleGroupItem }"
-      ],
-      "lines": 90
-    },
-    {
-      "name": "toggle",
-      "file": "toggle.tsx",
-      "path": "ui/toggle.tsx",
-      "imports": [
-        "react",
-        "class-variance-authority",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Toggle, toggleVariants }"
-      ],
-      "lines": 46
-    },
-    {
-      "name": "tooltip",
-      "file": "tooltip.tsx",
-      "path": "ui/tooltip.tsx",
-      "imports": [
-        "react",
-        "radix-ui",
-        "@/lib/utils"
-      ],
-      "siblingImports": [],
-      "exports": [
-        "export { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger }"
-      ],
-      "lines": 58
-    }
-  ]
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "icon-placeholder"
+   ],
+   "exports": [],
+   "lines": 86
+  },
+  {
+   "name": "spinner",
+   "file": "spinner.tsx",
+   "path": "ui/spinner.tsx",
+   "imports": [
+    "@/lib/utils",
+    "./icon-placeholder"
+   ],
+   "siblingImports": [
+    "cn",
+    "icon-placeholder"
+   ],
+   "exports": [],
+   "lines": 22
+  },
+  {
+   "name": "switch",
+   "file": "switch.tsx",
+   "path": "ui/switch.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 34
+  },
+  {
+   "name": "table",
+   "file": "table.tsx",
+   "path": "ui/table.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [
+    "export {\n  Table,\n  TableHeader,\n  TableBody,\n  TableFooter,\n  TableHead,\n  TableRow,\n  TableCell,\n  TableCaption,\n}"
+   ],
+   "lines": 117
+  },
+  {
+   "name": "tabs",
+   "file": "tabs.tsx",
+   "path": "ui/tabs.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 91
+  },
+  {
+   "name": "textarea",
+   "file": "textarea.tsx",
+   "path": "ui/textarea.tsx",
+   "imports": [
+    "react",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 19
+  },
+  {
+   "name": "toggle",
+   "file": "toggle.tsx",
+   "path": "ui/toggle.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 48
+  },
+  {
+   "name": "toggle-group",
+   "file": "toggle-group.tsx",
+   "path": "ui/toggle-group.tsx",
+   "imports": [
+    "react",
+    "class-variance-authority",
+    "radix-ui",
+    "@/lib/utils",
+    "@/components/ui/toggle"
+   ],
+   "siblingImports": [
+    "cn",
+    "toggle"
+   ],
+   "exports": [],
+   "lines": 90
+  },
+  {
+   "name": "tooltip",
+   "file": "tooltip.tsx",
+   "path": "ui/tooltip.tsx",
+   "imports": [
+    "react",
+    "radix-ui",
+    "@/lib/utils"
+   ],
+   "siblingImports": [
+    "cn"
+   ],
+   "exports": [],
+   "lines": 58
+  }
+ ]
 }
