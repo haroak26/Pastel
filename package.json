@@ -125,6 +125,7 @@
   },
   "devDependencies": {
     "@babel/standalone": "^7.29.8",
+    "@e2b/cli": "^2.16.1",
     "@replit/vite-plugin-cartographer": "^0.4.4",
     "@replit/vite-plugin-dev-banner": "^0.1.1",
     "@replit/vite-plugin-runtime-error-modal": "^0.0.3",

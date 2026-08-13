@@ -1,6 +1,6 @@
 {
   "include": ["client/src/**/*", "shared/**/*", "server/**/*"],
-  "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "server/lib/pastel-agent/picasso/output", "server/lib/pastel-agent/picasso/base-components"],
+  "exclude": ["node_modules", "build", "dist", "**/*.test.ts", "server/lib/maxi-agent/picasso/output", "server/lib/maxi-agent/picasso/base-components", "server/lib/maxi-agent/base-components"],
   "compilerOptions": {
     "incremental": true,
     "tsBuildInfoFile": "./node_modules/typescript/tsbuildinfo",

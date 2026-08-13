@@ -19,7 +19,7 @@ const TIERS: { key: PlanTier; description: string; badge?: string; features: str
       "50 credits per day",
       "150 credits per month",
       "Private projects",
-      "Pastel Agent",
+      "Maxi Agent",
       "10 projects",
     ],
   },

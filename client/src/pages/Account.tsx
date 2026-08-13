@@ -1083,7 +1083,7 @@ function CreditsPage({ planInfo }: any) {
 
   return (
     <div className="py-4 space-y-6">
-      <SettingsSection title="Credit Balance" description="Your available credits for Pastel AI agent generations.">
+      <SettingsSection title="Credit Balance" description="Your available credits for Maxi AI agent generations.">
         <div className="px-1 pt-2 pb-4">
           {isLoading ? (
             <div className="h-10 w-32 bg-muted rounded animate-pulse" />

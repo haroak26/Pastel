@@ -900,7 +900,7 @@ export const userSessions = pgTable("user_sessions", {
 export type UserSession = typeof userSessions.$inferSelect;
 export type NewUserSession = typeof userSessions.$inferInsert;
 
-// ── Pastel Agent Runs ──────────────────────────────────────────────────────
+// ── Maxi Agent Runs ──────────────────────────────────────────────────────
 
 export const AGENT_RUN_STATUSES = ["running", "done", "error"] as const;
 export type AgentRunStatus = (typeof AGENT_RUN_STATUSES)[number];
@@ -926,7 +926,7 @@ export const agentRuns = pgTable("agent_runs", {
 
 export type AgentRun = typeof agentRuns.$inferSelect;
 
-// ── Pastel Agent Documents (markdown design docs generated during a run) ────
+// ── Maxi Agent Documents (markdown design docs generated during a run) ────
 
 export const AGENT_DOCUMENT_KINDS = ["brief", "system", "screen-spec", "component-spec"] as const;
 export type AgentDocumentKind = (typeof AGENT_DOCUMENT_KINDS)[number];
@@ -945,7 +945,7 @@ export const agentDocuments = pgTable("agent_documents", {
 
 export type AgentDocument = typeof agentDocuments.$inferSelect;
 
-// ── Pastel Agent Files (virtual file system + compiled screen bundles) ─────
+// ── Maxi Agent Files (virtual file system + compiled screen bundles) ─────
 
 export const AGENT_FILE_KINDS = ["screen", "component", "style", "entry", "build"] as const;
 export type AgentFileKind = (typeof AGENT_FILE_KINDS)[number];
@@ -964,7 +964,7 @@ export const agentFiles = pgTable("agent_files", {
 
 export type AgentFile = typeof agentFiles.$inferSelect;
 
-// ── Pastel Agent Project State (persistent structured state per project) ───
+// ── Maxi Agent Project State (persistent structured state per project) ───
 //
 // The v2 pipeline is built around this table: every stage reads compact
 // structured slices of state instead of reprocessing long prompts, and every
@@ -993,7 +993,7 @@ export const agentProjectState = pgTable("agent_project_state", {
 
 export type AgentProjectState = typeof agentProjectState.$inferSelect;
 
-// ── Pastel Agent Component Registry (validated, reusable components) ───────
+// ── Maxi Agent Component Registry (validated, reusable components) ───────
 
 export const AGENT_COMPONENT_KINDS = ["shared", "layout", "screen"] as const;
 export type AgentComponentKind = (typeof AGENT_COMPONENT_KINDS)[number];
@@ -1022,7 +1022,7 @@ export const agentComponentRegistry = pgTable("agent_component_registry", {
 
 export type AgentComponentRegistryEntry = typeof agentComponentRegistry.$inferSelect;
 
-// ── Pastel Agent Design Patterns (curated library, embedding search) ────────
+// ── Maxi Agent Design Patterns (curated library, embedding search) ────────
 //
 // Stage 11 (design pattern retrieval) embeds a query from the project's
 // brief/spec/brand strategy and cosine-searches this table. Seeded by

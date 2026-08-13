@@ -212,7 +212,7 @@ export async function startServer(app: Express, httpServer: Server) {
 
   // Mark agent runs orphaned by a previous process as errored
   try {
-    const { cleanupStaleRuns } = await import("./lib/pastel-agent/run-store");
+    const { cleanupStaleRuns } = await import("./lib/maxi-agent/run-store");
     await cleanupStaleRuns();
   } catch {}
   app.use((err: any, _req: Request, res: Response, next: NextFunction) => {

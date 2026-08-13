@@ -24,7 +24,7 @@ const faqs = [
   },
   {
     q: "What are AI credits?",
-    a: "AI credits power the Pastel AI agent for UI generation. Each credit is consumed based on the AI model used and generation complexity. You get a monthly allowance with your plan, and can buy more credit packs anytime — they never expire.",
+    a: "AI credits power the Maxi AI agent for UI generation. Each credit is consumed based on the AI model used and generation complexity. You get a monthly allowance with your plan, and can buy more credit packs anytime — they never expire.",
   },
 ];
 

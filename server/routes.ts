@@ -12,7 +12,7 @@ import { sendVerificationEmail, sendEmailChangeVerification, sendPasswordResetEm
 import { generateTotpSecret, verifyTotp, buildOtpauthUrl } from "./totp";
 import { registerAuthRoutes } from "./routes/auth";
 import { registerRemainingRoutes } from "./routes/remaining";
-import { registerPastelAgentRoutes } from "./routes/pastel-agent";
+import { registerMaxiAgentRoutes } from "./routes/maxi-agent";
 import { buildOnboardingSession } from "./onboarding-session";
 import { createHash, randomBytes, randomInt, timingSafeEqual } from "crypto";
 import {
@@ -365,7 +365,7 @@ export async function registerRoutes(httpServer: Server, app: Express): Promise<
     }
   });
 
-  registerPastelAgentRoutes(app);
+  registerMaxiAgentRoutes(app);
 
   return httpServer;
 }

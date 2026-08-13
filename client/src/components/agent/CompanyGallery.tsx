@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { Check, Sparkles } from "lucide-react";
-import type { CompanyCatalogItem, SuggestedCompany } from "@/hooks/use-pastel-agent";
+import type { CompanyCatalogItem, SuggestedCompany } from "@/hooks/use-maxi-agent";
 
 interface CompanyGalleryProps {
   catalog: CompanyCatalogItem[];

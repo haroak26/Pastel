@@ -1,7 +1,7 @@
 import { useState, useRef } from "react";
 import { ArrowUp, ArrowRight, ArrowLeft, ChevronLeft, ChevronRight } from "lucide-react";
 import { Button } from "@/components/button";
-import type { ClarifyQuestion } from "@/hooks/use-pastel-agent";
+import type { ClarifyQuestion } from "@/hooks/use-maxi-agent";
 
 type Props = {
   questions: ClarifyQuestion[];

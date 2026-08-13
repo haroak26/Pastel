@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { Check, X, Pencil, Layers, Loader2 } from "lucide-react";
-import type { WireframeReviewPayload } from "@/hooks/use-pastel-agent";
+import type { WireframeReviewPayload } from "@/hooks/use-maxi-agent";
 
 interface WireframeReviewPanelProps {
   review: WireframeReviewPayload;

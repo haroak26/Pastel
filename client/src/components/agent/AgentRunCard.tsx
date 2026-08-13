@@ -1,7 +1,7 @@
 import { useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Check, Loader2, ShieldCheck, AlertTriangle } from "lucide-react";
-import type { ActivityItem, AgentPhase, PhaseState, SkillState } from "@/hooks/use-pastel-agent";
+import type { ActivityItem, AgentPhase, PhaseState, SkillState } from "@/hooks/use-maxi-agent";
 import { formatScreenLabel } from "@/lib/utils";
 
 interface AgentRunCardProps {

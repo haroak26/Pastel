@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import { FileCode2, Folder, ChevronRight, ChevronDown } from "lucide-react";
-import type { FileItem } from "@/hooks/use-pastel-agent";
+import type { FileItem } from "@/hooks/use-maxi-agent";
 
 interface FilesPanelProps {
   files: Record<string, FileItem>;

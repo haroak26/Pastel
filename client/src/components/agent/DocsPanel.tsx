@@ -1,6 +1,6 @@
 import { motion } from "framer-motion";
 import { FileText, Loader2 } from "lucide-react";
-import type { DocItem } from "@/hooks/use-pastel-agent";
+import type { DocItem } from "@/hooks/use-maxi-agent";
 
 interface DocsPanelProps {
   docs: DocItem[];

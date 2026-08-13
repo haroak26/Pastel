@@ -33,12 +33,12 @@ export function ScreenPreview({ runId, screen }: ScreenPreviewProps) {
       if (!iframeRef.current || e.source !== iframeRef.current.contentWindow) return;
       const data = e.data;
       if (!data || typeof data !== "object") return;
-      if (data.type === "pastel:mounted") setLoaded(true);
-      if (data.type === "pastel:height" && typeof data.height === "number" && data.height > 50) {
+      if (data.type === "maxi:mounted") setLoaded(true);
+      if (data.type === "maxi:height" && typeof data.height === "number" && data.height > 50) {
         setContentHeight(data.height);
       }
-      if (data.type === "pastel:error") setRuntimeError(data.message || "Runtime error");
-      if (data.type === "pastel:blank") setRuntimeError("The screen rendered empty — the build may be incomplete.");
+      if (data.type === "maxi:error") setRuntimeError(data.message || "Runtime error");
+      if (data.type === "maxi:blank") setRuntimeError("The screen rendered empty — the build may be incomplete.");
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);
@@ -54,7 +54,7 @@ export function ScreenPreview({ runId, screen }: ScreenPreviewProps) {
     return () => clearTimeout(t);
   }, [loaded, nonce]);
 
-  const src = `/api/pastel-agent/runs/${runId}/preview/${encodeURIComponent(screen)}?n=${nonce}`;
+  const src = `/api/maxi-agent/runs/${runId}/preview/${encodeURIComponent(screen)}?n=${nonce}`;
 
   return (
     <div

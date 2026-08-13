@@ -8,7 +8,7 @@ import { ComputerIcon, SmartPhone01Icon } from "hugeicons-react";
 import { PromptInput } from "@/components/PromptInput";
 import { CanvasPromptInput } from "@/components/CanvasPromptInput";
 import { CanvasDropdown } from "@/components/CanvasDropdown";
-import { usePastelAgent } from "@/hooks/use-pastel-agent";
+import { useMaxiAgent } from "@/hooks/use-maxi-agent";
 import { AgentRunCard } from "@/components/agent/AgentRunCard";
 import { WireframeReviewPanel } from "@/components/agent/WireframeReviewPanel";
 import { CompanyGallery } from "@/components/agent/CompanyGallery";
@@ -115,7 +115,7 @@ export default function CanvasPage() {
   const isNewCanvas = projectId === "new";
   const agentProjectId = projectId && !isNewCanvas ? projectId : null;
 
-  const agent = usePastelAgent(agentProjectId);
+  const agent = useMaxiAgent(agentProjectId);
   const {
     catalog,
     phases,

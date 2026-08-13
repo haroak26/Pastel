@@ -2,7 +2,7 @@ import { useMemo } from "react";
 import { marked } from "marked";
 import DOMPurify from "dompurify";
 import { ArrowLeft, FileText } from "lucide-react";
-import type { DocItem } from "@/hooks/use-pastel-agent";
+import type { DocItem } from "@/hooks/use-maxi-agent";
 
 marked.setOptions({ gfm: true, breaks: false });
 
