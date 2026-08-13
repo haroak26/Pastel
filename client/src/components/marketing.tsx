@@ -35,7 +35,7 @@ export function SectionHeader({
       </h2>
       {subtitle && (
         <p
-          className="text-[14px] text-fg-muted font-medium leading-[1.65] max-w-[560px]"
+          className="text-[14px] text-fg-muted font-normal leading-[1.65] max-w-[560px]"
           style={centered ? { margin: "0 auto" } : undefined}
         >
           {subtitle}

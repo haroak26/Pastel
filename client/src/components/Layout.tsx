@@ -16,16 +16,6 @@ interface LayoutProps {
 
 const navDropdowns = [
   {
-    label: "Features",
-    href: "/#features",
-    items: [
-      { icon: PenTool, title: "Design Editor", desc: "Intuitive canvas for UI design", href: "/#features" },
-      { icon: Layers, title: "Components", desc: "Reusable design components", href: "/#features" },
-      { icon: Share2, title: "Collaboration", desc: "Real-time team collaboration", href: "/#features" },
-      { icon: Sparkles, title: "AI-powered", desc: "Smart design suggestions", href: "/#features" },
-    ],
-  },
-  {
     label: "Product",
     href: "/#features",
     items: [
@@ -43,6 +33,16 @@ const navDropdowns = [
       { icon: Star, title: "Pro", desc: "$29/mo — For growing teams", href: "/pricing" },
       { icon: BarChart3, title: "Max", desc: "$99/mo — For teams that want everything", href: "/pricing" },
       { icon: ArrowRight, title: "Compare Plans", desc: "See all features side by side", href: "/pricing" },
+    ],
+  },
+  {
+    label: "Affiliate",
+    href: "/affiliate",
+    items: [
+      { icon: PenTool, title: "Affiliate Program", desc: "Earn recurring commission", href: "/affiliate" },
+      { icon: Layers, title: "Partners", desc: "Grow with Pastel", href: "/affiliate" },
+      { icon: Share2, title: "Refer a friend", desc: "Share the love, earn rewards", href: "/affiliate" },
+      { icon: Sparkles, title: "Contact sales", desc: "Talk to a human", href: "/contact" },
     ],
   },
 ];
@@ -76,10 +76,10 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
   };
 
   const headerContent = (
-    <header className={cn("w-full h-14 md:h-[60px] bg-background/95 backdrop-blur z-40 sticky top-0 flex items-center border-b transition-all duration-200", panel && "border-border")} style={!panel ? { borderColor: scrolled ? 'hsl(var(--border))' : 'transparent' } : undefined}>
+    <header className={cn("w-full h-14 md:h-[60px] bg-background/95 backdrop-blur z-40 sticky top-0 flex items-center border-b transition-all duration-200", panel && "border-border")} style={panel ? { borderColor: 'transparent' } : { borderColor: scrolled ? 'hsl(var(--border))' : 'transparent' }}>
       <div className="w-full max-w-[1280px] mx-auto px-6 md:px-8 overflow-x-hidden flex items-center justify-between">
         <Link href="/" className="flex items-center">
-          <img src="/PastelLogo.svg" alt="Pastel" width={130} className="h-auto shrink-0" />
+          <img src="/PastelLogo.svg" alt="Pastel" width={100} className="h-auto shrink-0" />
         </Link>
  
         <div className="flex items-center justify-end gap-2.5">
@@ -156,8 +156,9 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
         <nav className="flex flex-col flex-1">
           <div>
             {[
-              { label: "Features", href: "/#features" },
+              { label: "Product", href: "/#features" },
               { label: "Pricing", href: "/pricing" },
+              { label: "Affiliate", href: "/affiliate" },
             ].map(({ label, href }) => (
               <div key={label}>
                 <Link
@@ -214,7 +215,7 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
   return (
     <div className="min-h-screen flex flex-col bg-white">
       {panel ? (
-        <div className="flex-1 flex flex-col w-full max-w-[1280px] mx-auto border-x border-border bg-white">
+        <div className="flex-1 flex flex-col w-full max-w-[1280px] mx-auto bg-white">
           {headerContent}
           {mobileMenuContent}
           <main className="flex-1 w-full">

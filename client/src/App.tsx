@@ -27,6 +27,7 @@ import Pricing from "@/pages/Pricing";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
 import Docs from "@/pages/Docs";
+import Affiliate from "@/pages/Affiliate";
 import MarketingContact from "@/pages/MarketingContact";
 import MarketingStatus from "@/pages/MarketingStatus";
 import VerifyEmailPage from "@/pages/VerifyEmail";
@@ -106,6 +107,7 @@ function Router() {
       <Route path="/terms" component={Terms} />
       <Route path="/docs" component={Docs} />
       <Route path="/contact" component={MarketingContact} />
+      <Route path="/affiliate" component={Affiliate} />
       <Route path="/status" component={MarketingStatus} />
 
       {/* Dashboard */}

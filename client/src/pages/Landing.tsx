@@ -1,6 +1,6 @@
-import { FormEvent, useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useLocation } from "wouter";
-import { motion, useReducedMotion } from "framer-motion";
+import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/button";
 import { PricingSection } from "@/components/PricingSection";
@@ -12,28 +12,33 @@ import {
   FeatureVariant,
 } from "@/components/marketing";
 import {
+  ArrowDownLeft,
+  ArrowRight,
+  ArrowUpRight,
+  Bell,
   ChevronDown,
   Coffee,
-  Frame,
+  Dumbbell,
+  Ellipsis,
   Grid3X3,
-  Image,
+  Heart,
+  HeartPulse,
+  Home,
   Layers,
-  MousePointer2,
   PenTool,
+  Plus,
+  Search,
   Share2,
+  ShoppingCart,
   Sparkles,
-  Square,
+  TrendingUp,
   Type,
+  User,
+  Wallet,
+  Zap,
 } from "lucide-react";
 
 /* ─── Data ─── */
-
-const examplePrompts = [
-  "A landing page for an indie coffee brand",
-  "An analytics dashboard for a finance app",
-  "A mobile onboarding flow for a fitness app",
-  "A pricing page for a design tool",
-];
 
 const steps = [
   {
@@ -119,20 +124,11 @@ const faqs = [
   },
 ];
 
-/* Pastel accent dots scattered through the hero — a nod to the palette. */
-const heroDots = [
-  { color: "#FFD66E", size: 12, style: { top: "14%", right: "9%" }, delay: "0s" },
-  { color: "#C7B9FF", size: 14, style: { top: "38%", right: "4%" }, delay: "0.8s" },
-  { color: "#A8E6CF", size: 10, style: { top: "58%", right: "24%" }, delay: "1.6s" },
-  { color: "#FFB3A7", size: 9, style: { top: "8%", right: "38%" }, delay: "2.2s" },
-  { color: "#8ED1FF", size: 11, style: { top: "68%", right: "10%" }, delay: "1.2s" },
-];
-
 const variantText: Record<FeatureVariant, string> = {
   brand: "text-sky-500",
   amber: "text-amber-500",
   red: "text-rose-500",
-  green: "text-emerald-500",
+  green: "text-[#FF7A6E]",
   purple: "text-fuchsia-500",
 };
 
@@ -161,221 +157,330 @@ function Reveal({
   );
 }
 
-/* ─── Hero prompt bar — stores the prompt and carries it into the app ─── */
+/* ─── App mockups — portrait cards, no chrome, bottoms aligned, middle taller ─── */
 
-function HeroPromptBar() {
-  const { data: user } = useUser();
-  const [, setLocation] = useLocation();
-  const reduceMotion = useReducedMotion();
-  const [value, setValue] = useState("");
-  const [focused, setFocused] = useState(false);
-  const [idx, setIdx] = useState(0);
-  const [visible, setVisible] = useState(true);
-
-  const paused = reduceMotion || focused || value.length > 0;
-  useEffect(() => {
-    if (paused) return;
-    let swap: ReturnType<typeof setTimeout>;
-    const t = setInterval(() => {
-      setVisible(false);
-      swap = setTimeout(() => {
-        setIdx((i) => (i + 1) % examplePrompts.length);
-        setVisible(true);
-      }, 220);
-    }, 3400);
-    return () => {
-      clearInterval(t);
-      clearTimeout(swap);
-    };
-  }, [paused]);
-
-  const submit = (e: FormEvent) => {
-    e.preventDefault();
-    const q = value.trim();
-    if (q) sessionStorage.setItem("pastel-landing-prompt", q);
-    setLocation(user ? "/home" : "/auth/signup");
-  };
-
+function AppCard({ children, className }: { children: React.ReactNode; className?: string }) {
   return (
-    <form onSubmit={submit} className="w-full max-w-[600px]">
-      <div className="relative flex items-center h-[54px] md:h-[58px] rounded-full border border-border bg-white pl-5 pr-2 shadow-[0_10px_36px_rgba(0,0,0,0.08)] transition-colors focus-within:border-[hsl(var(--brand)/0.45)]">
-        <Sparkles size={17} className="text-brand shrink-0" />
-        <input
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
-          aria-label="Describe what you want to design"
-          className="peer flex-1 min-w-0 bg-transparent outline-none border-none text-[15px] font-medium text-foreground px-3"
-        />
-        {!value && (
-          <span
-            aria-hidden
-            className={`absolute left-[46px] right-[130px] text-[15px] text-fg-faint pointer-events-none truncate transition-opacity duration-200 ${visible && !focused ? "opacity-100" : "opacity-50"}`}
-          >
-            {examplePrompts[idx]}
-          </span>
-        )}
-        <button
-          type="submit"
-          className="shrink-0 h-[42px] px-5 rounded-full bg-brand text-white text-[14px] font-semibold transition-colors hover:bg-[hsl(var(--brand-hover))] active:scale-[0.97]"
-        >
-          Generate
-        </button>
-      </div>
-      <p className="mt-3 pl-5 text-[12.5px] text-fg-faint font-medium">
-        Free plan · 15 AI credits a month · No card required
-      </p>
-    </form>
+    <div
+      className={`shrink-0 overflow-hidden rounded-[20px] bg-white shadow-[0_0_16px_hsl(var(--brand)/0.06),0_0_40px_hsl(var(--brand)/0.08)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-[2px] hover:shadow-[0_0_20px_hsl(var(--brand)/0.1),0_0_56px_hsl(var(--brand)/0.12)] ${className}`}
+    >
+      {children}
+    </div>
   );
 }
 
-/* ─── Hand-crafted editor mockup ─── */
+/* ── Sunday Roast — coffee shop app ── */
 
-function EditorMockup() {
+function CoffeeScreen() {
+  const roasts = [
+    ["#C4562F", "Huila", "$18", "★ 4.7"],
+    ["#4A2C1A", "Yirgacheffe", "$18", "★ 4.9"],
+  ] as const;
   return (
-    <div className="relative">
-      {/* Floating palette card */}
-      <div
-        aria-hidden
-        className="hidden lg:block absolute -top-12 right-[6%] z-10 rotate-[4deg] rounded-2xl border border-border bg-white p-3.5 shadow-[0_10px_36px_rgba(0,0,0,0.09)] animate-float-slow"
-      >
-        <p className="text-[11px] font-semibold text-foreground mb-2">Palette</p>
+    <div className="flex h-full flex-col bg-white">
+      <div className="flex shrink-0 items-center justify-between px-5 pt-5">
         <div className="flex items-center gap-1.5">
-          {["#4A2C1A", "#FFB3A7", "#FFD66E", "#A8E6CF"].map((c) => (
-            <span key={c} className="w-7 h-7 rounded-md border border-black/5" style={{ backgroundColor: c }} />
-          ))}
+          <span className="h-4 w-4 rounded-full" style={{ backgroundColor: "#4A2C1A" }} />
+          <span className="text-[13px] font-semibold text-foreground">Sunday Roast</span>
         </div>
-        <p className="mt-2 text-[10px] font-medium text-fg-faint">Picked by the agent</p>
+        <div className="flex items-center gap-3">
+          <Search size={14} className="text-fg-muted" />
+          <span className="relative">
+            <ShoppingCart size={15} className="text-foreground" />
+            <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand text-[8px] font-bold text-white">2</span>
+          </span>
+        </div>
       </div>
 
-      {/* Floating agent toast */}
-      <div
-        aria-hidden
-        className="hidden lg:flex absolute bottom-[10%] left-[2%] z-10 -rotate-[3deg] items-center gap-2.5 rounded-full border border-border bg-white pl-2 pr-4 py-2 shadow-[0_10px_36px_rgba(0,0,0,0.09)] animate-float-slow"
-        style={{ animationDelay: "1.4s" }}
-      >
-        <span className="w-7 h-7 rounded-full bg-brand/10 flex items-center justify-center">
-          <Sparkles size={14} className="text-brand" />
-        </span>
-        <span>
-          <span className="block text-[12px] font-semibold text-foreground leading-tight">Generated 3 screens</span>
-          <span className="block text-[10.5px] text-fg-muted font-medium leading-tight mt-0.5">Landing · Pricing · Onboarding</span>
-        </span>
-      </div>
-
-      <div className="relative border border-border rounded-2xl bg-white mockup-glow overflow-hidden select-none">
-        {/* Chrome bar */}
-        <div className="flex items-center justify-between h-11 px-4 border-b border-border/70">
-          <div className="flex items-center gap-2">
-            <img src="/PastelIcon.svg" alt="" width={16} height={16} />
-            <span className="text-[12px] font-medium text-fg-muted">pastel.app/canvas/untitled</span>
-            <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full bg-brand/10 px-2.5 py-1 text-[11px] font-semibold text-brand ml-2">
-              <span className="w-1.5 h-1.5 rounded-full bg-brand" />
-              Draft ready
+      <div className="flex flex-1 flex-col px-5 pt-3">
+        <div className="flex flex-1 flex-col justify-between rounded-[18px] p-4" style={{ backgroundColor: "#3E2417" }}>
+          <div>
+            <span className="inline-flex rounded-full px-2.5 py-1 text-[8.5px] font-bold uppercase tracking-[0.12em]" style={{ backgroundColor: "#FFD66E", color: "#4A2C1A" }}>
+              Ethiopia · Single origin
+            </span>
+            <p className="mt-2.5 text-[18px] font-semibold leading-[1.15] tracking-[-0.02em] text-white">
+              Yirgacheffe, washed
+            </p>
+            <p className="mt-1.5 flex items-center gap-1.5 text-[10px] text-white/60">
+              <span className="text-[#FFD66E]">★★★★★</span> 4.9 · 312 reviews
+            </p>
+            <p className="mt-1.5 text-[10px] leading-[1.55] text-white/60">
+              Roasted every Sunday, shipped while it's still singing.
+            </p>
+          </div>
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="text-[9px] font-medium text-white/50">From</p>
+              <p className="text-[16px] font-semibold text-white">
+                $18 <span className="text-[10px] font-medium text-white/50">/ 250g</span>
+              </p>
+            </div>
+            <span className="rounded-full px-4 py-2 text-[11px] font-semibold" style={{ backgroundColor: "#FFD66E", color: "#4A2C1A" }}>
+              Add to bag
             </span>
           </div>
         </div>
 
-        <div className="flex h-[420px] md:h-[460px]">
-          {/* Toolbar rail */}
-          <div className="hidden sm:flex flex-col items-center gap-1 w-[52px] py-2.5 border-r border-border/70">
-            {[MousePointer2, Frame, Square, Type, Image, Sparkles].map((Icon, i) => (
-              <span
-                key={i}
-                className={`flex items-center justify-center w-8 h-8 rounded-[9px] ${i === 5 ? "text-brand bg-brand/10" : "text-fg-muted"}`}
-              >
-                <Icon size={15} strokeWidth={1.75} />
-              </span>
+        <div className="pb-4 pt-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[12px] font-semibold text-foreground">Featured roasts</p>
+            <p className="text-[10px] font-medium text-fg-muted">See all</p>
+          </div>
+          <div className="mt-2.5 flex gap-3">
+            {roasts.map(([c, n, p, rating]) => (
+              <div key={n} className="flex-1 rounded-[14px] border border-border/60 p-2.5">
+                <span className="block h-[52px] rounded-[10px]" style={{ backgroundColor: c }} />
+                <p className="mt-2 text-[11px] font-semibold text-foreground">{n}</p>
+                <p className="mt-0.5 text-[10px] font-medium text-fg-muted">
+                  {rating} · {p}
+                </p>
+              </div>
             ))}
           </div>
-
-          {/* Layers panel */}
-          <div className="hidden md:flex flex-col w-[196px] border-r border-border/70 py-3 px-2.5 gap-0.5">
-            <p className="px-1.5 pb-1.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-fg-faint">Layers</p>
-            {[
-              { d: 0, label: "Landing", active: false },
-              { d: 1, label: "Nav", active: false },
-              { d: 1, label: "Hero", active: true },
-              { d: 2, label: "Headline", active: false },
-              { d: 2, label: "CTA / Shop beans", active: false },
-              { d: 1, label: "Features", active: false },
-              { d: 0, label: "Pricing", active: false },
-              { d: 0, label: "Onboarding", active: false },
-            ].map((row) => (
-              <span
-                key={row.label}
-                style={{ paddingLeft: `${row.d * 14 + 6}px` }}
-                className={`flex items-center gap-1.5 py-[5px] pr-1.5 rounded-md text-[11.5px] font-medium ${row.active ? "bg-brand/10 text-brand" : "text-fg-muted"}`}
-              >
-                <span className={`w-1.5 h-1.5 rounded-[2px] ${row.active ? "bg-brand" : "bg-fg-faint/60"}`} />
-                {row.label}
-              </span>
-            ))}
-          </div>
-
-          {/* Canvas */}
-          <div className="relative flex-1 bg-surface-muted flex items-center justify-center overflow-hidden">
-            {/* Second screen peeking in */}
-            <div aria-hidden className="hidden lg:block absolute -right-14 top-16 rotate-[7deg] w-[210px] rounded-[14px] border border-border/60 bg-white p-4 space-y-2 opacity-90">
-              <div className="h-2 w-16 rounded bg-black/10" />
-              <div className="h-6 w-32 rounded bg-black/[0.14]" />
-              <div className="h-2 w-24 rounded bg-black/10" />
-              <div className="flex gap-1.5 pt-1">
-                <div className="h-5 w-14 rounded-full bg-brand/80" />
-                <div className="h-5 w-14 rounded-full bg-black/10" />
-              </div>
-            </div>
-
-            {/* The generated screen — matches example prompt #1 */}
-            <div className="relative w-[min(430px,84%)] rounded-[14px] border border-border/70 bg-white px-6 py-5 md:px-8 md:py-6">
-              {/* mini nav */}
-              <div className="flex items-center justify-between mb-6">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-4 h-4 rounded-full" style={{ backgroundColor: "#4A2C1A" }} />
-                  <span className="text-[12px] font-semibold text-foreground">Sunday Roast</span>
-                </div>
-                <div className="flex items-center gap-3 text-[10px] font-medium text-fg-muted">
-                  <span>Beans</span>
-                  <span>Story</span>
-                  <span>Wholesale</span>
-                </div>
-              </div>
-              {/* mini hero */}
-              <p className="text-[9px] font-bold uppercase tracking-[0.14em] mb-2" style={{ color: "#C4562F" }}>New roast · Huila, Colombia</p>
-              <p className="text-[20px] md:text-[23px] font-semibold leading-[1.1] tracking-[-0.02em] text-foreground mb-2">
-                Brew better coffee at home.
-              </p>
-              <p className="text-[10.5px] leading-[1.6] text-fg-muted mb-4 max-w-[260px]">
-                Small-batch beans, roasted every Sunday and shipped while they're still singing.
-              </p>
-              <div className="flex items-center gap-3 mb-5">
-                <span className="relative inline-flex">
-                  <span className="rounded-full px-3.5 py-1.5 text-[10px] font-semibold text-white" style={{ backgroundColor: "#4A2C1A" }}>Shop beans</span>
-                  {/* selection outline */}
-                  <span className="absolute -inset-[5px] rounded-full border border-brand pointer-events-none">
-                    <span className="absolute -top-[3.5px] -left-[3.5px] w-[7px] h-[7px] rounded-[2px] bg-white border border-brand" />
-                    <span className="absolute -top-[3.5px] -right-[3.5px] w-[7px] h-[7px] rounded-[2px] bg-white border border-brand" />
-                    <span className="absolute -bottom-[3.5px] -left-[3.5px] w-[7px] h-[7px] rounded-[2px] bg-white border border-brand" />
-                    <span className="absolute -bottom-[3.5px] -right-[3.5px] w-[7px] h-[7px] rounded-[2px] bg-white border border-brand" />
-                  </span>
-                </span>
-                <span className="rounded-full px-3.5 py-1.5 text-[10px] font-semibold text-foreground border border-border">Our story</span>
-              </div>
-              <div className="flex items-center gap-3 rounded-[10px] px-4 py-3" style={{ backgroundColor: "#F5EFE6" }}>
-                <span className="flex items-center justify-center w-9 h-9 rounded-full" style={{ backgroundColor: "#FFD66E" }}>
-                  <Coffee size={16} style={{ color: "#4A2C1A" }} />
-                </span>
-                <div>
-                  <p className="text-[10.5px] font-semibold text-foreground leading-tight">Roasted this week</p>
-                  <p className="text-[9.5px] text-fg-muted font-medium leading-tight mt-0.5">Order by Friday, sip by Monday</p>
-                </div>
-              </div>
-            </div>
+          <div className="mt-3 flex items-center justify-between rounded-[12px] px-3 py-2.5" style={{ backgroundColor: "#F5EFE6" }}>
+            <p className="text-[10px] font-semibold text-foreground">Free shipping over $30</p>
+            <p className="text-[9.5px] font-medium text-fg-muted">Code: SUNDAY</p>
           </div>
         </div>
       </div>
     </div>
+  );
+}
+
+/* ── Northwind — finance app (dark, tallest) ── */
+
+function FinanceScreen() {
+  const tabs = [Home, Wallet, ArrowUpRight, User];
+  const days = ["M", "T", "W", "T", "F", "S", "S"];
+  return (
+    <div className="flex h-full flex-col" style={{ backgroundColor: "#0F1217" }}>
+      <div className="flex shrink-0 items-center justify-between px-5 pt-5">
+        <div>
+          <p className="text-[10px] font-medium text-white/50">Good morning</p>
+          <p className="text-[15px] font-semibold text-white">Dana Kim</p>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span className="relative">
+            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.07]">
+              <Bell size={13} className="text-white" />
+            </span>
+            <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#FF5F57]" />
+          </span>
+          <span className="flex h-7 w-7 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: "linear-gradient(135deg,#0B99FF,#3D7BFF)" }}>
+            DK
+          </span>
+        </div>
+      </div>
+
+      <div className="flex flex-1 flex-col px-5 pt-3">
+        <div className="rounded-[18px] p-4" style={{ background: "linear-gradient(135deg,#0B99FF 0%,#3D7BFF 100%)" }}>
+          <div className="flex items-center justify-between">
+            <span className="h-5 w-7 rounded-[4px] bg-white/25" />
+            <p className="text-[9px] font-medium tracking-[0.08em] text-white/80">•••• 4829</p>
+          </div>
+          <p className="mt-2 text-[10px] font-medium text-white/70">Total balance</p>
+          <p className="mt-0.5 text-[24px] font-semibold tracking-[-0.02em] text-white">$48,260.40</p>
+          <span className="mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-semibold" style={{ backgroundColor: "rgba(255,255,255,0.2)", color: "#fff" }}>
+            <TrendingUp size={9} /> +2.4% this month
+          </span>
+        </div>
+
+        <div className="mt-3.5 flex items-center rounded-[10px] bg-white/[0.06] p-1">
+          {["Day", "Week", "Month"].map((label, i) => (
+            <span
+              key={label}
+              className={`flex-1 rounded-[8px] py-1.5 text-center text-[9.5px] font-semibold ${i === 2 ? "bg-white/15 text-white" : "text-white/50"}`}
+            >
+              {label}
+            </span>
+          ))}
+        </div>
+
+        <div className="mt-3 flex min-h-[110px] flex-1 flex-col rounded-[16px] bg-white/[0.06] p-4">
+          <div className="flex items-center justify-between">
+            <p className="text-[11px] font-semibold text-white/90">Spending</p>
+            <span className="text-[9.5px] font-medium text-emerald-400">−12% vs last month</span>
+          </div>
+          <div className="mt-3 flex min-h-[48px] flex-1 items-end gap-1.5">
+            {[38, 55, 44, 70, 52, 82, 64, 95].map((h, i) => (
+              <span
+                key={i}
+                className="flex-1 rounded-[3px]"
+                style={{ height: `${h}%`, backgroundColor: i === 7 ? "#0B99FF" : "rgba(255,255,255,0.16)" }}
+              />
+            ))}
+          </div>
+          <div className="mt-1.5 flex justify-between">
+            {days.map((d, i) => (
+              <span key={i} className={`flex-1 text-center text-[7.5px] font-medium ${i === 6 ? "text-[#0B99FF]" : "text-white/35"}`}>{d}</span>
+            ))}
+          </div>
+        </div>
+
+        <p className="mt-3.5 text-[11px] font-semibold text-white/90">Recent</p>
+        <div className="mt-1.5 space-y-1.5 pb-4">
+          {[
+            ["SP", "Stripe payout", "+$2,400.00", "#0B99FF", "2h ago"],
+            ["AW", "AWS · compute", "−$812.10", "#FF9F43", "Yesterday"],
+            ["FG", "Figma · seats", "−$135.00", "#A855F7", "Mon"],
+          ].map(([initials, name, value, color, time]) => (
+            <div key={name} className="flex items-center gap-2.5 rounded-[12px] bg-white/[0.05] px-3.5 py-2.5">
+              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold" style={{ backgroundColor: `${color}22`, color }}>
+                {initials}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="truncate text-[10.5px] font-medium text-white/85">{name}</p>
+                <p className="text-[8.5px] text-white/40">{time}</p>
+              </div>
+              <span className={`text-[10.5px] font-semibold ${value.startsWith("+") ? "text-emerald-400" : "text-white/90"}`}>{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <div className="flex shrink-0 items-center justify-around border-t border-white/10 px-2 py-3">
+        {tabs.map((Icon, i) => (
+          <span key={i} className={i === 0 ? "text-[#0B99FF]" : "text-white/30"}>
+            <Icon size={16} strokeWidth={2} />
+          </span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/* ── Pulse — fitness onboarding ── */
+
+function OnboardingScreen() {
+  const options = [
+    ["Build muscle", "4–5 sessions a week", Dumbbell],
+    ["Lose fat", "3–4 sessions a week", HeartPulse],
+    ["Stay fit", "2–3 sessions a week", Zap],
+  ] as const;
+  return (
+    <div className="flex h-full flex-col bg-white">
+      <div className="flex shrink-0 items-center justify-between px-6 pt-5">
+        <div className="flex gap-1.5">
+          {[0, 1, 2, 3].map((i) => (
+            <span key={i} className={`h-1.5 rounded-full ${i <= 1 ? "w-6 bg-brand" : "w-3 bg-border"}`} />
+          ))}
+        </div>
+        <p className="text-[10.5px] font-medium text-fg-muted">Skip</p>
+      </div>
+
+      <div className="flex flex-1 flex-col px-6 pt-8">
+        <div className="flex justify-center">
+          <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-brand/10">
+            <Dumbbell size={26} className="text-brand" />
+          </span>
+        </div>
+        <p className="mt-5 text-center text-[20px] font-semibold leading-[1.15] tracking-[-0.02em] text-foreground">What's your goal?</p>        <p className="mt-1.5 text-center text-[10.5px] text-fg-muted">We'll tailor your plan around it.</p>
+
+        <div className="mt-6 space-y-2.5">
+          {options.map(([label, sub, Icon], i) => (
+            <div key={label} className={`flex items-center justify-between rounded-[14px] border px-4 py-3 ${i === 0 ? "border-brand bg-brand/5" : "border-border"}`}>
+              <span className="flex items-center gap-3">
+                <span className={`flex h-8 w-8 items-center justify-center rounded-[10px] ${i === 0 ? "bg-brand/10 text-brand" : "bg-surface-muted text-fg-muted"}`}>
+                  <Icon size={14} />
+                </span>
+                <span>
+                  <span className="block text-[13px] font-semibold text-foreground">{label}</span>
+                  <span className="block text-[9.5px] font-medium text-fg-muted">{sub}</span>
+                </span>
+              </span>
+              <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${i === 0 ? "border-brand" : "border-border"}`}>
+                {i === 0 && <span className="h-2 w-2 rounded-full bg-brand" />}
+              </span>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-auto pb-6 pt-6">
+          <div className="rounded-full bg-brand py-3 text-center text-[12px] font-semibold text-white">Continue</div>
+          <p className="mt-3 text-center text-[10px] font-medium text-fg-muted">No credit card · Change anytime</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+/* ── App strip — three equal-width portrait cards, bottoms aligned, middle taller ── */
+
+function StripCard({ index, children }: { index: number; children: React.ReactNode }) {
+  const reduce = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const bodyRef = useRef<HTMLElement | null>(document.body);
+  const { scrollYProgress } = useScroll({
+    target: ref,
+    container: bodyRef,
+    offset: ["start 95%", "start 40%"],
+  });
+  const start = index * 0.22;
+  const opacity = useTransform(scrollYProgress, [start, Math.min(start + 0.55, 1)], [0, 1]);
+  const y = useTransform(scrollYProgress, [start, Math.min(start + 0.55, 1)], [64, 0]);
+
+  return (
+    <motion.div ref={ref} style={reduce ? undefined : { opacity, y }}>
+      {children}
+    </motion.div>
+  );
+}
+
+function PhoneStrip() {
+  return (
+    <div className="mx-auto flex max-w-[1000px] flex-row items-end justify-center gap-2 lg:gap-5">
+      <StripCard index={0}>
+        <div className="h-[160px] w-[96px] lg:h-auto lg:w-auto">
+          <div className="origin-top-left scale-[0.32] lg:origin-center lg:scale-100">
+            <AppCard className="h-[500px] w-[300px] xl:w-[320px]">
+              <CoffeeScreen />
+            </AppCard>
+          </div>
+        </div>
+      </StripCard>
+      <StripCard index={1}>
+        <div className="h-[186px] w-[96px] lg:h-auto lg:w-auto">
+          <div className="origin-top-left scale-[0.32] lg:origin-center lg:scale-100">
+            <AppCard className="h-[580px] w-[300px] shadow-[0_0_20px_hsl(var(--brand)/0.08),0_0_56px_hsl(var(--brand)/0.1)] hover:shadow-[0_0_28px_hsl(var(--brand)/0.12),0_0_80px_hsl(var(--brand)/0.14)] xl:w-[320px]">
+              <FinanceScreen />
+            </AppCard>
+          </div>
+        </div>
+      </StripCard>
+      <StripCard index={2}>
+        <div className="h-[160px] w-[96px] lg:h-auto lg:w-auto">
+          <div className="origin-top-left scale-[0.32] lg:origin-center lg:scale-100">
+            <AppCard className="h-[500px] w-[300px] xl:w-[320px]">
+              <OnboardingScreen />
+            </AppCard>
+          </div>
+        </div>
+      </StripCard>
+    </div>
+  );
+}
+/* ─── Specimen chips — small design-tool details flanking the headline ─── */
+
+function SpecimenChips() {
+  return (
+    <>
+      <div className="hidden xl:flex absolute -left-[176px] top-[96px] items-center gap-2.5 rounded-xl border border-border bg-white px-3.5 py-2.5 shadow-floating">
+        <span className="flex -space-x-1">
+          {["#0B99FF", "#1E1E1E", "#FFD66E", "#FF7A6E"].map((c) => (
+            <span key={c} className="w-3.5 h-3.5 rounded-full border-2 border-white" style={{ backgroundColor: c }} />
+          ))}
+        </span>
+        <span className="text-[11px] font-medium text-fg-muted">Palette</span>
+      </div>
+      <div className="hidden xl:flex absolute -right-[172px] top-[150px] items-baseline gap-2 rounded-xl border border-border bg-white px-3.5 py-2.5 shadow-floating">
+        <span className="text-[19px] font-medium leading-none tracking-[-0.03em] text-foreground">Aa</span>
+        <span className="text-[11px] font-medium text-fg-muted">Inter · 64</span>
+      </div>
+      <div className="hidden xl:flex absolute -left-[148px] top-[320px] items-center gap-2 rounded-xl border border-border bg-white px-3.5 py-2.5 shadow-floating">
+        <Layers size={14} className="text-brand" />
+        <span className="text-[11px] font-medium text-fg-muted">12 layers</span>
+      </div>
+    </>
   );
 }
 
@@ -397,66 +502,51 @@ export default function Landing() {
       <div className="landing-grid" />
 
       {/* ── Hero ── */}
-      <section className="relative w-full pt-16 md:pt-24 pb-16 md:pb-24 hero-grain overflow-hidden">
-        <div className="px-6 md:px-8">
-          <div className="relative">
-            {/* Pastel color dots — playful, desktop only */}
-            {heroDots.map((dot) => (
-              <span
-                key={dot.color}
-                aria-hidden
-                className="hidden lg:block absolute rounded-full animate-float-slow"
-                style={{ ...dot.style, width: dot.size, height: dot.size, backgroundColor: dot.color, animationDelay: dot.delay }}
-              />
-            ))}
+      <section className="relative w-full pt-16 md:pt-28 pb-16 md:pb-24">
+        <div className="relative px-6 md:px-8">
+          <div className="relative mx-auto max-w-3xl text-center">
+            <SpecimenChips />
+            <Reveal>
+              <div className="mb-7 flex justify-center">
+                <Eyebrow label="NEW">Export design code for free</Eyebrow>
+              </div>
 
-            <Reveal className="max-w-3xl">
-            <div className="mb-7">
-              <Eyebrow label="NEW">Meet the Pastel design agent</Eyebrow>
-            </div>
+              <h1 className="text-[36px] sm:text-[44px] md:text-[50px] lg:text-[56px] text-foreground font-medium leading-[1.04] tracking-[-0.04em] mb-6 text-pretty">
+                Describe your idea.
+                <br />
+                Design your product.
+              </h1>
 
-            <h1 className="text-[36px] sm:text-[46px] md:text-[52px] lg:text-[58px] text-foreground font-semibold leading-[1.04] tracking-[-0.03em] mb-6">
-              Design beautiful interfaces.
-              <br />
-              Start with a sentence.
-            </h1>
+              <p className="mx-auto mb-9 max-w-[520px] text-[14.5px] md:text-[15.5px] text-fg-secondary font-normal leading-[1.7] text-pretty">
+                One sentence is all it takes to get real, editable screens. Then refine
+                every pixel on a real canvas, with components, vectors, and your whole team.
+              </p>
 
-            <p className="mb-8 max-w-[560px] text-[15px] md:text-[16px] text-fg-secondary font-sans font-medium leading-[1.65]">
-              Describe your product in plain language and Pastel drafts polished, editable
-              UI in seconds. Then refine every pixel on a real canvas — vectors, components,
-              and your whole team included.
-            </p>
-
-            <div className="flex items-center gap-3 mb-7">
-              <Link href="/auth/signup">
-                <Button design="pill" size="md" className="h-[44px] px-6 text-[15px]">
-                  Start Designing
-                </Button>
-              </Link>
-              <Button
-                design="pill-ghost"
-                size="md"
-                className="h-[44px] px-5 text-[15px]"
-                onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-              >
-                Learn more
-              </Button>
-            </div>
-
-              <HeroPromptBar />
+              <div className="flex items-center justify-center gap-5">
+                <Link href="/auth/signup">
+                  <Button design="pill" size="md" className="h-[40px] px-5 text-[14px]">
+                    Start designing free
+                  </Button>
+                </Link>
+                <button
+                  onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth", block: "start" })}
+                  className="group flex items-center gap-1.5 text-[14px] font-medium text-fg-muted hover:text-foreground transition-colors border-none bg-transparent cursor-pointer"
+                >
+                  See how it works
+                  <ArrowRight size={14} strokeWidth={2} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                </button>
+              </div>
             </Reveal>
           </div>
 
-          <Reveal className="mt-16 md:mt-24 pb-14 lg:pb-20" delay={0.15}>
-            <EditorMockup />
-          </Reveal>
+          <div className="mt-14 md:mt-20">
+            <PhoneStrip />
+          </div>
         </div>
-
-        <div className="hero-glow" />
       </section>
 
       {/* ── How it works ── */}
-      <section className="w-full py-16 md:py-24 border-t border-border">
+      <section className="relative w-full py-16 md:py-24 border-t border-border">
         <div className="px-6 md:px-8">
           <Reveal>
             <SectionHeader
@@ -469,7 +559,7 @@ export default function Landing() {
             {steps.map((step, i) => (
               <Reveal key={step.num} delay={i * 0.1}>
                 <div className="border-t border-border pt-5">
-                  <p className="text-[12px] font-semibold text-brand tracking-[0.06em]">{step.num}</p>
+                  <p className="text-[12px] font-semibold text-[#FF7A6E] tracking-[0.06em]">{step.num}</p>
                   <h3 className="mt-2.5 text-[16px] font-semibold text-foreground tracking-[-0.01em]">{step.title}</h3>
                   <p className="mt-1.5 text-[13px] text-fg-muted leading-[1.65] font-medium">{step.description}</p>
                 </div>
