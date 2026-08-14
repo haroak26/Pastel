@@ -12,17 +12,21 @@ interface LayoutProps {
   children: React.ReactNode;
   showFooter?: boolean;
   panel?: boolean;
+  /** Full-bleed layout: no max-width shell, so the page spans the whole viewport. */
+  fullWidth?: boolean;
+  /** Custom logo asset for the header/footer (e.g. the new Pastel mark). */
+  logo?: string;
 }
 
 const navDropdowns = [
   {
     label: "Product",
-    href: "/#features",
+    href: "/product",
     items: [
-      { icon: PenTool, title: "Design", desc: "Create beautiful interfaces", href: "/#features" },
-      { icon: Layers, title: "Prototype", desc: "Interactive prototypes", href: "/#features" },
-      { icon: Share2, title: "Handoff", desc: "Developer handoff made easy", href: "/#features" },
-      { icon: Sparkles, title: "AI Features", desc: "AI-powered design tools", href: "/#features" },
+      { icon: PenTool, title: "Design", desc: "Create beautiful interfaces", href: "/product" },
+      { icon: Layers, title: "Prototype", desc: "Interactive prototypes", href: "/product" },
+      { icon: Share2, title: "Handoff", desc: "Developer handoff made easy", href: "/product" },
+      { icon: Sparkles, title: "AI Features", desc: "AI-powered design tools", href: "/product" },
     ],
   },
   {
@@ -47,7 +51,7 @@ const navDropdowns = [
   },
 ];
 
-export function Layout({ children, showFooter = true, panel = false }: LayoutProps) {
+export function Layout({ children, showFooter = true, panel = false, fullWidth = false, logo }: LayoutProps) {
   const { data: user, isLoading: userLoading } = useUser();
   const logout = useLogout();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -75,18 +79,24 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
     clearTimeout(hoverTimeout.current);
   };
 
+  const logoSrc = logo ?? "/PastelLogo.svg";
+
   const headerContent = (
-    <header className={cn("w-full h-14 md:h-[60px] bg-background/95 backdrop-blur z-40 sticky top-0 flex items-center border-b transition-all duration-200", panel && "border-border")} style={panel ? { borderColor: 'transparent' } : { borderColor: scrolled ? 'hsl(var(--border))' : 'transparent' }}>
-      <div className="w-full max-w-[1280px] mx-auto px-6 md:px-8 overflow-x-hidden flex items-center justify-between">
+    <header className={cn("w-full h-16 md:h-[72px] bg-background z-40 sticky top-0 flex items-center border-b transition-[border-color] duration-200", panel && "border-border")} style={panel ? { borderColor: 'transparent' } : { borderColor: scrolled ? 'hsl(var(--border))' : 'transparent' }}>
+      <div className={cn("w-full px-6 md:px-10 overflow-x-hidden flex items-center justify-between", !fullWidth && "max-w-[1280px] mx-auto")}>
         <Link href="/" className="flex items-center">
-          <img src="/PastelLogo.svg" alt="Pastel" width={100} className="h-auto shrink-0" />
+          {logo ? (
+            <img src={logoSrc} alt="Pastel" height={32} className="h-[32px] w-auto shrink-0" />
+          ) : (
+            <img src={logoSrc} alt="Pastel" width={100} className="h-auto shrink-0" />
+          )}
         </Link>
  
         <div className="flex items-center justify-end gap-2.5">
           <div className="hidden md:flex items-center gap-1">
             <nav className="flex items-center gap-0.5">
               {navDropdowns.map(({ label, href }) => (
-                <Link key={label} href={href} className="inline-flex items-center text-[14px] font-medium text-foreground px-2.5 leading-[20px] transition-colors hover:opacity-80">
+                <Link key={label} href={href} className="inline-flex items-center text-[15px] font-medium text-foreground px-3 leading-[20px] transition-colors hover:opacity-80">
                   {label}
                 </Link>
               ))}
@@ -150,13 +160,13 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
   const mobileMenuContent = mobileMenuOpen && (
     <div
       className="fixed left-0 right-0 bottom-0 z-50 md:hidden flex flex-col bg-background"
-      style={{ top: "3.5rem" }}
+      style={{ top: "4rem" }}
     >
       <div className="flex-1 flex flex-col overflow-y-auto px-6 pt-4 pb-6">
         <nav className="flex flex-col flex-1">
           <div>
             {[
-              { label: "Product", href: "/#features" },
+              { label: "Product", href: "/product" },
               { label: "Pricing", href: "/pricing" },
               { label: "Affiliate", href: "/affiliate" },
             ].map(({ label, href }) => (
@@ -214,11 +224,11 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
 
   return (
     <div className="min-h-screen flex flex-col bg-white">
-      {panel ? (
-        <div className="flex-1 flex flex-col w-full max-w-[1280px] mx-auto bg-white">
+      {panel || fullWidth ? (
+        <div className={cn("flex-1 flex flex-col w-full bg-white", !fullWidth && "max-w-[1280px] mx-auto")}>
           {headerContent}
           {mobileMenuContent}
-          <main className="flex-1 w-full">
+          <main className="flex-1 w-full lds-marketing-main">
             {children}
           </main>
         </div>
@@ -226,54 +236,95 @@ export function Layout({ children, showFooter = true, panel = false }: LayoutPro
         <>
           {headerContent}
           {mobileMenuContent}
-          <main className="flex-1 w-full bg-white">
+          <main className="flex-1 w-full bg-white lds-marketing-main">
             {children}
           </main>
         </>
       )}
 
       {showFooter && (
-        <footer className="mt-auto border-t bg-white" style={{ borderColor: 'hsl(var(--border))' }}>
-          <div className="w-full max-w-[1280px] mx-auto px-6 md:px-8 pt-16 pb-12">
-            <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-10 pb-10 border-b border-border">
-              <div className="space-y-3 max-w-xs">
-                <Link href="/" className="inline-flex items-center gap-2">
-<img src="/PastelLogo.svg" alt="Pastel" width={116} className="h-auto shrink-0" />
-                </Link>
-                <p className="text-[13px] text-fg-muted font-medium leading-[1.6]">
-                  Design beautiful interfaces, together.
-                </p>
-              </div>
-            </div>
-
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-8 py-10">
-              {[
-                { heading: "Product", links: [["Features", "/#features"], ["Pricing", "/pricing"]] },
-                { heading: "Resources", links: [["Documentation", "/docs"], ["Status", "/status"], ["Contact", "/contact"]] },
-                { heading: "Company", links: [["Privacy", "/privacy"], ["Terms", "/terms"]] },
-                { heading: "Legal", links: [["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"]] },
-              ].map(({ heading, links }) => (
-                <div key={heading} className="space-y-3">
-                  <p className="lds-section-label">{heading}</p>
-                  <nav className="flex flex-col gap-2">
-                    {links.map(([label, href]) => (
-                      href.startsWith('https://') ? (
-                        <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="lds-body text-[13px] hover:text-foreground transition-colors">
-                          {label}
-                        </a>
-                      ) : (
-                        <Link key={label} href={href} className="lds-body text-[13px] hover:text-foreground transition-colors">
-                          {label}
-                        </Link>
-                      )
-                    ))}
-                  </nav>
+        <footer className="mt-auto bg-white">
+          <div className={cn("w-full px-6 md:px-10 border-t", !fullWidth && "max-w-[1280px] mx-auto")} style={{ borderColor: 'hsl(var(--border))' }}>
+            <div className="pt-16 md:pt-20 pb-8">
+              {/* ── Top: brand + link columns ── */}
+              <div className="grid grid-cols-2 lg:grid-cols-12 gap-x-6 gap-y-12">
+                <div className="col-span-2 lg:col-span-5 lg:pr-14">
+                  <Link href="/" className="inline-flex items-center gap-2">
+                    {logo ? (
+                      <img src={logoSrc} alt="Pastel" height={36} className="h-9 w-auto shrink-0" />
+                    ) : (
+                      <img src="/PastelLogo.svg" alt="Pastel" width={110} className="h-auto shrink-0" />
+                    )}
+                  </Link>
+                  <p className="mt-6 max-w-sm text-[13.5px] text-fg-muted font-medium leading-[1.75]">
+                    Pastel turns a sentence into a polished, editable design — then helps
+                    your team refine, prototype, and ship it together.
+                  </p>
+                  <div className="mt-7 flex items-center gap-2">
+                    <Link
+                      href="/status"
+                      className="inline-flex items-center gap-2 px-3.5 py-2 rounded-full bg-surface-subtle/60 hover:bg-surface-subtle transition-colors"
+                    >
+                      <span className="relative flex h-2 w-2">
+                        <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-500" />
+                      </span>
+                      <span className="text-[12px] font-medium text-fg-muted">All systems operational</span>
+                    </Link>
+                  </div>
+                  <p className="mt-5 text-[12.5px] text-fg-muted font-medium">
+                    Proudly built in the United Kingdom
+                  </p>
                 </div>
-              ))}
-            </div>
 
-            <div className="pt-6 border-t border-border">
-              <span className="text-[12px] font-medium text-muted-foreground">&copy; {new Date().getFullYear()} Pastel. All rights reserved.</span>
+                {[
+                  {
+                    heading: "Product",
+                    links: [["Product", "/product"], ["Features", "/#features"], ["Pricing", "/pricing"], ["Affiliate", "/affiliate"]],
+                  },
+                  {
+                    heading: "Resources",
+                    links: [["Documentation", "/docs"], ["Status", "/status"], ["Contact", "/contact"], ["Blog", "/blog"]],
+                  },
+                  {
+                    heading: "Company",
+                    links: [["Changelog", "/changelog"], ["Roadmap", "/roadmap"], ["Contact", "/contact"], ["Status", "/status"]],
+                  },
+                  {
+                    heading: "Legal",
+                    links: [["Privacy Policy", "/privacy"], ["Terms of Service", "/terms"]],
+                  },
+                ].map(({ heading, links }) => (
+                  <div key={heading} className="col-span-1 lg:col-span-2">
+                    <p className="text-[11px] font-bold uppercase tracking-[0.09em] text-fg-muted">{heading}</p>
+                    <nav className="mt-5 flex flex-col gap-3.5">
+                      {links.map(([label, href]) => (
+                        href.startsWith('https://') ? (
+                          <a key={label} href={href} target="_blank" rel="noopener noreferrer" className="text-[13.5px] text-foreground/75 font-medium hover:text-foreground transition-colors">
+                            {label}
+                          </a>
+                        ) : (
+                          <Link key={label} href={href} className="text-[13.5px] text-foreground/75 font-medium hover:text-foreground transition-colors">
+                            {label}
+                          </Link>
+                        )
+                      ))}
+                    </nav>
+                  </div>
+                ))}
+              </div>
+
+              {/* ── Bottom bar ── */}
+              <div className="mt-16 pt-8 border-t border-border flex flex-col md:flex-row items-center justify-between gap-4">
+                <span className="text-[12.5px] font-medium text-muted-foreground">
+                  &copy; {new Date().getFullYear()} Pastel. All rights reserved.
+                </span>
+                <div className="flex items-center gap-7">
+                  <Link href="/privacy" className="text-[12.5px] font-medium text-muted-foreground hover:text-foreground transition-colors">Privacy</Link>
+                  <Link href="/terms" className="text-[12.5px] font-medium text-muted-foreground hover:text-foreground transition-colors">Terms</Link>
+                  <Link href="/contact" className="text-[12.5px] font-medium text-muted-foreground hover:text-foreground transition-colors">Contact</Link>
+                </div>
+              </div>
             </div>
           </div>
         </footer>

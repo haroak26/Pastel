@@ -13,8 +13,7 @@ import {
   Ticket,
   Settings2,
 } from "lucide-react";
-import { MarketingFeatureSection } from "@/components/marketing";
-import { Eyebrow } from "@/components/ds";
+import { MarketingFeatureSection, LandingHero } from "@/components/marketing";
 import { PrimaryRail } from "@/components/sidebar/PrimaryRail";
 import { SecondaryPanel } from "@/components/sidebar/SecondaryPanel";
 
@@ -110,24 +109,23 @@ const operationsFeatures = [
 
 export default function Features() {
   return (
-    <Layout panel>
-      <section className="w-full pt-24 md:pt-28 pb-14 md:pb-20 hero-grain">
-        <div className="lds-marketing-section">
-          <div className="max-w-xl">
-            <div className="mb-7">
-              <Eyebrow label="NEW">All the tools. None of the bloat.</Eyebrow>
-            </div>
-            <h1 className="text-[32px] sm:text-[38px] md:text-[44px] text-foreground font-medium leading-[1.1] tracking-[-0.03em] mb-7">
-              Everything your team needs
-              <br />
-              to ship great support.
-            </h1>
-            <p className="mb-7 max-w-[540px] text-[15px] text-fg-secondary font-sans font-medium leading-[1.65]">
-              Unified inbox, AI-powered replies, ticket tracking, automation rules, live chat, performance reporting — all in one platform that scales with you. No complexity. No unnecessary features. Just what works.
-            </p>
-          </div>
+    <Layout fullWidth>
+      <LandingHero
+        eyebrowLabel="NEW"
+        eyebrow="All the tools. None of the bloat."
+        title={
+          <>
+            Everything your team needs
+            <br />
+            to ship great support.
+          </>
+        }
+        description="Unified inbox, AI-powered replies, ticket tracking, automation rules, live chat, performance reporting — all in one platform that scales with you. No complexity. No unnecessary features. Just what works."
+      />
 
-          {/* ── Mock App Preview ── */}
+      {/* ── Mock App Preview ── */}
+      <section className="w-full">
+        <div className="lds-marketing-section">
           <div className="relative mt-20 md:mt-24 rounded-2xl mockup-glow">
             <div className="relative border-t border-x border-white/10 dark:border-white/10 rounded-2xl bg-background dark:[--background:0_0%_7%] h-[560px] pointer-events-none select-none overflow-hidden">
               <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-white/20 to-transparent pointer-events-none z-20" />

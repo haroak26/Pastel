@@ -9,6 +9,7 @@ interface ScreenPanelProps {
   isSelected?: boolean;
   onSelect?: () => void;
   onRename?: (name: string) => void;
+  onPointerDown?: (e: React.PointerEvent) => void;
   isMobile?: boolean;
   onToggleDevice?: () => void;
   onViewCode?: () => void;
@@ -28,6 +29,7 @@ export function ScreenPanel({
   isSelected = false,
   onSelect,
   onRename,
+  onPointerDown,
   isMobile = false,
   onToggleDevice,
   onViewCode,
@@ -103,6 +105,8 @@ export function ScreenPanel({
       onMouseEnter={() => setHovered(true)}
       onMouseLeave={() => setHovered(false)}
       onClick={() => onSelect?.()}
+      onPointerDown={onPointerDown}
+      className="screen-panel select-none"
     >
       <div className="flex items-center justify-between mb-1.5">
         {editingName ? (
@@ -113,12 +117,14 @@ export function ScreenPanel({
             onBlur={handleSaveName}
             onKeyDown={handleNameKeyDown}
             onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => e.stopPropagation()}
             className="text-xs text-brand bg-transparent border-none outline-none p-0 m-0 w-40 min-w-0 border-b border-border/40 focus:border-brand transition-colors"
             autoFocus
           />
         ) : (
           <span
             onClick={handleStartEdit}
+            onPointerDown={(e) => e.stopPropagation()}
             className={`text-xs transition-colors cursor-text ${
               isActive ? "text-brand" : "text-fg-muted"
             }`}
@@ -183,14 +189,16 @@ export function ScreenPanel({
           </button>
         </div>
 
-        <div
-          className={`border rounded-md overflow-hidden transition-all duration-150 ${
-            isActive
-              ? "border-brand ring-1 ring-brand ring-offset-0"
-              : "border-border/40"
-          }`}
-        >
-          {children}
+        <div className="p-1.5 cursor-grab active:cursor-grabbing">
+          <div
+            className={`border rounded-md overflow-hidden transition-all duration-150 ${
+              isActive
+                ? "border-brand ring-1 ring-brand ring-offset-0"
+                : "border-border/40"
+            }`}
+          >
+            {children}
+          </div>
         </div>
       </div>
     </div>

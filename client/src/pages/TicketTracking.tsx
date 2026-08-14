@@ -1,39 +1,37 @@
 import { Layout } from "@/components/Layout";
-import { Eyebrow } from "@/components/ds";
 import { Button } from "@/components/button";
+import { Link } from "wouter";
 import { ArrowRight, Ticket } from "lucide-react";
+import { LandingHero } from "@/components/marketing";
 
 export default function TicketTracking() {
   return (
-    <Layout panel>
-      <section className="pt-20 pb-6 hero-grain overflow-hidden">
-        <div className="lds-marketing-section">
-          <div className="max-w-xl">
-            <div className="mb-7">
-              <Eyebrow label="Feature">
-                Ticket Tracking
-              </Eyebrow>
-            </div>
-            <h1 className="text-[32px] sm:text-[38px] md:text-[44px] text-foreground font-medium leading-[1.1] tracking-[-0.03em] mb-7">
-              Track every ticket from
-              <br />
-              open to resolved.
-            </h1>
-            <p className="mb-7 max-w-[540px] text-[15px] text-fg-secondary font-sans font-medium leading-[1.65]">
-              Automatically create tickets from incoming email, track their status through every stage, and never lose sight of a customer request.
-            </p>
-            <div className="flex flex-wrap items-center gap-3">
-              <Button href="/auth/signup">
+    <Layout fullWidth>
+      <LandingHero
+        eyebrowLabel="Feature"
+        eyebrow="Ticket Tracking"
+        title={
+          <>
+            Track every ticket from
+            <br />
+            open to resolved.
+          </>
+        }
+        description="Automatically create tickets from incoming email, track their status through every stage, and never lose sight of a customer request."
+        actions={
+          <>
+            <Link href="/auth/signup">
+              <Button design="pill" size="md" className="h-[44px] px-6 text-[15px]">
                 Get Started
               </Button>
-              <Button href="/features" design="ghost" className="group">
-                All Features <ArrowRight className="h-4 w-4 transition-transform duration-200 group-hover:translate-x-1" />
-              </Button>
-            </div>
-          </div>
-        </div>
-      </section>
-
+            </Link>
+            <Link href="/features" className="group flex items-center gap-1.5 text-[15px] font-medium text-fg-muted hover:text-foreground transition-colors">
+              All Features
+              <ArrowRight size={15} strokeWidth={2} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+            </Link>
+          </>
+        }
+      />
 
       <section className="w-full py-14 md:py-20">
         <div className="lds-marketing-section">

@@ -1,9 +1,11 @@
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/button";
+import { HeroWave } from "@/components/HeroWave";
 import { TextInput, Textarea } from "@/components/text-input";
 import { Send, CheckCircle2, AlertCircle, Mail, Clock, MessageSquare } from "lucide-react";
-import { MarketingHero, MarketingSection } from "@/components/ds/widgets";
+import { LandingHero } from "@/components/marketing";
+import { MarketingSection } from "@/components/ds/widgets";
 
 const contactMethods = [
   {
@@ -72,8 +74,8 @@ export default function MarketingContact() {
 
   if (submitted) {
     return (
-      <Layout panel>
-        <MarketingHero
+      <Layout fullWidth>
+        <LandingHero
           title="Thanks for reaching out!"
           description="We've received your message and will get back to you within 24 hours. If your inquiry is urgent, reach us directly at hello@getlatte.app."
         />
@@ -89,8 +91,8 @@ export default function MarketingContact() {
   }
 
   return (
-    <Layout panel>
-      <MarketingHero
+    <Layout fullWidth>
+      <LandingHero
         eyebrowLabel="Contact"
         title="Get in touch."
         description="Have a question about Pastel, need help with your account, or want to share feedback? Send us a message and we'll follow up promptly."
@@ -212,6 +214,11 @@ export default function MarketingContact() {
           </div>
         </div>
       </MarketingSection>
+
+      {/* ── Wave divider into the footer ── */}
+      <section className="relative w-full overflow-hidden">
+        <HeroWave variant="contact" className="h-[110px] md:h-[150px]" />
+      </section>
     </Layout>
   );
 }

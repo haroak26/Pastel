@@ -1,0 +1,71 @@
+{
+  "test": "agentv23-normal-models",
+  "runId": "0d1c72e7-2a7f-4de2-a22f-ea1d8c428263",
+  "status": "done_needs_review",
+  "title": "A fitness tracking app that logs",
+  "productType": "A fitness tracking app",
+  "inspiration": "nike",
+  "modelOverride": "none (default routing)",
+  "thinking": "disabled (default)",
+  "prompt": "A fitness tracking app that logs runs: today's workout, weekly distance, pace trends, and run history with splits.",
+  "screens": [
+    "detail",
+    "home"
+  ],
+  "failedScreens": [],
+  "wallSeconds": 375.08,
+  "timedOut": false,
+  "timing": {
+    "0": 51.1,
+    "1": 19.8,
+    "2": 131.6,
+    "3": 13.7
+  },
+  "callsByRole": {
+    "plan": 2,
+    "genome": 2,
+    "copy": 2,
+    "data": 2,
+    "planner": 4,
+    "builder": 12,
+    "builderCustom": 3,
+    "compose": 2,
+    "review": 2,
+    "repair": 7
+  },
+  "totalCalls": 38,
+  "kbSlices": {
+    "wave1-genome": 41247
+  },
+  "quality": {
+    "score": 62,
+    "passed": false,
+    "repairs": 1
+  },
+  "gate": {
+    "passed": false,
+    "score": 0,
+    "issues": 29
+  },
+  "review": {
+    "passed": false,
+    "score": 62,
+    "decision": "RETURN_TO_BUILDER"
+  },
+  "fidelity": {
+    "total": 10,
+    "passed": 9,
+    "failed": 1,
+    "highIssues": 1
+  },
+  "propContract": {
+    "violations": 0,
+    "autoFixed": 0
+  },
+  "screenshotFiles": [
+    "detail-desktop.png",
+    "detail-mobile.png",
+    "home-desktop.png",
+    "home-mobile.png"
+  ]
+}

@@ -205,32 +205,35 @@ export type PlanLimits = {
 };
 
 // Tier keys map to the new plan lineup:
-//   free → Hobby, pro → Individual, team → Professional, enterprise → Enterprise
+//   free → Free, pro → Individual, team → Professional, enterprise → Enterprise
 // 1 credit = $0.01 of AI API usage.
+// Pricing: linear $15/$30/$60 monthly, 20% off annually. Credits scale at
+// ~50% of price (50 credits per $1) so a plan stays profitable even at full
+// usage: Individual = 750 credits ($7.50 max API cost vs $15/mo).
 export const PLAN_LIMITS: Record<PlanTier, PlanLimits> = {
   free: {
-    label: "Hobby", prices: { monthly: 0, annual: 0 },
+    label: "Free", prices: { monthly: 0, annual: 0 },
     projects: 10, designFiles: 10, editors: 1, viewers: 1, storage: 100,
     versionHistory: 7, components: 10, customFonts: false,
     exportPresets: false, advancedPrototyping: false, apiAccess: false, ssO: false,
     prioritySupport: false, aiCredits: { monthly: 150, daily: 50 },
   },
   pro: {
-    label: "Individual", prices: { monthly: 25, annual: 255 },
+    label: "Individual", prices: { monthly: 15, annual: 144 },
     projects: "unlimited", designFiles: 100, editors: 1, viewers: 10, storage: 2048,
     versionHistory: 30, components: 300, customFonts: true,
     exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: false,
-    prioritySupport: false, aiCredits: { monthly: 1000, daily: 250 },
+    prioritySupport: false, aiCredits: { monthly: 750, daily: 100 },
   },
   team: {
-    label: "Professional", prices: { monthly: 50, annual: 510 },
+    label: "Professional", prices: { monthly: 30, annual: 288 },
     projects: "unlimited", designFiles: 500, editors: 5, viewers: 50, storage: 10240,
     versionHistory: 90, components: 1000, customFonts: true,
     exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: false,
     prioritySupport: true, aiCredits: { monthly: "unlimited", daily: "unlimited" },
   },
   enterprise: {
-    label: "Enterprise", prices: { monthly: 75, annual: 765 },
+    label: "Enterprise", prices: { monthly: 60, annual: 576 },
     projects: "unlimited", designFiles: "unlimited", editors: "unlimited", viewers: "unlimited", storage: 51200,
     versionHistory: 365, components: 10000, customFonts: true,
     exportPresets: true, advancedPrototyping: true, apiAccess: true, ssO: true,

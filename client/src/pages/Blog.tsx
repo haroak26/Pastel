@@ -1,6 +1,7 @@
 import { Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { ArrowRight } from "lucide-react";
+import { LandingHero } from "@/components/marketing";
 
 const posts = [
   {
@@ -35,44 +36,14 @@ const posts = [
 
 export default function Blog() {
   return (
-    <Layout panel>
+    <Layout fullWidth>
       {/* ── HERO ──────────────────────────────────────────────────── */}
-      <section className="pt-20 pb-16">
-        <div className="w-full max-w-[1060px] mx-auto px-8">
-          <div className="max-w-2xl">
-            <div className="mb-7">
-              <div
-                className="inline-flex items-center gap-2 px-1 py-1 pr-4 rounded-full select-none"
-                style={{ background: "#f5f5f7" }}
-              >
-                <span
-                  className="inline-flex items-center px-2.5 py-0.5 rounded-full text-white text-[11px] uppercase tracking-wide"
-                  style={{ background: "#4682B4", fontWeight: 700 }}
-                >
-                  Blog
-                </span>
-                <span className="text-[13px]" style={{ color: "#6e6e73", fontWeight: 500 }}>
-                  Thoughts on support, AI, and building Pastel
-                </span>
-              </div>
-            </div>
-
-            <h1
-             
-              className="text-[32px] sm:text-[38px] md:text-[44px] text-foreground font-medium leading-[1.1] tracking-[-0.03em] mb-7"
-            >
-              From the team.
-            </h1>
-
-            <p
-             
-              className="mb-12 max-w-[480px] text-[14px] text-fg-secondary font-medium leading-[1.6]"
-            >
-              We write about customer support, the future of AI in helpdesks, and what we're building — and why.
-            </p>
-          </div>
-        </div>
-      </section>
+      <LandingHero
+        eyebrowLabel="Blog"
+        eyebrow="Thoughts on support, AI, and building Pastel"
+        title="From the team."
+        description="We write about customer support, the future of AI in helpdesks, and what we're building — and why."
+      />
 
       {/* ── POSTS ────────────────────────────────────────────────── */}
       <section className="border-t border-border pb-24">

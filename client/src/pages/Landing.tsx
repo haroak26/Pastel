@@ -1,40 +1,25 @@
-import { useEffect, useRef, useState } from "react";
-import { Link, useLocation } from "wouter";
-import { motion, useReducedMotion, useScroll, useTransform } from "framer-motion";
+import { useEffect, useState } from "react";
+import { Link } from "wouter";
+import { motion, useReducedMotion } from "framer-motion";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/button";
 import { PricingSection } from "@/components/PricingSection";
-import { useUser } from "@/hooks/use-user";
+import { HeroWave } from "@/components/HeroWave";
 import { Eyebrow } from "@/components/ds";
+import { SectionHeader, FeatureCard, type FeatureVariant } from "@/components/marketing";
 import {
-  SectionHeader,
-  SoftCard,
-  FeatureVariant,
-} from "@/components/marketing";
-import {
-  ArrowDownLeft,
   ArrowRight,
-  ArrowUpRight,
-  Bell,
   ChevronDown,
-  Coffee,
-  Dumbbell,
-  Ellipsis,
+  Code2,
+  Download,
+  FileCode2,
   Grid3X3,
-  Heart,
-  HeartPulse,
-  Home,
   Layers,
+  MessageSquare,
+  MousePointer2,
   PenTool,
-  Plus,
-  Search,
   Share2,
-  ShoppingCart,
   Sparkles,
-  TrendingUp,
-  Type,
-  User,
-  Wallet,
   Zap,
 } from "lucide-react";
 
@@ -58,42 +43,77 @@ const steps = [
   },
 ];
 
-const features: { icon: typeof PenTool; title: string; description: string; variant: FeatureVariant }[] = [
+const collabPoints = [
   {
-    icon: Sparkles,
-    title: "Prompt to polished UI",
-    description: "Describe the product you're imagining and get real, editable screens in seconds — not a static mockup.",
-    variant: "brand",
+    icon: MousePointer2,
+    text: "Live cursors so you can see exactly where everyone is working.",
   },
   {
-    icon: PenTool,
-    title: "A real canvas",
-    description: "Vector tools, frames, and boolean ops to refine every detail once the first draft lands.",
-    variant: "purple",
-  },
-  {
-    icon: Layers,
-    title: "Components in sync",
-    description: "Build once, reuse everywhere. Edit the source and every instance follows along.",
-    variant: "amber",
+    icon: MessageSquare,
+    text: "Comments pinned to any layer, resolved inline as the design evolves.",
   },
   {
     icon: Share2,
-    title: "Real-time collaboration",
-    description: "Cursors, comments, and live edits. Design in the same room, even when you're not sharing one.",
-    variant: "green",
+    text: "Invite teammates as editors or share a read-only link in one click.",
   },
+];
+
+const agentFeatures: {
+  icon: typeof Sparkles;
+  title: string;
+  description: string;
+  variant: FeatureVariant;
+}[] = [
   {
-    icon: Grid3X3,
-    title: "Auto layout",
-    description: "Stacks, wraps, and spacing that adapt as content changes — no more nudging by hand.",
+    icon: Sparkles,
+    title: "Prompt to polished screens",
+    description: "Type a sentence and get real, editable screens — never a static mockup.",
     variant: "brand",
   },
   {
-    icon: Type,
-    title: "Typography system",
-    description: "Pair fonts, set scales, and apply consistent text styles across every screen in one click.",
+    icon: Layers,
+    title: "Flows, not one-offs",
+    description: "Generates whole flows with consistent components and tokens across every screen.",
     variant: "purple",
+  },
+  {
+    icon: PenTool,
+    title: "Editable on the canvas",
+    description: "Every output lands as layered frames and vectors, ready for your fine-tuning.",
+    variant: "amber",
+  },
+  {
+    icon: Grid3X3,
+    title: "On-brand from the first draft",
+    description: "Screens are sized for your audience and tuned to your brand palette and type.",
+    variant: "green",
+  },
+  {
+    icon: Zap,
+    title: "First drafts in seconds",
+    description: "A full set of screens fast, so you can judge the direction early and iterate in place.",
+    variant: "brand",
+  },
+  {
+    icon: FileCode2,
+    title: "Export-ready code",
+    description: "Clean, semantic CSS and production assets come along with every run.",
+    variant: "green",
+  },
+];
+
+const exportPoints = [
+  {
+    icon: Code2,
+    text: "Clean, semantic CSS and markup you can hand straight to engineers.",
+  },
+  {
+    icon: Download,
+    text: "SVG, PNG, PDF, and CSS export — all free, all the time.",
+  },
+  {
+    icon: FileCode2,
+    text: "Export one screen or your whole flow in a single pass.",
   },
 ];
 
@@ -104,7 +124,7 @@ const faqs = [
   },
   {
     q: "Is there a free plan?",
-    a: "Yes! The Free plan is available without a payment card and includes 1 project, 3 design files, 100 MB storage, and 15 AI credits per month. Paid plans start at $19/month.",
+    a: "Yes! The Free plan is available without a payment card and includes 10 projects, 10 design files, 100 MB storage, and 150 AI credits per month. Paid plans start at $15/month.",
   },
   {
     q: "Can my whole team use Pastel?",
@@ -123,14 +143,6 @@ const faqs = [
     a: "Yes — connect frames with interactive flows, add transitions, and share clickable prototypes with stakeholders.",
   },
 ];
-
-const variantText: Record<FeatureVariant, string> = {
-  brand: "text-sky-500",
-  amber: "text-amber-500",
-  red: "text-rose-500",
-  green: "text-[#FF7A6E]",
-  purple: "text-fuchsia-500",
-};
 
 /* ─── Motion helper ─── */
 
@@ -157,333 +169,6 @@ function Reveal({
   );
 }
 
-/* ─── App mockups — portrait cards, no chrome, bottoms aligned, middle taller ─── */
-
-function AppCard({ children, className }: { children: React.ReactNode; className?: string }) {
-  return (
-    <div
-      className={`shrink-0 overflow-hidden rounded-[20px] bg-white shadow-[0_0_16px_hsl(var(--brand)/0.06),0_0_40px_hsl(var(--brand)/0.08)] transition-[transform,box-shadow] duration-300 ease-out hover:-translate-y-[2px] hover:shadow-[0_0_20px_hsl(var(--brand)/0.1),0_0_56px_hsl(var(--brand)/0.12)] ${className}`}
-    >
-      {children}
-    </div>
-  );
-}
-
-/* ── Sunday Roast — coffee shop app ── */
-
-function CoffeeScreen() {
-  const roasts = [
-    ["#C4562F", "Huila", "$18", "★ 4.7"],
-    ["#4A2C1A", "Yirgacheffe", "$18", "★ 4.9"],
-  ] as const;
-  return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="flex shrink-0 items-center justify-between px-5 pt-5">
-        <div className="flex items-center gap-1.5">
-          <span className="h-4 w-4 rounded-full" style={{ backgroundColor: "#4A2C1A" }} />
-          <span className="text-[13px] font-semibold text-foreground">Sunday Roast</span>
-        </div>
-        <div className="flex items-center gap-3">
-          <Search size={14} className="text-fg-muted" />
-          <span className="relative">
-            <ShoppingCart size={15} className="text-foreground" />
-            <span className="absolute -right-1.5 -top-1.5 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-brand text-[8px] font-bold text-white">2</span>
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col px-5 pt-3">
-        <div className="flex flex-1 flex-col justify-between rounded-[18px] p-4" style={{ backgroundColor: "#3E2417" }}>
-          <div>
-            <span className="inline-flex rounded-full px-2.5 py-1 text-[8.5px] font-bold uppercase tracking-[0.12em]" style={{ backgroundColor: "#FFD66E", color: "#4A2C1A" }}>
-              Ethiopia · Single origin
-            </span>
-            <p className="mt-2.5 text-[18px] font-semibold leading-[1.15] tracking-[-0.02em] text-white">
-              Yirgacheffe, washed
-            </p>
-            <p className="mt-1.5 flex items-center gap-1.5 text-[10px] text-white/60">
-              <span className="text-[#FFD66E]">★★★★★</span> 4.9 · 312 reviews
-            </p>
-            <p className="mt-1.5 text-[10px] leading-[1.55] text-white/60">
-              Roasted every Sunday, shipped while it's still singing.
-            </p>
-          </div>
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-[9px] font-medium text-white/50">From</p>
-              <p className="text-[16px] font-semibold text-white">
-                $18 <span className="text-[10px] font-medium text-white/50">/ 250g</span>
-              </p>
-            </div>
-            <span className="rounded-full px-4 py-2 text-[11px] font-semibold" style={{ backgroundColor: "#FFD66E", color: "#4A2C1A" }}>
-              Add to bag
-            </span>
-          </div>
-        </div>
-
-        <div className="pb-4 pt-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[12px] font-semibold text-foreground">Featured roasts</p>
-            <p className="text-[10px] font-medium text-fg-muted">See all</p>
-          </div>
-          <div className="mt-2.5 flex gap-3">
-            {roasts.map(([c, n, p, rating]) => (
-              <div key={n} className="flex-1 rounded-[14px] border border-border/60 p-2.5">
-                <span className="block h-[52px] rounded-[10px]" style={{ backgroundColor: c }} />
-                <p className="mt-2 text-[11px] font-semibold text-foreground">{n}</p>
-                <p className="mt-0.5 text-[10px] font-medium text-fg-muted">
-                  {rating} · {p}
-                </p>
-              </div>
-            ))}
-          </div>
-          <div className="mt-3 flex items-center justify-between rounded-[12px] px-3 py-2.5" style={{ backgroundColor: "#F5EFE6" }}>
-            <p className="text-[10px] font-semibold text-foreground">Free shipping over $30</p>
-            <p className="text-[9.5px] font-medium text-fg-muted">Code: SUNDAY</p>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── Northwind — finance app (dark, tallest) ── */
-
-function FinanceScreen() {
-  const tabs = [Home, Wallet, ArrowUpRight, User];
-  const days = ["M", "T", "W", "T", "F", "S", "S"];
-  return (
-    <div className="flex h-full flex-col" style={{ backgroundColor: "#0F1217" }}>
-      <div className="flex shrink-0 items-center justify-between px-5 pt-5">
-        <div>
-          <p className="text-[10px] font-medium text-white/50">Good morning</p>
-          <p className="text-[15px] font-semibold text-white">Dana Kim</p>
-        </div>
-        <div className="flex items-center gap-2.5">
-          <span className="relative">
-            <span className="flex h-7 w-7 items-center justify-center rounded-full bg-white/[0.07]">
-              <Bell size={13} className="text-white" />
-            </span>
-            <span className="absolute right-1 top-1 h-1.5 w-1.5 rounded-full bg-[#FF5F57]" />
-          </span>
-          <span className="flex h-7 w-7 items-center justify-center rounded-full text-[9px] font-bold text-white" style={{ background: "linear-gradient(135deg,#0B99FF,#3D7BFF)" }}>
-            DK
-          </span>
-        </div>
-      </div>
-
-      <div className="flex flex-1 flex-col px-5 pt-3">
-        <div className="rounded-[18px] p-4" style={{ background: "linear-gradient(135deg,#0B99FF 0%,#3D7BFF 100%)" }}>
-          <div className="flex items-center justify-between">
-            <span className="h-5 w-7 rounded-[4px] bg-white/25" />
-            <p className="text-[9px] font-medium tracking-[0.08em] text-white/80">•••• 4829</p>
-          </div>
-          <p className="mt-2 text-[10px] font-medium text-white/70">Total balance</p>
-          <p className="mt-0.5 text-[24px] font-semibold tracking-[-0.02em] text-white">$48,260.40</p>
-          <span className="mt-2 inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[9px] font-semibold" style={{ backgroundColor: "rgba(255,255,255,0.2)", color: "#fff" }}>
-            <TrendingUp size={9} /> +2.4% this month
-          </span>
-        </div>
-
-        <div className="mt-3.5 flex items-center rounded-[10px] bg-white/[0.06] p-1">
-          {["Day", "Week", "Month"].map((label, i) => (
-            <span
-              key={label}
-              className={`flex-1 rounded-[8px] py-1.5 text-center text-[9.5px] font-semibold ${i === 2 ? "bg-white/15 text-white" : "text-white/50"}`}
-            >
-              {label}
-            </span>
-          ))}
-        </div>
-
-        <div className="mt-3 flex min-h-[110px] flex-1 flex-col rounded-[16px] bg-white/[0.06] p-4">
-          <div className="flex items-center justify-between">
-            <p className="text-[11px] font-semibold text-white/90">Spending</p>
-            <span className="text-[9.5px] font-medium text-emerald-400">−12% vs last month</span>
-          </div>
-          <div className="mt-3 flex min-h-[48px] flex-1 items-end gap-1.5">
-            {[38, 55, 44, 70, 52, 82, 64, 95].map((h, i) => (
-              <span
-                key={i}
-                className="flex-1 rounded-[3px]"
-                style={{ height: `${h}%`, backgroundColor: i === 7 ? "#0B99FF" : "rgba(255,255,255,0.16)" }}
-              />
-            ))}
-          </div>
-          <div className="mt-1.5 flex justify-between">
-            {days.map((d, i) => (
-              <span key={i} className={`flex-1 text-center text-[7.5px] font-medium ${i === 6 ? "text-[#0B99FF]" : "text-white/35"}`}>{d}</span>
-            ))}
-          </div>
-        </div>
-
-        <p className="mt-3.5 text-[11px] font-semibold text-white/90">Recent</p>
-        <div className="mt-1.5 space-y-1.5 pb-4">
-          {[
-            ["SP", "Stripe payout", "+$2,400.00", "#0B99FF", "2h ago"],
-            ["AW", "AWS · compute", "−$812.10", "#FF9F43", "Yesterday"],
-            ["FG", "Figma · seats", "−$135.00", "#A855F7", "Mon"],
-          ].map(([initials, name, value, color, time]) => (
-            <div key={name} className="flex items-center gap-2.5 rounded-[12px] bg-white/[0.05] px-3.5 py-2.5">
-              <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-[9px] font-bold" style={{ backgroundColor: `${color}22`, color }}>
-                {initials}
-              </span>
-              <div className="min-w-0 flex-1">
-                <p className="truncate text-[10.5px] font-medium text-white/85">{name}</p>
-                <p className="text-[8.5px] text-white/40">{time}</p>
-              </div>
-              <span className={`text-[10.5px] font-semibold ${value.startsWith("+") ? "text-emerald-400" : "text-white/90"}`}>{value}</span>
-            </div>
-          ))}
-        </div>
-      </div>
-
-      <div className="flex shrink-0 items-center justify-around border-t border-white/10 px-2 py-3">
-        {tabs.map((Icon, i) => (
-          <span key={i} className={i === 0 ? "text-[#0B99FF]" : "text-white/30"}>
-            <Icon size={16} strokeWidth={2} />
-          </span>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-/* ── Pulse — fitness onboarding ── */
-
-function OnboardingScreen() {
-  const options = [
-    ["Build muscle", "4–5 sessions a week", Dumbbell],
-    ["Lose fat", "3–4 sessions a week", HeartPulse],
-    ["Stay fit", "2–3 sessions a week", Zap],
-  ] as const;
-  return (
-    <div className="flex h-full flex-col bg-white">
-      <div className="flex shrink-0 items-center justify-between px-6 pt-5">
-        <div className="flex gap-1.5">
-          {[0, 1, 2, 3].map((i) => (
-            <span key={i} className={`h-1.5 rounded-full ${i <= 1 ? "w-6 bg-brand" : "w-3 bg-border"}`} />
-          ))}
-        </div>
-        <p className="text-[10.5px] font-medium text-fg-muted">Skip</p>
-      </div>
-
-      <div className="flex flex-1 flex-col px-6 pt-8">
-        <div className="flex justify-center">
-          <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-brand/10">
-            <Dumbbell size={26} className="text-brand" />
-          </span>
-        </div>
-        <p className="mt-5 text-center text-[20px] font-semibold leading-[1.15] tracking-[-0.02em] text-foreground">What's your goal?</p>        <p className="mt-1.5 text-center text-[10.5px] text-fg-muted">We'll tailor your plan around it.</p>
-
-        <div className="mt-6 space-y-2.5">
-          {options.map(([label, sub, Icon], i) => (
-            <div key={label} className={`flex items-center justify-between rounded-[14px] border px-4 py-3 ${i === 0 ? "border-brand bg-brand/5" : "border-border"}`}>
-              <span className="flex items-center gap-3">
-                <span className={`flex h-8 w-8 items-center justify-center rounded-[10px] ${i === 0 ? "bg-brand/10 text-brand" : "bg-surface-muted text-fg-muted"}`}>
-                  <Icon size={14} />
-                </span>
-                <span>
-                  <span className="block text-[13px] font-semibold text-foreground">{label}</span>
-                  <span className="block text-[9.5px] font-medium text-fg-muted">{sub}</span>
-                </span>
-              </span>
-              <span className={`flex h-4 w-4 items-center justify-center rounded-full border ${i === 0 ? "border-brand" : "border-border"}`}>
-                {i === 0 && <span className="h-2 w-2 rounded-full bg-brand" />}
-              </span>
-            </div>
-          ))}
-        </div>
-
-        <div className="mt-auto pb-6 pt-6">
-          <div className="rounded-full bg-brand py-3 text-center text-[12px] font-semibold text-white">Continue</div>
-          <p className="mt-3 text-center text-[10px] font-medium text-fg-muted">No credit card · Change anytime</p>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-/* ── App strip — three equal-width portrait cards, bottoms aligned, middle taller ── */
-
-function StripCard({ index, children }: { index: number; children: React.ReactNode }) {
-  const reduce = useReducedMotion();
-  const ref = useRef<HTMLDivElement>(null);
-  const bodyRef = useRef<HTMLElement | null>(document.body);
-  const { scrollYProgress } = useScroll({
-    target: ref,
-    container: bodyRef,
-    offset: ["start 95%", "start 40%"],
-  });
-  const start = index * 0.22;
-  const opacity = useTransform(scrollYProgress, [start, Math.min(start + 0.55, 1)], [0, 1]);
-  const y = useTransform(scrollYProgress, [start, Math.min(start + 0.55, 1)], [64, 0]);
-
-  return (
-    <motion.div ref={ref} style={reduce ? undefined : { opacity, y }}>
-      {children}
-    </motion.div>
-  );
-}
-
-function PhoneStrip() {
-  return (
-    <div className="mx-auto flex max-w-[1000px] flex-row items-end justify-center gap-2 lg:gap-5">
-      <StripCard index={0}>
-        <div className="h-[160px] w-[96px] lg:h-auto lg:w-auto">
-          <div className="origin-top-left scale-[0.32] lg:origin-center lg:scale-100">
-            <AppCard className="h-[500px] w-[300px] xl:w-[320px]">
-              <CoffeeScreen />
-            </AppCard>
-          </div>
-        </div>
-      </StripCard>
-      <StripCard index={1}>
-        <div className="h-[186px] w-[96px] lg:h-auto lg:w-auto">
-          <div className="origin-top-left scale-[0.32] lg:origin-center lg:scale-100">
-            <AppCard className="h-[580px] w-[300px] shadow-[0_0_20px_hsl(var(--brand)/0.08),0_0_56px_hsl(var(--brand)/0.1)] hover:shadow-[0_0_28px_hsl(var(--brand)/0.12),0_0_80px_hsl(var(--brand)/0.14)] xl:w-[320px]">
-              <FinanceScreen />
-            </AppCard>
-          </div>
-        </div>
-      </StripCard>
-      <StripCard index={2}>
-        <div className="h-[160px] w-[96px] lg:h-auto lg:w-auto">
-          <div className="origin-top-left scale-[0.32] lg:origin-center lg:scale-100">
-            <AppCard className="h-[500px] w-[300px] xl:w-[320px]">
-              <OnboardingScreen />
-            </AppCard>
-          </div>
-        </div>
-      </StripCard>
-    </div>
-  );
-}
-/* ─── Specimen chips — small design-tool details flanking the headline ─── */
-
-function SpecimenChips() {
-  return (
-    <>
-      <div className="hidden xl:flex absolute -left-[176px] top-[96px] items-center gap-2.5 rounded-xl border border-border bg-white px-3.5 py-2.5 shadow-floating">
-        <span className="flex -space-x-1">
-          {["#0B99FF", "#1E1E1E", "#FFD66E", "#FF7A6E"].map((c) => (
-            <span key={c} className="w-3.5 h-3.5 rounded-full border-2 border-white" style={{ backgroundColor: c }} />
-          ))}
-        </span>
-        <span className="text-[11px] font-medium text-fg-muted">Palette</span>
-      </div>
-      <div className="hidden xl:flex absolute -right-[172px] top-[150px] items-baseline gap-2 rounded-xl border border-border bg-white px-3.5 py-2.5 shadow-floating">
-        <span className="text-[19px] font-medium leading-none tracking-[-0.03em] text-foreground">Aa</span>
-        <span className="text-[11px] font-medium text-fg-muted">Inter · 64</span>
-      </div>
-      <div className="hidden xl:flex absolute -left-[148px] top-[320px] items-center gap-2 rounded-xl border border-border bg-white px-3.5 py-2.5 shadow-floating">
-        <Layers size={14} className="text-brand" />
-        <span className="text-[11px] font-medium text-fg-muted">12 layers</span>
-      </div>
-    </>
-  );
-}
-
 /* ─── Page ─── */
 
 export default function Landing() {
@@ -498,70 +183,67 @@ export default function Landing() {
   }, []);
 
   return (
-    <Layout panel>
+    <Layout fullWidth logo="/PastelLogoNew.svg">
       <div className="landing-grid" />
 
       {/* ── Hero ── */}
-      <section className="relative w-full pt-16 md:pt-28 pb-16 md:pb-24">
-        <div className="relative px-6 md:px-8">
-          <div className="relative mx-auto max-w-3xl text-center">
-            <SpecimenChips />
+      <section className="relative w-full overflow-hidden pt-20 md:pt-32 pb-36 md:pb-64">
+        <div className="relative px-6 md:px-10">
+          <div className="relative mx-auto max-w-4xl text-center">
             <Reveal>
-              <div className="mb-7 flex justify-center">
+              <div className="mb-8 flex justify-center">
                 <Eyebrow label="NEW">Export design code for free</Eyebrow>
               </div>
 
-              <h1 className="text-[36px] sm:text-[44px] md:text-[50px] lg:text-[56px] text-foreground font-medium leading-[1.04] tracking-[-0.04em] mb-6 text-pretty">
+              <h1 className="text-[40px] sm:text-[50px] md:text-[58px] lg:text-[66px] text-foreground font-medium leading-[1.04] tracking-[-0.04em] mb-8 text-pretty">
                 Describe your idea.
                 <br />
                 Design your product.
               </h1>
 
-              <p className="mx-auto mb-9 max-w-[520px] text-[14.5px] md:text-[15.5px] text-fg-secondary font-normal leading-[1.7] text-pretty">
+              <p className="mx-auto mb-10 max-w-[560px] text-[15.5px] md:text-[17px] text-fg-secondary font-normal leading-[1.7] text-pretty">
                 One sentence is all it takes to get real, editable screens. Then refine
                 every pixel on a real canvas, with components, vectors, and your whole team.
               </p>
 
-              <div className="flex items-center justify-center gap-5">
+              <div className="flex items-center justify-center gap-6">
                 <Link href="/auth/signup">
-                  <Button design="pill" size="md" className="h-[40px] px-5 text-[14px]">
+                  <Button design="pill" size="md" className="h-[46px] px-6 text-[15px]">
                     Start designing free
                   </Button>
                 </Link>
                 <button
                   onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  className="group flex items-center gap-1.5 text-[14px] font-medium text-fg-muted hover:text-foreground transition-colors border-none bg-transparent cursor-pointer"
+                  className="group flex items-center gap-1.5 text-[15px] font-medium text-fg-muted hover:text-foreground transition-colors border-none bg-transparent cursor-pointer"
                 >
-                  See how it works
-                  <ArrowRight size={14} strokeWidth={2} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                  See it in action
+                  <ArrowRight size={15} strokeWidth={2} className="transition-transform duration-200 group-hover:translate-x-0.5" />
                 </button>
               </div>
             </Reveal>
           </div>
-
-          <div className="mt-14 md:mt-20">
-            <PhoneStrip />
-          </div>
         </div>
+
+        <HeroWave variant="hero" className="h-[150px] md:h-[190px]" />
       </section>
 
-      {/* ── How it works ── */}
-      <section className="relative w-full py-16 md:py-24 border-t border-border">
-        <div className="px-6 md:px-8">
+      {/* ── Features ── */}
+      <section id="features" className="relative w-full scroll-mt-[64px] py-20 md:py-28">
+        <div className="mx-auto max-w-[1280px] px-6 md:px-10">
           <Reveal>
             <SectionHeader
-              label="How it works"
+              label="Features"
               title="From sentence to shipped design."
               subtitle="No blank canvas anxiety. No wrestling with tools before the idea is clear."
             />
           </Reveal>
-          <div className="mt-12 md:mt-16 grid md:grid-cols-3 gap-x-12 gap-y-10">
+          <div className="mt-14 md:mt-20 grid md:grid-cols-3 gap-x-12 gap-y-10">
             {steps.map((step, i) => (
               <Reveal key={step.num} delay={i * 0.1}>
-                <div className="border-t border-border pt-5">
-                  <p className="text-[12px] font-semibold text-[#FF7A6E] tracking-[0.06em]">{step.num}</p>
-                  <h3 className="mt-2.5 text-[16px] font-semibold text-foreground tracking-[-0.01em]">{step.title}</h3>
-                  <p className="mt-1.5 text-[13px] text-fg-muted leading-[1.65] font-medium">{step.description}</p>
+                <div className="border-t border-border pt-6">
+                  <p className="text-[13px] font-semibold text-[#FF7A6E] tracking-[0.06em]">{step.num}</p>
+                  <h3 className="mt-3 text-[18px] font-semibold text-foreground tracking-[-0.01em]">{step.title}</h3>
+                  <p className="mt-2 text-[14px] text-fg-muted leading-[1.65] font-medium">{step.description}</p>
                 </div>
               </Reveal>
             ))}
@@ -569,51 +251,222 @@ export default function Landing() {
         </div>
       </section>
 
-      {/* ── Features ── */}
-      <section id="features" className="w-full py-16 md:py-24 border-t border-border scroll-mt-[64px]">
-        <div className="px-6 md:px-8">
-          <Reveal>
-            <SectionHeader
-              label="Features"
-              title="Everything you need to design great products."
-              subtitle="The agent gets you to a strong first draft. The editor makes it precisely yours."
-            />
-          </Reveal>
-          <div className="mt-12 md:mt-16 grid sm:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-5">
-            {features.map(({ icon: Icon, title, description, variant }, i) => (
-              <Reveal key={title} delay={(i % 3) * 0.08}>
-                <SoftCard className="p-6 h-full flex flex-col gap-3">
-                  <span className="flex items-center justify-center w-9 h-9 rounded-[10px] bg-white border border-border/70 shrink-0">
-                    <Icon size={17} strokeWidth={1.75} className={variantText[variant]} />
+      {/* ── Team collaboration ── */}
+      <section className="w-full bg-surface-muted py-20 md:py-28">
+        <div className="mx-auto max-w-[1280px] px-6 md:px-10">
+          <div className="grid lg:grid-cols-2 gap-14 lg:gap-24 items-center">
+            <Reveal>
+              <div className="space-y-9">
+                <SectionHeader
+                  label="Team collaboration"
+                  title="Design in the same room, even when you're apart."
+                  subtitle="Cursors, comments, and live edits mean your whole team shapes the design together — no exports back and forth, no version confusion."
+                />
+                <ul className="space-y-4">
+                  {collabPoints.map(({ icon: Icon, text }) => (
+                    <li key={text} className="flex items-start gap-3">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand/10 text-brand shrink-0 mt-0.5">
+                        <Icon size={13} strokeWidth={2} />
+                      </span>
+                      <span className="text-[14px] text-fg-muted font-medium leading-[1.65]">{text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.12}>
+              <div className="relative rounded-2xl border border-border bg-white shadow-[0_20px_60px_-24px_rgba(0,0,0,0.15)] overflow-hidden">
+                <div className="flex items-center justify-between px-4 h-11 border-b border-border">
+                  <span className="text-[13px] font-semibold text-foreground tracking-[-0.01em]">Marketing site — Home</span>
+                  <span className="flex -space-x-1.5">
+                    {["bg-sky-400", "bg-fuchsia-400", "bg-amber-400", "bg-emerald-400"].map((c, i) => (
+                      <span key={i} className={`w-5 h-5 rounded-full ${c} border-2 border-white`} />
+                    ))}
                   </span>
-                  <h3 className="text-[15px] font-semibold text-foreground tracking-[-0.01em]">{title}</h3>
-                  <p className="text-[13px] text-fg-muted leading-[1.65] font-medium">{description}</p>
-                </SoftCard>
-              </Reveal>
-            ))}
+                </div>
+
+                <div className="relative p-5 md:p-7 bg-[radial-gradient(80%_70%_at_30%_0%,hsl(var(--brand)/0.07),transparent_70%)]">
+                  <div className="mx-auto max-w-[300px] rounded-lg border border-border bg-white p-3 shadow-sm">
+                    <div className="h-2 w-3/5 rounded-full bg-[linear-gradient(90deg,#2a77f8,#fa778c)] mb-2" />
+                    <div className="h-1.5 w-full rounded-full bg-border/70 mb-1.5" />
+                    <div className="h-1.5 w-11/12 rounded-full bg-border/70 mb-1.5" />
+                    <div className="h-1.5 w-4/5 rounded-full bg-border/70" />
+                    <div className="mt-2.5 h-6 w-20 rounded-md bg-gradient-to-r from-[#2a77f8] to-[#6373e5]" />
+                  </div>
+
+                  <div className="absolute left-[18%] top-[22%]">
+                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-border shadow-sm">
+                      <MousePointer2 size={12} className="text-fuchsia-500" />
+                      <span className="text-[11px] font-semibold text-foreground">Ava</span>
+                    </span>
+                  </div>
+                  <div className="absolute right-[16%] top-[48%]">
+                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-border shadow-sm">
+                      <MousePointer2 size={12} className="text-sky-500" />
+                      <span className="text-[11px] font-semibold text-foreground">Liam</span>
+                    </span>
+                  </div>
+                  <div className="absolute right-[8%] bottom-[16%] max-w-[190px]">
+                    <div className="rounded-xl rounded-br-sm bg-white border border-border shadow-md px-3 py-2">
+                      <p className="text-[11.5px] text-foreground font-medium leading-snug">Love this gradient — let's use it on the pricing cards too</p>
+                      <p className="mt-1 text-[10.5px] text-fg-muted font-medium">Ava · just now</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between px-4 h-11 border-t border-border bg-surface-subtle/50">
+                  <span className="flex items-center gap-1.5 text-[11.5px] text-fg-muted font-medium">
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-60 animate-ping" />
+                      <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    </span>
+                    4 collaborators online
+                  </span>
+                  <span className="text-[11.5px] text-fg-muted font-medium">Changes sync live</span>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Maxi Agent ── */}
+      <section className="w-full py-20 md:py-28">
+        <div className="mx-auto max-w-[1280px] px-6 md:px-10">
+          <div className="grid lg:grid-cols-2 gap-14 lg:gap-24 items-center">
+            <Reveal>
+              <div className="space-y-9">
+                <SectionHeader
+                  label="Maxi Agent"
+                  title="One sentence. A full product UI."
+                  subtitle="Maxi turns a plain-language brief into a complete set of real, editable screens — sized for your audience, tuned to your brand, ready to refine."
+                />
+                <div className="space-y-5">
+                  {agentFeatures.map(({ icon, title, description, variant }) => (
+                    <FeatureCard
+                      key={title}
+                      icon={icon}
+                      title={title}
+                      description={description}
+                      variant={variant}
+                    />
+                  ))}
+                </div>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.12}>
+              <div className="rounded-2xl bg-white border border-border shadow-[0_20px_60px_-24px_rgba(0,0,0,0.18)] overflow-hidden">
+                <div className="flex items-center gap-2.5 px-4 h-11 border-b border-border">
+                  <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand/10 text-brand">
+                    <Sparkles size={13} strokeWidth={2} />
+                  </span>
+                  <span className="text-[13px] font-semibold text-foreground tracking-[-0.01em]">Maxi AI</span>
+                  <span className="ml-auto flex items-center gap-1.5 text-[11px] text-emerald-600 font-semibold">
+                    <span className="h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                    Online
+                  </span>
+                </div>
+                <div className="p-4 md:p-5 space-y-4">
+                  <div className="flex justify-end">
+                    <p className="max-w-[80%] rounded-2xl rounded-br-sm bg-brand/10 px-4 py-2.5 text-[13px] text-foreground font-medium leading-[1.6]">
+                      Design a landing page for a plant-based cafe — warm, minimal, earthy.
+                    </p>
+                  </div>
+                  <div className="space-y-3">
+                    <div className="grid grid-cols-3 gap-2.5">
+                      {[
+                        "bg-[#fdf6ee]",
+                        "bg-[#eef5ef]",
+                        "bg-[#f6f1ff]",
+                      ].map((c, i) => (
+                        <div key={i} className={`rounded-lg border border-border ${c} p-2.5`}>
+                          <div className="h-1.5 w-3/5 rounded-full bg-[#c9b8a0] mb-1.5" />
+                          <div className="h-1 w-full rounded-full bg-border/70 mb-1" />
+                          <div className="h-1 w-4/5 rounded-full bg-border/70" />
+                        </div>
+                      ))}
+                    </div>
+                    <div className="flex items-center justify-between px-3 py-2 rounded-lg bg-surface-subtle/70">
+                      <span className="text-[12px] text-fg-muted font-medium">Home, Menu, About, Contact</span>
+                      <span className="text-[11.5px] font-semibold text-emerald-600">4 screens · 6s</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </Reveal>
+          </div>
+        </div>
+      </section>
+
+      {/* ── Export code for free ── */}
+      <section className="w-full bg-surface-muted py-20 md:py-28">
+        <div className="mx-auto max-w-[1280px] px-6 md:px-10">
+          <div className="grid lg:grid-cols-2 gap-14 lg:gap-24 items-center">
+            <Reveal>
+              <div className="rounded-2xl bg-[#0d1117] border border-white/10 shadow-[0_20px_60px_-24px_rgba(0,0,0,0.45)] overflow-hidden">
+                <div className="flex items-center gap-2 px-4 h-10 border-b border-white/10">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#ff5f57]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#febc2e]" />
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#28c840]" />
+                  <span className="ml-auto text-[11px] text-[#8b949e] font-medium">export.css</span>
+                </div>
+                <div className="p-5 md:p-6 font-mono text-[12.5px] leading-[1.9]">
+                  <p><span className="text-[#ff7b72]">.hero</span> <span className="text-[#79c0ff]">{'{'}</span></p>
+                  <p className="pl-5"><span className="text-[#79c0ff]">display</span><span className="text-[#8b949e]">:</span> <span className="text-[#a5d6ff]">flex</span><span className="text-[#8b949e]">;</span></p>
+                  <p className="pl-5"><span className="text-[#79c0ff]">gap</span><span className="text-[#8b949e]">:</span> <span className="text-[#a5d6ff]">16px</span><span className="text-[#8b949e]">;</span></p>
+                  <p className="pl-5"><span className="text-[#79c0ff]">padding</span><span className="text-[#8b949e]">:</span> <span className="text-[#a5d6ff]">24px</span><span className="text-[#8b949e]">;</span></p>
+                  <p className="pl-5"><span className="text-[#79c0ff]">border-radius</span><span className="text-[#8b949e]">:</span> <span className="text-[#a5d6ff]">16px</span><span className="text-[#8b949e]">;</span></p>
+                  <p className="pl-5"><span className="text-[#79c0ff]">background</span><span className="text-[#8b949e]">:</span> <span className="text-[#a5d6ff]">#ffffff</span><span className="text-[#8b949e]">;</span></p>
+                  <p><span className="text-[#ff7b72]">{'}'}</span></p>
+                </div>
+              </div>
+            </Reveal>
+
+            <Reveal delay={0.12}>
+              <div className="space-y-9">
+                <SectionHeader
+                  label="Export code for free"
+                  title="Design to code, without the export paywall."
+                  subtitle="Every plan — including Free — can export clean, semantic CSS and production-ready assets. No watermark, no upgrade nag, no cost."
+                />
+                <ul className="space-y-4">
+                  {exportPoints.map(({ icon: Icon, text }) => (
+                    <li key={text} className="flex items-start gap-3">
+                      <span className="flex items-center justify-center w-6 h-6 rounded-full bg-emerald-500/10 text-emerald-600 shrink-0 mt-0.5">
+                        <Icon size={13} strokeWidth={2} />
+                      </span>
+                      <span className="text-[14px] text-fg-muted font-medium leading-[1.65]">{text}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </Reveal>
           </div>
         </div>
       </section>
 
       {/* ── Pricing ── */}
-      <section className="w-full py-16 md:py-24 border-t border-border">
-        <div className="px-6 md:px-8">
+      <section className="w-full py-20 md:py-28">
+        <div className="mx-auto max-w-[1280px] px-6 md:px-10">
           <Reveal>
             <SectionHeader
+              centered
               label="Pricing"
               title="Simple, transparent pricing."
               subtitle="Start for free. Upgrade when you grow. No hidden fees."
             />
           </Reveal>
-          <div className="mt-8">
+          <div className="mt-10">
             <PricingSection />
           </div>
         </div>
       </section>
 
-      {/* ── FAQs ── */}
-      <section className="w-full py-16 md:py-24 border-t border-border">
-        <div className="px-6 md:px-8">
+      {/* ── FAQ ── */}
+      <section className="w-full bg-surface-muted py-20 md:py-28">
+        <div className="mx-auto max-w-[1280px] px-6 md:px-10">
           <Reveal>
             <SectionHeader
               label="FAQ"
@@ -621,14 +474,14 @@ export default function Landing() {
               subtitle="Everything you need to know about Pastel plans and features."
             />
           </Reveal>
-          <div className="mt-10">
+          <div className="mt-12">
             {faqs.map(({ q, a }, i) => (
               <div key={q}>
                 <button
                   onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="flex items-center justify-between w-full py-5 text-left bg-none border-none cursor-pointer group"
+                  className="flex items-center justify-between w-full py-6 text-left bg-none border-none cursor-pointer group"
                 >
-                  <span className="text-[15px] font-semibold text-foreground tracking-[-0.01em] group-hover:text-brand transition-colors">{q}</span>
+                  <span className="text-[16px] font-semibold text-foreground tracking-[-0.01em] group-hover:text-brand transition-colors">{q}</span>
                   <ChevronDown
                     className={`h-4 w-4 text-fg-muted shrink-0 ml-4 transition-transform duration-200 ${openFaq === i ? 'rotate-180' : ''}`}
                   />
@@ -637,7 +490,7 @@ export default function Landing() {
                   className={`grid transition-all duration-200 ease-out ${openFaq === i ? 'grid-rows-[1fr] opacity-100' : 'grid-rows-[0fr] opacity-0'}`}
                 >
                   <div className="overflow-hidden">
-                    <p className="pb-5 max-w-2xl text-[13px] text-fg-muted leading-[1.7] font-medium">{a}</p>
+                    <p className="pb-6 max-w-3xl text-[14px] text-fg-muted leading-[1.7] font-medium">{a}</p>
                   </div>
                 </div>
                 {i < faqs.length - 1 && <div className="border-b border-border" />}
@@ -648,20 +501,28 @@ export default function Landing() {
       </section>
 
       {/* ── Final CTA ── */}
-      <section className="relative w-full border-t border-border overflow-hidden">
-        <div className="hero-glow" />
-        <div className="relative px-6 md:px-8 py-20 md:py-28">
+      <section className="w-full py-20 md:py-28">
+        <div className="mx-auto max-w-[1280px] px-6 md:px-10">
           <Reveal>
-            <p className="lds-eyebrow mb-4">Start free</p>
-            <h2 className="max-w-2xl text-[30px] sm:text-[38px] md:text-[44px] font-semibold leading-[1.06] tracking-[-0.03em] text-foreground">
-              Your next interface is one sentence away.
-            </h2>
-            <div className="mt-8 flex items-center gap-4">
-              <Link href="/auth/signup">
-                <Button design="pill" size="md" className="h-[44px] px-6 text-[15px]">
-                  Start designing free
-                </Button>
-              </Link>
+            <div className="mx-auto max-w-3xl text-center">
+              <h2 className="text-[34px] sm:text-[44px] md:text-[52px] text-foreground font-medium leading-[1.06] tracking-[-0.04em] text-pretty">
+                Your next interface is one sentence away.
+              </h2>
+              <p className="mx-auto mt-6 max-w-[540px] text-[15.5px] md:text-[17px] text-fg-secondary leading-[1.7] text-pretty">
+                Describe your idea and get real, editable screens in seconds. Start free —
+                no card, no watermark, no catch.
+              </p>
+              <div className="mt-8 flex flex-wrap items-center justify-center gap-4">
+                <Link href="/auth/signup">
+                  <Button design="pill" size="md" className="h-[42px] px-5 text-[14.5px]">
+                    Start designing free
+                  </Button>
+                </Link>
+                <Link href="/pricing" className="group flex items-center gap-1.5 text-[14px] font-medium text-fg-muted hover:text-foreground transition-colors">
+                  See plans &amp; pricing
+                  <ArrowRight size={14} strokeWidth={2} className="transition-transform duration-200 group-hover:translate-x-0.5" />
+                </Link>
+              </div>
             </div>
           </Reveal>
         </div>

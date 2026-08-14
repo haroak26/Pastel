@@ -12,8 +12,7 @@ import { useMaxiAgent } from "@/hooks/use-maxi-agent";
 import { AgentRunCard } from "@/components/agent/AgentRunCard";
 import { WireframeReviewPanel } from "@/components/agent/WireframeReviewPanel";
 import { CompanyGallery } from "@/components/agent/CompanyGallery";
-import { ScreenPreview } from "@/components/agent/ScreenPreview";
-import { ScreenPanel } from "@/components/agent/ScreenPanel";
+import { CanvasBoard } from "@/components/agent/CanvasBoard";
 import { DocsPanel } from "@/components/agent/DocsPanel";
 import { DocReader } from "@/components/agent/DocReader";
 import { FilesPanel } from "@/components/agent/FilesPanel";
@@ -94,6 +93,7 @@ export default function CanvasPage() {
   const [inviteEmail, setInviteEmail] = useState("");
   const [invitedUsers, setInvitedUsers] = useState<{ name: string; email: string; status: "pending" | "accepted" | "declined" }[]>([]);
   const [isCreating, setIsCreating] = useState(false);
+  const [screenNames, setScreenNames] = useState<Record<string, string>>({});
 
   const searchRef = useRef<HTMLInputElement>(null);
   const iconHeaderRef = useRef<HTMLDivElement>(null);
@@ -483,7 +483,7 @@ export default function CanvasPage() {
                         ) : (
                           <Loader2 size={12} className="shrink-0 animate-spin text-fg-faint" />
                         )}
-                        <span className="text-[11px] truncate">{formatScreenLabel(s.name)}</span>
+                        <span className="text-[11px] truncate">{formatScreenLabel(screenNames[s.name] ?? s.name)}</span>
                         {s.failed && <span className="ml-auto text-[9px] text-warning font-medium">warn</span>}
                       </motion.button>
                     ))}
@@ -872,7 +872,7 @@ export default function CanvasPage() {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.4, delay: 0.4 }}
           >
-            <div className="flex items-center gap-1.5 h-[36px] px-2 rounded-[10px] bg-background shadow-[0_1px_3px_rgba(0,0,0,0.1)] border border-border/50">
+            <div className="flex items-center gap-1 h-[36px] px-1.5 rounded-[10px] bg-background border border-border/80">
               <div className="flex items-center gap-0.5">
                 {[
                   { id: "select", icon: MousePointer2, label: "Select" },
@@ -894,7 +894,7 @@ export default function CanvasPage() {
                   );
                 })}
               </div>
-              <div className="w-px h-[14px] bg-border/50 shrink-0" />
+              <div className="w-px h-[16px] bg-border/60 shrink-0" />
               <div className="flex items-center gap-0.5">
                 <div className="relative group">
                   <button
@@ -918,7 +918,7 @@ export default function CanvasPage() {
               </div>
               {showPreviewToggle && (
                 <>
-                  <div className="w-px h-[14px] bg-border/50 shrink-0" />
+                  <div className="w-px h-[16px] bg-border/60 shrink-0" />
                   <div className="flex items-center gap-0.5">
                     <div className="relative group">
                       <button
@@ -952,7 +952,7 @@ export default function CanvasPage() {
                   </div>
                 </>
               )}
-              <div className="w-px h-[14px] bg-border/50 shrink-0" />
+              <div className="w-px h-[16px] bg-border/60 shrink-0" />
               <button className="flex shrink-0 items-center gap-1.5 px-2.5 h-[28px] rounded-[7px] text-[12px] font-semibold bg-brand text-white hover:bg-[hsl(var(--brand-hover))] transition-colors border-none cursor-pointer">
                 Export
               </button>
@@ -1003,18 +1003,21 @@ export default function CanvasPage() {
                 </div>
               )}
 
-              {/* Verified screen preview — live once the agent presents the UI */}
-              {!activeDoc && previewMode === "preview" && (status === "done" || phases.present.status !== "idle") && selectedScreen && runId && (
-                <div className="absolute inset-0 flex flex-col items-center p-6 overflow-y-auto">
-                  <div className="w-full max-w-[1400px]">
-                    <ScreenPanel screenName={selectedScreen || ""}>
-                      <div className="w-full"
-                           style={{ transform: `scale(${zoom / 100})`, transformOrigin: "center top" }}>
-                        <ScreenPreview runId={runId} screen={selectedScreen} />
-                      </div>
-                    </ScreenPanel>
-                  </div>
-                </div>
+              {/* Verified screen preview — free-form canvas with draggable screens */}
+              {!activeDoc && previewMode === "preview" && (status === "done" || phases.present.status !== "idle") && runId && (
+                <CanvasBoard
+                  projectId={projectId ?? "new"}
+                  runId={runId}
+                  screens={displayScreens.filter((s) => s.ready).map((s) => s.name)}
+                  zoom={zoom}
+                  activeTool={activeTool}
+                  selectedScreen={selectedScreen}
+                  screenNames={screenNames}
+                  onSelectScreen={(name) => selectScreen(name, true)}
+                  onRenameScreen={(name, label) =>
+                    setScreenNames((prev) => ({ ...prev, [name]: label }))
+                  }
+                />
               )}
 
               {/* Working state */}
@@ -1107,19 +1110,6 @@ export default function CanvasPage() {
                         </div>
                       </div>
                     </div>
-                  </div>
-                </div>
-              )}
-
-              {/* Done but no screen selected */}
-              {!activeDoc && previewMode === "preview" && status === "done" && !selectedScreen && (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <div className="flex flex-col items-center text-center max-w-xs">
-                    <div className="w-16 h-16 rounded-2xl bg-surface-muted flex items-center justify-center mb-4">
-                      <Layout size={24} strokeWidth={1.5} className="text-fg-muted" />
-                    </div>
-                    <h2 className="text-[15px] font-semibold text-foreground mb-1">Select a screen</h2>
-                    <p className="text-[12px] text-fg-muted leading-relaxed">Pick a screen from the sidebar to view it.</p>
                   </div>
                 </div>
               )}

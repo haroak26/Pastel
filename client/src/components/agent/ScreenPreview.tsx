@@ -5,6 +5,9 @@ import { formatScreenLabel } from "@/lib/utils";
 interface ScreenPreviewProps {
   runId: string;
   screen: string;
+  editMode?: boolean;
+  onScreenDrag?: (dx: number, dy: number, px?: number, py?: number) => void;
+  onScreenDragEnd?: () => void;
 }
 
 /**
@@ -15,18 +18,32 @@ interface ScreenPreviewProps {
  * The iframe auto-sizes to match its content height via a postMessage
  * from inside the iframe — no same-origin access needed.
  */
-export function ScreenPreview({ runId, screen }: ScreenPreviewProps) {
+export function ScreenPreview({ runId, screen, editMode = false, onScreenDrag, onScreenDragEnd }: ScreenPreviewProps) {
   const iframeRef = useRef<HTMLIFrameElement>(null);
   const [nonce, setNonce] = useState(0);
   const [loaded, setLoaded] = useState(false);
   const [runtimeError, setRuntimeError] = useState<string | null>(null);
   const [contentHeight, setContentHeight] = useState<number | null>(null);
 
+  const onScreenDragRef = useRef(onScreenDrag);
+  const onScreenDragEndRef = useRef(onScreenDragEnd);
+  useEffect(() => {
+    onScreenDragRef.current = onScreenDrag;
+    onScreenDragEndRef.current = onScreenDragEnd;
+  }, [onScreenDrag, onScreenDragEnd]);
+
   useEffect(() => {
     setLoaded(false);
     setRuntimeError(null);
     setContentHeight(null);
   }, [runId, screen, nonce]);
+
+  // Toggle the injected editor (component selection + screen drag) inside the frame
+  useEffect(() => {
+    const win = iframeRef.current?.contentWindow;
+    if (!win || !loaded) return;
+    win.postMessage({ type: "maxi:edit-mode", on: editMode }, "*");
+  }, [editMode, loaded, nonce]);
 
   useEffect(() => {
     const handler = (e: MessageEvent) => {
@@ -39,6 +56,19 @@ export function ScreenPreview({ runId, screen }: ScreenPreviewProps) {
       }
       if (data.type === "maxi:error") setRuntimeError(data.message || "Runtime error");
       if (data.type === "maxi:blank") setRuntimeError("The screen rendered empty — the build may be incomplete.");
+      if (data.type === "maxi:screen-drag" && typeof data.dx === "number") {
+        let absX = data.px;
+        let absY = data.py;
+        if (typeof absX === "number" && iframeRef.current) {
+          const rect = iframeRef.current.getBoundingClientRect();
+          absX += rect.left;
+          absY += rect.top;
+        }
+        onScreenDragRef.current?.(data.dx, data.dy, absX, absY);
+      }
+      if (data.type === "maxi:screen-drag-end") {
+        onScreenDragEndRef.current?.();
+      }
     };
     window.addEventListener("message", handler);
     return () => window.removeEventListener("message", handler);

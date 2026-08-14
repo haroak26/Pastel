@@ -1,0 +1,266 @@
+/**
+ * Pastel (Maxi) Agent v23 — e2e harness, NORMAL models (no overrides).
+ *
+ *   npx tsx agenttests/agentv23/run-e2e.ts
+ *
+ * Runs ONE cold end-to-end run of the wave executor with the default model
+ * routing (cheap anthropic/claude-haiku-4-5 + mid openai/gpt-5.6-luna) for a
+ * two-screen fitness-tracking UI. If the run fails, ALL issues and errors
+ * are collected and logged — the harness never launches another run.
+ */
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HERE = path.dirname(fileURLToPath(import.meta.url));
+const ARTIFACTS = HERE;
+const LOG_PATH = path.join(ARTIFACTS, "run.log");
+
+delete process.env.PASTEL_THINKING_BUDGET;
+
+const RUN_TIMEOUT_MS = 15 * 60 * 1000;
+const PROMPT = "A fitness tracking app that logs runs: today's workout, weekly distance, pace trends, and run history with splits.";
+const ANSWERS: Record<string, string> = {};
+
+const { createRun } = await import("../../server/lib/maxi-agent/run-store");
+const { startAgentLoop } = await import("../../server/lib/maxi-agent/orchestrator");
+const { db } = await import("../../server/db");
+const { agentRuns, agentDocuments, agentFiles } = await import("../../shared/schema");
+const { eq } = await import("drizzle-orm");
+
+const run = await createRun({ prompt: PROMPT, answers: ANSWERS });
+const runId = run.id;
+console.log(`[e2e] run ${runId} started — prompt: ${PROMPT.slice(0, 60)}…`);
+console.log(`[e2e] models: DEFAULT (cheap claude-haiku-4-5 + mid gpt-5.6-luna) — no overrides`);
+
+const startedAt = Date.now();
+let timedOut = false;
+try {
+  await Promise.race([
+    startAgentLoop(runId, PROMPT, ANSWERS, undefined, undefined, undefined, { maxCredits: 45 }),
+    new Promise((_, reject) =>
+      setTimeout(() => reject(new Error(`run exceeded ${RUN_TIMEOUT_MS / 1000}s`)), RUN_TIMEOUT_MS),
+    ),
+  ]);
+} catch (err) {
+  timedOut = true;
+  console.error("[e2e] run failed/timed out:", err instanceof Error ? err.message : err);
+}
+const wallSeconds = Math.round((Date.now() - startedAt) / 10) / 100;
+
+const [row] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId)).limit(1);
+const docs = await db.select().from(agentDocuments).where(eq(agentDocuments.runId, runId));
+const files = await db.select().from(agentFiles).where(eq(agentFiles.runId, runId));
+const manifest = (row?.manifest ?? {}) as Record<string, unknown>;
+
+const doc = (kind: string) => {
+  const d = docs.find((x) => x.kind === kind);
+  if (!d) return null;
+  try { return JSON.parse(d.content); } catch { return null; }
+};
+
+const gate = doc("gate-report") as { passed?: boolean; score?: number; issues?: Array<{ file?: string; severity?: string; category?: string; description?: string }> } | null;
+const review = doc("review-result") as { passed?: boolean; score?: number; decision?: string; issues?: Array<{ target?: string; severity?: string; category?: string; description?: string }>; summary?: string } | null;
+const fidelity = doc("fidelity-report") as { summary?: { total?: number; passed?: number; failed?: number; highIssues?: number } } | null;
+const props = doc("prop-contract-report") as { violations?: Array<{ componentId?: string; missingRequired?: string[] }>; autoFixedCount?: number } | null;
+const timing = doc("timing-report") as { wallSeconds?: number; stages?: Array<{ wave: number; stage: string; ms: number }> } | null;
+const calls = doc("call-counts") as { callsByRole?: Record<string, number>; totalCalls?: number } | null;
+const brief = doc("brief") as { title?: string; productType?: string; inspiration?: { primary?: string } } | null;
+
+const quality = (manifest.quality ?? {}) as { passed?: boolean; score?: number; repairs?: number };
+const kbSlices = (manifest.kbSlices ?? {}) as Record<string, { chars: number; files: string[] }>;
+const failedScreens = (manifest.failedScreens ?? []) as string[];
+const screens = (manifest.screens ?? []) as string[];
+
+const summary = {
+  test: "agentv23-normal-models",
+  runId,
+  status: row?.status,
+  title: row?.title ?? brief?.title ?? null,
+  productType: brief?.productType ?? null,
+  inspiration: brief?.inspiration?.primary ?? null,
+  modelOverride: "none (default routing)",
+  thinking: "disabled (default)",
+  prompt: PROMPT,
+  screens,
+  failedScreens,
+  wallSeconds,
+  timedOut,
+  timing: timing?.stages
+    ? Object.fromEntries([0, 1, 2, 3].map((w) => [w, Math.round((timing!.stages!.filter((s) => s.wave === w).reduce((n, s) => n + s.ms, 0) / 1000) * 10) / 10]))
+    : null,
+  callsByRole: calls?.callsByRole ?? manifest.callsByRole ?? {},
+  totalCalls: calls?.totalCalls ?? null,
+  kbSlices: Object.fromEntries(Object.entries(kbSlices).map(([k, v]) => [k, v.chars])),
+  quality,
+  gate: gate ? { passed: gate.passed, score: gate.score, issues: gate.issues?.length ?? 0 } : null,
+  review: review ? { passed: review.passed, score: review.score, decision: review.decision } : null,
+  fidelity: fidelity?.summary ?? null,
+  propContract: props ? { violations: props.violations?.length ?? 0, autoFixed: props.autoFixedCount ?? 0 } : null,
+};
+fs.writeFileSync(path.join(ARTIFACTS, "run-summary.json"), JSON.stringify(summary, null, 2));
+
+// ── ISSUES + ERRORS collection (works even when the run errors out) ──
+const issues: Array<{ severity: string; category: string; file: string; description: string }> = [];
+for (const i of gate?.issues ?? []) {
+  issues.push({ severity: i.severity ?? "?", category: i.category ?? "?", file: i.file ?? "?", description: i.description ?? "?" });
+}
+for (const i of review?.issues ?? []) {
+  issues.push({ severity: i.severity ?? "?", category: i.category ?? "?", file: i.target ?? "?", description: i.description ?? "?" });
+}
+for (const v of props?.violations ?? []) {
+  issues.push({ severity: "high", category: "props", file: `src/components/${v.componentId}.jsx`, description: `mounted without required prop(s) ${(v.missingRequired ?? []).join(", ")}` });
+}
+
+// Log anomalies captured during the run (console output of the pipeline).
+let logText = "";
+try { logText = fs.readFileSync(LOG_PATH, "utf8"); } catch { /* no log file */ }
+const logAnomalies = logText
+  .split("\n")
+  .filter((l) =>
+    /\[maxi-agent\]|\[pastel v21\]|\[e2e\]/.test(l) &&
+    /error|fail|truncat|validat|fallback|salvag|retry|repair|violation|issue|warn|skip/i.test(l),
+  )
+  .map((l) => l.trim())
+  .slice(0, 80);
+
+const { marked: markdown } = await import("marked");
+const issuesMd = issues.length === 0 ? "None." : issues.map((i, n) => `### ${n + 1}. [${i.severity}] ${i.category} — ${i.file}\n\n${markdown.parse(i.description)}`).join("\n\n");
+
+const hardErrors = [
+  ...(timedOut ? [`- TIMEOUT: run exceeded ${RUN_TIMEOUT_MS / 1000}s — aborted by the harness`] : []),
+  ...(row?.error ? [`- Run error: ${row.error}`] : []),
+  ...(failedScreens.length > 0 ? [`- Flagged screens that failed verification: ${failedScreens.join(", ")}`] : []),
+  ...(row?.status === "error" ? [`- Run status is \`error\` — pipeline threw (see run.error above)`] : []),
+];
+const errorsMd = hardErrors.length > 0 ? hardErrors.join("\n") : "None.";
+
+fs.writeFileSync(path.join(ARTIFACTS, "ISSUES_AND_ERRORS.md"), `# Agent v23 e2e — Issues & Errors (normal models)
+
+Run: \`${runId}\` · status: \`${row?.status ?? "?"}\` · models: default (cheap \`anthropic/claude-haiku-4-5\`, mid \`openai/gpt-5.6-luna\`) · thinking: disabled
+Two-screen UI: fitness tracking ("${summary.title ?? "?"}")
+
+## Outcome
+${row?.status === "done" ? "Run completed. Screens verified, review passed." : `Run did NOT fully pass (status \`${row?.status}\`). This report lists every issue found. The harness does not rerun.`}
+
+## Hard errors / flagged screens
+${errorsMd}
+
+## Gate + review issues
+${issuesMd}
+
+## Pipeline log anomalies (console capture)
+${logAnomalies.length > 0 ? "```\n" + logAnomalies.join("\n") + "\n```" : "None captured."}
+
+## Fidelity
+- ${fidelity ? `${fidelity.summary?.passed ?? 0}/${fidelity.summary?.total ?? 0} components passed · ${fidelity.summary?.failed ?? 0} hard failures · ${fidelity.summary?.highIssues ?? 0} issues` : "no fidelity report"}
+
+## Prop contract
+- ${props ? `${props.violations?.length ?? 0} violations after auto-fix (${props.autoFixedCount ?? 0} auto-fixed)` : "no prop report"}
+
+## Review verdict
+- ${review ? `${review.score}/100 — ${review.decision}${review.summary ? ` — ${review.summary}` : ""}` : "no review result"}
+`);
+
+console.log(`[e2e] done: status=${row?.status} · screens=${screens.join(", ") || "none"} · failed=${failedScreens.join(", ") || "none"} · gate=${gate?.score ?? "?"}/100 · review=${review?.score ?? "?"}/100 · ${wallSeconds}s · timedOut=${timedOut}`);
+
+// ── Offline screenshot render (local chromium, same preview HTML as the app) ──
+const { chromium } = await import("playwright-core");
+const styles = files.find((f) => f.path === "src/styles.css")?.content ?? "";
+const bundles = files.filter((f) => f.kind === "build" && f.path.startsWith(".build/") && f.path.endsWith(".js"));
+const brandKit = (manifest.brandKit ?? {}) as { fonts?: Record<string, string> };
+const fonts = brandKit.fonts ? Object.values(brandKit.fonts) : [];
+const shotDir = path.join(ARTIFACTS, "screenshots");
+fs.mkdirSync(shotDir, { recursive: true });
+
+const chromes = [
+  process.env.PASTEL_CHROMIUM_PATH,
+  "/nix/store/qa9cnw4v5xkxyip6mb9kxqfq1z4x2dx1-chromium-138.0.7204.100/bin/chromium",
+  "/usr/bin/chromium",
+  "/usr/bin/chromium-browser",
+].filter(Boolean);
+
+const htmlFor = (screen: string, bundle: string) => {
+  const fontLinks = [...new Set(fonts)]
+    .map((f) => `<link href="https://fonts.googleapis.com/css2?family=${encodeURIComponent(f).replace(/%20/g, "+")}:wght@300;400;500;600;700&display=swap" rel="stylesheet">`)
+    .join("\n");
+  return `<!DOCTYPE html><html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><title>${screen}</title>${fontLinks}<script src="https://cdn.tailwindcss.com"></script><style>${styles}html, body { height: 100%; }</style></head><body><div id="root"></div><script>${bundle}</script></body></html>`;
+};
+
+let browser: Awaited<ReturnType<typeof chromium.launch>> | null = null;
+const screenshotNames: string[] = [];
+try {
+  browser = await chromium.launch({ headless: true, executablePath: chromes[0], args: ["--disable-dev-shm-usage", "--no-sandbox"] });
+  for (const b of bundles) {
+    const screen = b.path.replace(/^\.build\//, "").replace(/\.js$/, "");
+    const html = htmlFor(screen, b.content);
+    for (const [viewport, w, h] of [["desktop", 1440, 900], ["mobile", 390, 844]] as const) {
+      const page = await browser.newPage({ viewport: { width: w, height: h }, deviceScaleFactor: 2 });
+      try {
+        await page.setContent(html, { waitUntil: "domcontentloaded", timeout: 30000 });
+        await page.waitForFunction(() => Boolean((window as Window & { __maxiMounted?: boolean }).__maxiMounted), undefined, { timeout: 15000 }).catch(() => {});
+        await page.evaluate(() => (document as Document).fonts?.ready.then(() => true)).catch(() => {});
+        await page.waitForTimeout(500);
+        const name = `${screen}-${viewport}.png`;
+        await page.screenshot({ type: "png", fullPage: true, path: path.join(shotDir, name) });
+        screenshotNames.push(name);
+        console.log(`✓ screenshot ${name}`);
+      } finally {
+        await page.close();
+      }
+    }
+  }
+} catch (err) {
+  console.error("[e2e] screenshot render failed:", err instanceof Error ? err.message : err);
+} finally {
+  await browser?.close();
+}
+summary.screenshotFiles = screenshotNames;
+fs.writeFileSync(path.join(ARTIFACTS, "run-summary.json"), JSON.stringify(summary, null, 2));
+
+// ── RUN_SUMMARY.md ──
+const waves = summary.timing as Record<string, number> | null;
+const rows = Object.entries(summary.callsByRole as Record<string, number>)
+  .sort((a, b) => b[1] - a[1])
+  .map(([role, n]) => `| ${role} | ${n} |`).join("\n");
+fs.writeFileSync(path.join(ARTIFACTS, "RUN_SUMMARY.md"), `# Agent v23 e2e — Run Summary (normal models)
+
+| | |
+|---|---|
+| Run ID | \`${runId}\` |
+| Status | \`${row?.status}\` |
+| Product | ${summary.title ?? "?"} (${summary.productType ?? "?"}) |
+| Inspiration company | ${summary.inspiration ?? "?"} |
+| Models | default routing — cheap \`anthropic/claude-haiku-4-5\` (plan/genome/clarify/planner/builder/compose/data/assemble) + mid \`openai/gpt-5.6-luna\` (design/brief/copy/review/visualReview/repair) |
+| Thinking | disabled (default) |
+| Wall time | ${wallSeconds}s |
+| Screens (verified) | ${screens.join(", ") || "none"} |
+| Failed screens | ${failedScreens.join(", ") || "none"} |
+| Quality | passed=${quality.passed} · score=${quality.score} · repairs=${quality.repairs} |
+
+## Wave timing (s)
+| Wave | Seconds |
+|---|---|
+${waves ? Object.entries(waves).map(([w, s]) => `| w${w} | ${s} |`).join("\n") : "| — | no timing |"}
+
+## Model calls by role
+| Role | Calls |
+|---|---|
+${rows || "| — | — |"}
+| **Total** | **${summary.totalCalls ?? "?"}** |
+
+## Knowledge-base slices
+${Object.entries(summary.kbSlices as Record<string, number>).map(([k, v]) => `- ${k}: ${v} chars`).join("\n") || "- none"}
+
+## Gate / fidelity / props / review
+- Gate: ${gate ? `${gate.score}/100 — ${gate.passed ? "PASS" : "FAIL"} (${gate.issues?.length ?? 0} issues)` : "n/a"}
+- Fidelity: ${fidelity ? `${fidelity.summary?.passed ?? 0}/${fidelity.summary?.total ?? 0} passed · ${fidelity.summary?.failed ?? 0} hard failures` : "n/a"}
+- Prop contract: ${props ? `${props.violations?.length ?? 0} violations after auto-fix` : "n/a"}
+- Review: ${review ? `${review.score}/100 — ${review.decision}` : "n/a"}
+
+## Screenshots
+${screenshotNames.map((n) => `- \`screenshots/${n}\``).join("\n") || "- none rendered"}
+`);
+
+console.log(`[e2e] artifacts written to ${ARTIFACTS}`);
+process.exit(0);

@@ -2,8 +2,7 @@ import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { PricingSection } from "@/components/PricingSection";
 import { ChevronDown } from "lucide-react";
-import { Button } from "@/components/button";
-import { Eyebrow } from "@/components/ds";
+import { LandingHero } from "@/components/marketing";
 
 const faqs = [
   {
@@ -16,7 +15,7 @@ const faqs = [
   },
   {
     q: "Is there a free plan?",
-    a: "Yes! The Free plan includes 1 project, 3 design files, 1 editor, 100 MB storage, and 15 AI credits per month — no payment card required.",
+    a: "Yes! The Free plan includes 10 projects, 10 design files, 1 editor, 100 MB storage, and 150 AI credits per month — no payment card required.",
   },
   {
     q: "Can I switch plans at any time?",
@@ -31,25 +30,20 @@ const faqs = [
 export default function Pricing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   return (
-    <Layout panel>
+    <Layout fullWidth>
+      <div className="landing-grid" />
+
       {/* ── HERO ──────────────────────────────────────────────────── */}
-      <section className="pt-20 pb-10 md:pb-12 hero-grain overflow-hidden">
-        <div className="lds-marketing-section">
-          <div className="max-w-xl">
-            <div className="mb-7">
-              <Eyebrow label="NEW">
-                Unlimited agents, no per-seat fees
-              </Eyebrow>
-            </div>
-            <h1 className="text-[32px] sm:text-[38px] md:text-[44px] text-foreground font-medium leading-[1.1] tracking-[-0.03em] mb-7">
-              Simple pricing.
-              <br />
-              No games.
-            </h1>
-            
-          </div>
-        </div>
-      </section>
+      <LandingHero
+        title={
+          <>
+            Simple pricing.
+            <br />
+            No games.
+          </>
+        }
+        description="Start for free, upgrade when you grow. No hidden fees."
+      />
 
       {/* ── PRICING CARDS ────────────────────────────────────────── */}
       <div className="lds-marketing-section">

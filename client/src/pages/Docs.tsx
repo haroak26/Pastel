@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Layout } from "@/components/Layout";
 import { ChevronDown, Link as LinkIcon } from "lucide-react";
-import { Eyebrow } from "@/components/ds";
+import { LandingHero } from "@/components/marketing";
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
   return (
@@ -46,24 +46,13 @@ function Step({ num, children }: { num: string; children: React.ReactNode }) {
 
 export default function Docs() {
   return (
-    <Layout panel>
-      <section className="pt-20 pb-6 hero-grain overflow-hidden">
-        <div className="lds-marketing-section">
-          <div className="max-w-xl">
-            <div className="mb-7">
-              <Eyebrow label="Docs">
-                Documentation
-              </Eyebrow>
-            </div>
-            <h1 className="text-[32px] sm:text-[38px] md:text-[44px] text-foreground font-medium leading-[1.1] tracking-[-0.03em] mb-7">
-              Documentation
-            </h1>
-            <p className="mb-7 max-w-[540px] text-[15px] text-fg-secondary font-sans font-medium leading-[1.65]">
-              Everything you need to know about setting up and using Pastel — from connecting your first domain to configuring AI agents.
-            </p>
-          </div>
-        </div>
-      </section>
+    <Layout fullWidth>
+      <LandingHero
+        eyebrowLabel="Docs"
+        eyebrow="Documentation"
+        title="Documentation"
+        description="Everything you need to know about setting up and using Pastel — from connecting your first domain to configuring AI agents."
+      />
 
       <div className="max-w-3xl mx-auto px-8 py-16 md:py-24 space-y-16">
 

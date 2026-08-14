@@ -61,7 +61,7 @@ export default function Contact() {
             </p>
           </div>
         </div>
-      </section>
+            </section>
 
       {/* Channels */}
       <section className="border-t border-border py-16">

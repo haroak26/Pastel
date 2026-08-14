@@ -23,19 +23,19 @@ export function SectionHeader({
     <div className={`space-y-3 ${centered ? "text-center" : ""}`}>
       {label && (
         <div className={`${centered ? "flex justify-center" : ""}`}>
-          <span className="text-[11px] font-semibold text-brand tracking-wide uppercase">
+          <span className="text-[12px] font-semibold text-brand tracking-wide uppercase">
             {label}
           </span>
         </div>
       )}
       <h2
-        className="text-[24px] sm:text-[28px] md:text-[34px] text-foreground font-semibold leading-[1.12] tracking-[-0.025em]"
+        className="text-[28px] sm:text-[32px] md:text-[40px] text-foreground font-semibold leading-[1.12] tracking-[-0.025em]"
       >
         {title}
       </h2>
       {subtitle && (
         <p
-          className="text-[14px] text-fg-muted font-normal leading-[1.65] max-w-[560px]"
+          className="text-[15px] text-fg-muted font-normal leading-[1.65] max-w-[600px]"
           style={centered ? { margin: "0 auto" } : undefined}
         >
           {subtitle}
@@ -45,9 +45,7 @@ export function SectionHeader({
   );
 }
 
-export type FeatureVariant = "brand" | "amber" | "red" | "green" | "purple";
-
-const variantColors: Record<FeatureVariant, string> = {
+export type FeatureVariant = "brand" | "amber" | "red" | "green" | "purple";const variantColors: Record<FeatureVariant, string> = {
   brand: "text-sky-500",
   amber: "text-amber-500",
   red: "text-rose-500",
@@ -113,6 +111,53 @@ export function SoftCard({
   children: React.ReactNode;
 }) {
   return <div className={cn("soft-card", className)}>{children}</div>;
+}
+
+/*
+ * Compact landing-style hero — centered eyebrow pill, display title,
+ * description, and CTA row. Matches the Landing page hero treatment
+ * (same centered composition, tight tracking, pill buttons) but tuned
+ * smaller for interior marketing pages, with no wave divider.
+ */
+export function LandingHero({
+  eyebrowLabel,
+  eyebrow,
+  title,
+  description,
+  actions,
+}: {
+  eyebrowLabel?: string;
+  eyebrow?: React.ReactNode;
+  title: React.ReactNode;
+  description?: React.ReactNode;
+  actions?: React.ReactNode;
+}) {
+  return (
+    <section className="relative w-full overflow-hidden pt-20 md:pt-28 pb-14 md:pb-20">
+      <div className="relative px-6 md:px-10">
+        <div className="relative mx-auto max-w-4xl text-center">
+          {(eyebrowLabel || eyebrow) && (
+            <div className="mb-6 md:mb-7 flex justify-center">
+              {eyebrowLabel ? <Eyebrow label={eyebrowLabel}>{eyebrow}</Eyebrow> : eyebrow}
+            </div>
+          )}
+          <h1 className="text-[36px] sm:text-[44px] md:text-[52px] text-foreground font-medium leading-[1.06] tracking-[-0.04em] mb-6 text-pretty">
+            {title}
+          </h1>
+          {description && (
+            <p className="mx-auto mb-8 max-w-[560px] text-[15.5px] md:text-[16.5px] text-fg-secondary font-normal leading-[1.7] text-pretty">
+              {description}
+            </p>
+          )}
+          {actions && (
+            <div className="flex flex-wrap items-center justify-center gap-x-5 gap-y-3">
+              {actions}
+            </div>
+          )}
+        </div>
+      </div>
+    </section>
+  );
 }
 
 export function MarketingHeroSection({

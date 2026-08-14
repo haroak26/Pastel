@@ -506,6 +506,14 @@
 }
 .hero-grain > * { position: relative; z-index: 1; }
 
+/* Marketing pages: skip layout + paint for sections far off-screen while
+   scrolling so long pages scroll at compositor speed. `auto` intrinsic size
+   keeps the scrollbar stable once a section has been rendered. */
+.lds-marketing-main > section {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 800px;
+}
+
 .agent-markdown {
   line-height: 1.7;
   word-wrap: break-word;

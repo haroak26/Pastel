@@ -326,8 +326,165 @@ ${fontLinks}
 <style>
 ${styles?.content ?? "* { box-sizing: border-box; margin: 0; padding: 0; }"}
 html, body { height: 100%; }
+/* Pastel editor — component selection & resize chrome */
+html.maxi-edit-on * { cursor: default !important; }
+html.maxi-edit-on:not(.maxi-has-sel) *:hover { outline: 1px solid rgba(11, 153, 255, 0.4) !important; outline-offset: -1px; }
+html.maxi-edit-on .maxi-sel, html.maxi-edit-on .maxi-sel:hover { outline: 2px solid #0B99FF !important; outline-offset: -2px; }
+html.maxi-edit-on .maxi-handle { outline: none !important; }
+html.maxi-dragging * { user-select: none !important; -webkit-user-select: none !important; }
 </style>
 <script>
+/* Pastel editor — injected into every preview so components are
+   individually selectable (blue box + resize handles) and the screen
+   background can be grabbed to drag the frame around the canvas. */
+(function () {
+  var EDIT = false;
+  var sel = null;
+  var dragState = null;
+  var hud = null;
+  var chip = null;
+
+  function send(msg) {
+    try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, "*"); } catch (e) {}
+  }
+  function makeEl(tag, style, cls) {
+    var el = document.createElement(tag);
+    if (cls) el.className = cls;
+    if (style) el.style.cssText = style;
+    return el;
+  }
+  function ensureHud() {
+    if (hud) return hud;
+    hud = makeEl("div", "position:fixed;left:0;top:0;width:0;height:0;z-index:2147483646;pointer-events:none;", "maxi-hud");
+    document.body.appendChild(hud);
+    chip = makeEl("div", "position:fixed;padding:2px 6px;background:#0B99FF;color:#fff;font:600 10px/1.4 Inter,system-ui,sans-serif;border-radius:3px;pointer-events:none;white-space:nowrap;z-index:2147483647;display:none;", "maxi-chip");
+    document.body.appendChild(chip);
+    return hud;
+  }
+  function handleCursor(dir) {
+    switch (dir) {
+      case "n": case "s": return "ns-resize";
+      case "e": case "w": return "ew-resize";
+      case "nw": case "se": return "nwse-resize";
+      default: return "nesw-resize";
+    }
+  }
+  function labelOf(el) {
+    var t = el.tagName ? el.tagName.toLowerCase() : "?";
+    if (el.id) return t + "#" + el.id;
+    var cn = el.className;
+    if (typeof cn === "string") {
+      var parts = cn.split(/\\s+/).filter(function (c) { return c && c !== "maxi-sel"; }).slice(0, 2);
+      if (parts.length) return t + "." + parts.join(".");
+    }
+    return t;
+  }
+  function refreshHud() {
+    if (!sel) return;
+    var r = sel.getBoundingClientRect();
+    ensureHud();
+    hud.innerHTML = "";
+    var dirs = [["nw",0,0],["n",0.5,0],["ne",1,0],["e",1,0.5],["se",1,1],["s",0.5,1],["sw",0,1],["w",0,0.5]];
+    for (var i = 0; i < dirs.length; i++) {
+      var d = dirs[i];
+      var h = makeEl("div",
+        "position:absolute;width:9px;height:9px;background:#fff;border:1.5px solid #0B99FF;border-radius:2px;" +
+        "transform:translate(-50%,-50%);pointer-events:auto;cursor:" + handleCursor(d[0]) +
+        ";left:" + (r.left + d[1] * r.width) + "px;top:" + (r.top + d[2] * r.height) + "px;",
+        "maxi-handle");
+      h.setAttribute("data-dir", d[0]);
+      hud.appendChild(h);
+    }
+    chip.textContent = labelOf(sel);
+    chip.style.left = Math.max(4, Math.min(r.left, window.innerWidth - 140)) + "px";
+    chip.style.top = Math.max(4, r.top - 22) + "px";
+  }
+  function clearSel() {
+    if (sel) { sel.classList.remove("maxi-sel"); sel = null; }
+    if (hud) hud.innerHTML = "";
+    if (chip) chip.style.display = "none";
+    document.documentElement.classList.remove("maxi-has-sel");
+  }
+  function select(el) {
+    clearSel();
+    if (!el) return;
+    sel = el;
+    el.classList.add("maxi-sel");
+    document.documentElement.classList.add("maxi-has-sel");
+    if (chip) chip.style.display = "block";
+    refreshHud();
+  }
+
+  document.addEventListener("pointerdown", function (e) {
+    if (!EDIT) return;
+    var handle = e.target.closest ? e.target.closest(".maxi-handle") : null;
+    if (handle && sel) {
+      e.preventDefault();
+      e.stopPropagation();
+      var r = sel.getBoundingClientRect();
+      dragState = { mode: "resize", dir: handle.getAttribute("data-dir"), sx: e.clientX, sy: e.clientY, rect: { l: r.left, t: r.top, w: r.width, h: r.height } };
+      document.documentElement.classList.add("maxi-dragging");
+      try { e.target.setPointerCapture(e.pointerId); } catch (err) {}
+      return;
+    }
+    var rootEl = document.getElementById("root");
+    if (e.target === rootEl || e.target === document.body || e.target === document.documentElement) {
+      e.preventDefault();
+      dragState = { mode: "screen", sx: e.clientX, sy: e.clientY, moved: 0 };
+      document.documentElement.classList.add("maxi-dragging");
+      return;
+    }
+    select(e.target);
+    e.preventDefault();
+    e.stopPropagation();
+  });
+
+  document.addEventListener("pointermove", function (e) {
+    if (!dragState) return;
+    if (dragState.mode === "resize") {
+      var r = dragState.rect;
+      var dir = dragState.dir;
+      var w = r.w, h = r.h;
+      if (dir.indexOf("e") >= 0) w = r.w + (e.clientX - dragState.sx);
+      if (dir.indexOf("s") >= 0) h = r.h + (e.clientY - dragState.sy);
+      if (dir.indexOf("w") >= 0) w = r.w - (e.clientX - dragState.sx);
+      if (dir.indexOf("n") >= 0) h = r.h - (e.clientY - dragState.sy);
+      w = Math.max(16, Math.round(w));
+      h = Math.max(16, Math.round(h));
+      sel.style.width = w + "px";
+      sel.style.height = h + "px";
+      refreshHud();
+    } else if (dragState.mode === "screen") {
+      var dx = e.clientX - dragState.sx;
+      var dy = e.clientY - dragState.sy;
+      if (Math.abs(dx) + Math.abs(dy) > 3) dragState.moved = 1;
+      if (dragState.moved) send({ type: "maxi:screen-drag", dx: dx, dy: dy, px: e.clientX, py: e.clientY });
+    }
+  });
+
+  function endDrag() {
+    if (dragState && dragState.mode === "screen" && dragState.moved) {
+      send({ type: "maxi:screen-drag-end" });
+    }
+    dragState = null;
+    document.documentElement.classList.remove("maxi-dragging");
+  }
+  document.addEventListener("pointerup", endDrag);
+  document.addEventListener("pointercancel", endDrag);
+
+  window.addEventListener("message", function (e) {
+    var d = e.data;
+    if (!d || typeof d !== "object") return;
+    if (d.type === "maxi:edit-mode") {
+      var on = !!d.on;
+      if (on === EDIT) return;
+      EDIT = on;
+      if (!on) clearSel();
+    }
+  });
+})();
+</script>
+</head>
 (function () {
   function send(msg) {
     try { if (window.parent && window.parent !== window) window.parent.postMessage(msg, "*"); } catch (e) {}

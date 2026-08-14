@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/button";
 import { CheckCircle2, XCircle, AlertTriangle, RefreshCw, Server, Mail, Bot, Globe, Database } from "lucide-react";
-import { Eyebrow } from "@/components/ds";
+import { LandingHero } from "@/components/marketing";
 
 type ComponentStatus = "operational" | "degraded" | "down";
 
@@ -87,24 +87,13 @@ export default function MarketingStatus() {
   }, []);
 
   return (
-    <Layout panel>
-      <section className="pt-20 pb-6 hero-grain overflow-hidden">
-        <div className="lds-marketing-section">
-          <div className="max-w-xl">
-            <div className="mb-7">
-              <Eyebrow label="Status">
-                System health
-              </Eyebrow>
-            </div>
-            <h1 className="text-[32px] sm:text-[38px] md:text-[44px] text-foreground font-medium leading-[1.1] tracking-[-0.03em] mb-7">
-              Pastel System Status.
-            </h1>
-            <p className="mb-7 max-w-[540px] text-[15px] text-fg-secondary font-sans font-medium leading-[1.65]">
-              Real-time status of Pastel's services. Check here for ongoing incidents, scheduled maintenance, and system health.
-            </p>
-          </div>
-        </div>
-      </section>
+    <Layout fullWidth>
+      <LandingHero
+        eyebrowLabel="Status"
+        eyebrow="System health"
+        title="Pastel System Status."
+        description="Real-time status of Pastel's services. Check here for ongoing incidents, scheduled maintenance, and system health."
+      />
 
       <section className="pb-24">
         <div className="lds-marketing-section">

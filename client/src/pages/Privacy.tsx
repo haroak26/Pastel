@@ -1,22 +1,15 @@
 import { Layout } from "@/components/Layout";
-import { Eyebrow } from "@/components/ds";
+import { LandingHero } from "@/components/marketing";
 
 export default function Privacy() {
   return (
-    <Layout panel>
-      <section className="pt-20 pb-6 hero-grain overflow-hidden">
-        <div className="lds-marketing-section">
-          <div className="max-w-xl">
-            <div className="mb-7">
-              <Eyebrow label="Legal">Privacy Policy</Eyebrow>
-            </div>
-            <h1 className="text-[32px] sm:text-[38px] md:text-[44px] text-foreground font-medium leading-[1.1] tracking-[-0.03em] mb-7">
-              Privacy Policy
-            </h1>
-            <p className="mb-7 max-w-[540px] text-[15px] text-fg-secondary font-sans font-medium leading-[1.65]">Last updated: June 24, 2026</p>
-          </div>
-        </div>
-      </section>
+    <Layout fullWidth>
+      <LandingHero
+        eyebrowLabel="Legal"
+        eyebrow="Privacy Policy"
+        title="Privacy Policy"
+        description="Last updated: June 24, 2026"
+      />
 
       <section className="pb-24">
         <div className="lds-marketing-section">

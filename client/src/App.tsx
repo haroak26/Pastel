@@ -23,6 +23,7 @@ import { AppLayout } from "@/components/AppLayout";
 
 /* ── Page imports ── */
 import Landing from "@/pages/Landing";
+import Product from "@/pages/Product";
 import Pricing from "@/pages/Pricing";
 import Privacy from "@/pages/Privacy";
 import Terms from "@/pages/Terms";
@@ -90,6 +91,7 @@ function Router() {
       <Switch>
       {/* Public */}
       <Route path="/" component={Landing} />
+      <Route path="/product" component={Product} />
       <Route path="/pricing" component={Pricing} />
       <Route path="/auth/login" component={LoginPage} />
       <Route path="/auth/signup" component={SignUpPage} />

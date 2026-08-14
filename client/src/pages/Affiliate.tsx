@@ -3,7 +3,8 @@ import { Link } from "wouter";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/button";
 import { Eyebrow } from "@/components/ds";
-import { MarketingHero, MarketingSection, MarketingSectionHead } from "@/components/ds/widgets";
+import { MarketingSection, MarketingSectionHead } from "@/components/ds/widgets";
+import { LandingHero } from "@/components/marketing";
 import {
   ArrowRight,
   CalendarClock,
@@ -97,11 +98,17 @@ export default function Affiliate() {
   const [openFaq, setOpenFaq] = useState<number | null>(0);
 
   return (
-    <Layout panel>
-      <MarketingHero
-        eyebrowLabel="Affiliate"
-        eyebrow="Partner program"
-        title="Earn 25% on every customer you send."
+    <Layout fullWidth>
+      <div className="landing-grid" />
+
+      <LandingHero
+        title={
+          <>
+            Earn 25% on every
+            <br />
+            customer you refer.
+          </>
+        }
         description="Promote Pastel to your audience and earn 25% recurring commission for as long as your referrals stay customers. Real-time dashboard, monthly payouts, and no caps."
         actions={
           <>
