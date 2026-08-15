@@ -114,6 +114,8 @@ export interface V6RunState {
   error: string | null;
 
   geometryReports: Record<string, import("./checks/geometry").GeometryReport>;
+  /** V24 (WS6): geometry per viewport width — the gate checks every one. */
+  geometryReportsByViewport: Record<number, Record<string, import("./checks/geometry").GeometryReport>>;
 }
 
 const MAX_REPAIR_CYCLES = 1; // V23: bounded repair — one targeted pass only.
@@ -183,6 +185,7 @@ function createState(opts: {
     status: "running",
     error: null,
     geometryReports: {},
+    geometryReportsByViewport: {},
     composerRetries: {},
     propContractReport: null,
   };
@@ -386,6 +389,24 @@ export async function startAgentLoop(
     s.data = dataOut.data;
     if (dataOut.usedFallback) emitActivity(runId, "Content: deterministic domain-pack fallback used");
     for (const note of dataOut.notes) emitActivity(runId, note);
+
+    // V24 WS5: domain-contract cross-check BEFORE the build — units and
+    // dates are validated against the brief's declared domain and supplied
+    // dataset, and any violation is repaired deterministically (domain-pack
+    // regeneration / date remap). The mismatch is named here, never left to
+    // surface only in the review verdict.
+    {
+      const { enforceDomainContract } = await import("./lib/domain-contract");
+      const enforced = enforceDomainContract({
+        brief: s.brief!,
+        domain: s.data.domain,
+        data: s.data,
+        copy: null,
+        seed: prompt + runId,
+      });
+      s.data = enforced.data;
+      for (const note of enforced.notes) emitActivity(runId, note);
+    }
     await persistJsonDoc(runId, "docs/planning/DataPlan.json", "Content & Data Plan", "data-plan", {
       domain: s.data.domain,
       people: s.data.people,
@@ -422,9 +443,25 @@ export async function startAgentLoop(
         s.copy = fallbackCopy(s.brief!, s.wireframe!, s.data!);
         emitActivity(runId, "Copy: deterministic fallback used (model call unavailable)");
       }
+      // V24 WS5.2: table/list field completeness against the layout
+      // template's declared table contract, BEFORE composing — unfillable
+      // columns are dropped deterministically, never shipped.
+      {
+        const { enforceDomainContract } = await import("./lib/domain-contract");
+        const enforced = enforceDomainContract({
+          brief: s.brief!,
+          domain: s.data!.domain,
+          data: s.data!,
+          copy: s.copy!,
+          seed: prompt + runId,
+        });
+        s.data = enforced.data;
+        if (enforced.copy) s.copy = enforced.copy;
+        for (const note of enforced.notes) emitActivity(runId, note);
+      }
       await persistJsonDoc(runId, "docs/planning/CopyPlan.json", "Copy Plan", "copy-plan", s.copy);
       emitActivity(runId, `Copy plan written — ${s.copy.screens.length} screen(s)`);
-      s.layoutPlan = layoutFromGenome({ wireframe: s.wireframe!, ux: s.ux! }, s.visualIntent, s.copy);
+      s.layoutPlan = layoutFromGenome({ wireframe: s.wireframe!, ux: s.ux!, mode: s.genome?.mode ?? s.brief?.mode }, s.visualIntent, s.copy);
       await persistJsonDoc(runId, "docs/planning/LayoutPlan.json", "V21 Layout Plan", "layout-plan", s.layoutPlan);
       emitActivity(runId, "Layout plan derived from the genome — placement, headers, and section budget set");
       return s.layoutPlan;
@@ -729,6 +766,7 @@ export async function startAgentLoop(
     s.screenshots = shotResult.screenshots.map((x) => x.dataUrl);
     s.screenshotNames = shotResult.screenshots.map((x) => x.name);
     s.geometryReports = shotResult.geometryReports;
+    s.geometryReportsByViewport = shotResult.geometryReportsByViewport ?? {};
     if (shotResult.reason) emitActivity(runId, `Render: ${shotResult.reason}`);
     for (const [name, geo] of Object.entries(s.geometryReports)) {
       const { ok, reasons } = geometryPasses(geo);
@@ -758,9 +796,11 @@ export async function startAgentLoop(
     }
 
     // ══ WAVE 3b — GATES + REVIEW ══
+    t.begin(3, "gate-review");
     setPhase(s, "review", "running", "Running the quality gate and visual review…");
     await runGate(s);
     await runModelReview(s, onUsage);
+    t.end();
 
     // ══ WAVE 4 — BOUNDED REPAIR (one targeted pass, flagged failures) ══
     const needsRepair =
@@ -770,14 +810,23 @@ export async function startAgentLoop(
         s.repairCycles++;
         emitActivity(runId, `Repair ${s.repairCycles}/${MAX_REPAIR_CYCLES} — one targeted pass…`);
         setPhase(s, "build", "running");
+        // V24 (WS9): repair + re-verify + final review are timed as wave 4
+        // — the ~159s gap between w0-w3 and the v23 wall time is now
+        // visible in TimingReport.json + the manifest + RUN_SUMMARY.
+        t.begin(4, "repair");
         await runRepairRound(s);
+        t.end();
         setPhase(s, "build", "done");
         setPhase(s, "assemble", "running", "Re-verifying…");
+        t.begin(4, "reverify");
         await runVerification(s);
+        t.end();
         setPhase(s, "assemble", "done");
         setPhase(s, "review", "running", "Re-running the quality gate…");
+        t.begin(4, "final-review");
         await runGate(s);
         await runModelReview(s, onUsage);
+        t.end();
       } else {
         emitActivity(runId, "Budget ceiling reached — skipping repair");
       }
@@ -796,7 +845,7 @@ export async function startAgentLoop(
     const report = t.report();
     s.timing = report;
     emitActivity(runId, `Run cost: $${costs.totalDollars.toFixed(4)} (${costs.totalCredits.toFixed(2)} credits) across ${costs.entries.length} model call(s)`);
-    emitActivity(runId, `Waves: w0=${(waveMs(report, 0) / 1000).toFixed(1)}s w1=${(waveMs(report, 1) / 1000).toFixed(1)}s w2=${(waveMs(report, 2) / 1000).toFixed(1)}s w3=${(waveMs(report, 3) / 1000).toFixed(1)}s — total ${report.wallSeconds}s`);
+    emitActivity(runId, `Waves: w0=${(waveMs(report, 0) / 1000).toFixed(1)}s w1=${(waveMs(report, 1) / 1000).toFixed(1)}s w2=${(waveMs(report, 2) / 1000).toFixed(1)}s w3=${(waveMs(report, 3) / 1000).toFixed(1)}s w4=${(waveMs(report, 4) / 1000).toFixed(1)}s — total ${report.wallSeconds}s`);
     if (s.status === "done_needs_review") emitActivity(runId, "Review did not pass after the bounded repair pass — run marked done_needs_review (shipped but QA-failed).");
 
     await persistJsonDoc(runId, "docs/timing/TimingReport.json", "Wave Timing Report", "timing-report", report);
@@ -861,10 +910,15 @@ export async function startAgentLoop(
       kbSlices: s.kbSlices,
     };
 
+    // V24 (WS8): the final updateRun for a COMPLETED run explicitly clears
+    // the `error` field — cleanupStaleRuns may have stamped "Run interrupted
+    // by server restart" on this row mid-flight, and a completed run must
+    // never carry a stale error in its final state.
     await updateRun(runId, {
       status: s.status,
       title: s.brief.title,
       manifest: manifestOut,
+      error: null,
     });
 
     emitEvent(runId, {
@@ -953,6 +1007,7 @@ async function runVerification(s: V6RunState): Promise<void> {
   s.screenshots = shotResult.screenshots.map((x) => x.dataUrl);
   s.screenshotNames = shotResult.screenshots.map((x) => x.name);
   s.geometryReports = shotResult.geometryReports;
+  s.geometryReportsByViewport = shotResult.geometryReportsByViewport ?? {};
   if (shotResult.reason) emitActivity(s.runId, `Render: ${shotResult.reason}`);
 }
 
@@ -1021,19 +1076,24 @@ async function runGate(s: V6RunState): Promise<void> {
     );
   }
 
-  for (const [name, geo] of Object.entries(s.geometryReports ?? {})) {
-    const file = s.generatedFiles[`src/screens/${name}.jsx`] ? `src/screens/${name}.jsx` : name;
-    const push = (severity: "high" | "medium", category: string, description: string) => {
-      if (!issues.some((i) => i.file === file && i.description === description)) {
-        issues.push({ file, severity, category, description });
+  // V24 (WS6): geometry is a HARD gate at every rendered viewport — the
+  // sandbox renders 1440/768/375 and an overflow at ANY width (mobile
+  // clipping included) is a blocking failure. The v16 standard claimed
+  // geometry checks at 1440px and 375px; this is that standard enforced.
+  {
+    const { geometryIssuesFor } = await import("./checks/geometry");
+    const pushed = new Set<string>();
+    for (const [width, perScreen] of Object.entries(s.geometryReportsByViewport ?? {})) {
+      for (const [name, geo] of Object.entries(perScreen)) {
+        const file = s.generatedFiles[`src/screens/${name}.jsx`] ? `src/screens/${name}.jsx` : name;
+        for (const issue of geometryIssuesFor(name, geo, Number(width))) {
+          const key = `${file}|${issue.description}`;
+          if (pushed.has(key)) continue;
+          pushed.add(key);
+          issues.push({ ...issue, file });
+        }
       }
-    };
-    if (geo.overflow) push("high", "layout", "Horizontal overflow detected on the rendered screen");
-    if (geo.overlaps.length > 0) push("high", "layout", `${geo.overlaps.length} overlapping element(s) on the rendered screen`);
-    if (geo.blanks.length > 0) push("medium", "layout", `${geo.blanks.length} blank section(s) on the rendered screen`);
-    if (geo.rhythm.length > 0) push("medium", "layout", `Uneven vertical rhythm: ${geo.rhythm.slice(0, 2).join("; ")}`);
-    if (geo.flush.length > 0) push("medium", "layout", `Flush sections with no whitespace: ${geo.flush.slice(0, 2).join("; ")}`);
-    if (!geo.heroScale) push("medium", "layout", "No hero-scale type on the page — the dominant moment must be the largest element (reads as a template)");
+    }
   }
 
   const high = issues.filter((i) => i.severity === "high").length;

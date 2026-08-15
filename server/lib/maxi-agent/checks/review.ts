@@ -1,5 +1,6 @@
 import type { GateIssue } from "./audit";
 import type { WireframePlan, ComponentInventory } from "../schemas";
+import { SHELL_PRIMITIVES, NAV_CHROME } from "../lib/genome";
 
 /**
  * V14 review — deterministic screen-composition audits that feed the gate
@@ -43,8 +44,12 @@ export function auditScreenComposition(
     // Defense in depth: an inventory component listed for a screen must be
     // mounted by a block there (the mount contract enforces this at
     // wireframe time; this catches anything that slipped through).
+    // V24: shell primitives and nav chrome are exempt — they are mounted by
+    // the deterministic shell wrapper (NavAdapter) or the body, never by a
+    // wireframe block, so they cannot be "planned but unmounted".
     const mounted = new Set(mounts.map((b) => b.component));
     for (const c of inventory.components) {
+      if (SHELL_PRIMITIVES.has(c.name) || NAV_CHROME.has(c.name)) continue;
       if (c.usedBy.includes(screen.id) && !mounted.has(c.name)) {
         issues.push({
           file: `src/screens/${screen.id}.jsx`,

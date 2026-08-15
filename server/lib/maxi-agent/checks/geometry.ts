@@ -1,4 +1,5 @@
 import type { Page } from "playwright-core";
+import type { GateIssue } from "./audit";
 
 /**
  * DOM-geometry audit — runs inside the headless render and measures what a
@@ -208,4 +209,68 @@ export function geometryPasses(rep: GeometryReport): { ok: boolean; reasons: str
   if (!rep.heroScale) reasons.push("no hero-scale type on the page (reads as a template)");
   if (!rep.minHeightOk) reasons.push("page rendered suspiciously short");
   return { ok: reasons.length === 0, reasons };
+}
+
+/**
+ * V24 — geometry issues for the GATE (WS6). Extracted from the orchestrator
+ * so the regression suite can assert the blocking behavior without a run.
+ *
+ * Horizontal overflow / clipping is BLOCKING (high) at every viewport — the
+ * v16 standard claimed "geometry checks at 1440px and 375px", and v24 makes
+ * it actually enforced: the sandbox renders every screen at 1440 / 768 /
+ * 375 and an overflow at ANY width fails the gate. Overlaps stay blocking;
+ * blank/rhythm/flush/hero-scale stay advisory.
+ */
+export function geometryIssuesFor(name: string, geo: GeometryReport, viewportWidth?: number): GateIssue[] {
+  const issues: GateIssue[] = [];
+  const at = viewportWidth ? ` (${viewportWidth}px)` : "";
+  if (geo.overflow) {
+    issues.push({
+      file: `src/screens/${name}.jsx`,
+      severity: "high",
+      category: "geometry",
+      description: `Horizontal overflow detected on the rendered screen${at} — content clips beyond the viewport (mobile clipping is a hard gate failure)`,
+    });
+  }
+  if (geo.overlaps.length > 0) {
+    issues.push({
+      file: `src/screens/${name}.jsx`,
+      severity: "high",
+      category: "geometry",
+      description: `${geo.overlaps.length} overlapping element(s) on the rendered screen${at}`,
+    });
+  }
+  if (geo.blanks.length > 0) {
+    issues.push({
+      file: `src/screens/${name}.jsx`,
+      severity: "medium",
+      category: "geometry",
+      description: `${geo.blanks.length} blank section(s) on the rendered screen${at}`,
+    });
+  }
+  if (geo.rhythm.length > 0) {
+    issues.push({
+      file: `src/screens/${name}.jsx`,
+      severity: "medium",
+      category: "geometry",
+      description: `Uneven vertical rhythm: ${geo.rhythm.slice(0, 2).join("; ")}${at}`,
+    });
+  }
+  if (geo.flush.length > 0) {
+    issues.push({
+      file: `src/screens/${name}.jsx`,
+      severity: "medium",
+      category: "geometry",
+      description: `Flush sections with no whitespace: ${geo.flush.slice(0, 2).join("; ")}${at}`,
+    });
+  }
+  if (!geo.heroScale) {
+    issues.push({
+      file: `src/screens/${name}.jsx`,
+      severity: "medium",
+      category: "geometry",
+      description: "No hero-scale type on the page — the dominant moment must be the largest element (reads as a template)",
+    });
+  }
+  return issues;
 }

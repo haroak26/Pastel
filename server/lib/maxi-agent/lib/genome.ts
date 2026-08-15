@@ -35,6 +35,14 @@ export const genomeRegionSchema = z.object({
   surface: z.string().optional(),
   /** Exactly one region per screen may be the dominant moment. */
   emphasis: z.boolean().optional(),
+  /** V24: density floor — min populated rows a list/table region must
+   * render. REQUIRED on list/table regions (schema-validated, never
+   * advisory): the v23 "2 list rows (min 3)" gate failure is caught at the
+   * Wave-1 call, not at review. */
+  minRows: z.number().int().min(3).max(12).optional(),
+  /** V24: exactly ONE region per screen is the primary action (the v23
+   * "missing primary action" density failure, schema-validated). */
+  primaryAction: z.boolean().optional(),
   /** PascalCase component slot from `componentSlots` — required on custom. */
   component: z.string().optional(),
   /** One-line intent (≤80 chars) — what this region must communicate. */
@@ -46,22 +54,57 @@ export const genomeScreenSchema = z.object({
   title: z.string().max(60).optional(),
   purpose: z.string().max(160).optional(),
   nav: z.enum(["sidebar", "topbar", "sidebar+topbar"]),
+  /** V24: the model-declared ceiling for empty viewport (0-0.2) — an
+   * under-filled genome is rejected here at the cheap Wave-1 call, never
+   * left to surface as a v17-density medium at review. */
+  maxEmptyViewport: z.number().min(0).max(0.2),
   /** The screen's region stack — 3-6 regions, canonical order. */
   regions: z.array(genomeRegionSchema).min(3).max(6),
   /** Region pairs that render side-by-side as a two-up row (max 2). */
   pairHints: z.array(z.tuple([z.string(), z.string()])).max(2).optional(),
+}).superRefine((screen, ctx) => {
+  const add = (path: (string | number)[], message: string) => {
+    ctx.addIssue({ code: z.ZodIssueCode.custom, message, path });
+  };
+  // Exactly one primary-action region per screen (hard floor).
+  const actions = screen.regions.filter((r) => r.primaryAction);
+  if (actions.length === 0) {
+    add(["regions"], `${screen.id} declares NO primary-action region — exactly one region must carry primaryAction: true`);
+  } else if (actions.length > 1) {
+    add(["regions"], `${screen.id} declares ${actions.length} primary-action regions — exactly one is required`);
+  }
+  // List/table regions must declare a populated-row floor (hard floor).
+  for (let i = 0; i < screen.regions.length; i++) {
+    const r = screen.regions[i]!;
+    if ((r.block === "list" || r.block === "table") && r.minRows === undefined) {
+      add(["regions", i, "minRows"], `list/table region ${i} must declare minRows (≥3) — density floors are schema, not advisory`);
+    }
+  }
 });
 
 export const layoutGenomeSchema = z.object({
   version: z.literal("1.0.0"),
   mode: z.enum(["browse", "track", "create", "operate", "learn", "social", "transact"]),
   screens: z.array(genomeScreenSchema).length(2),
-  /** Component slots — the product-specific component inventory (4-6). */
+  /** Component slots — the product-specific custom component inventory.
+   * V24: at most TWO per screen and FOUR total (the layout law: fewer,
+   * richer components). Navigation chrome is NEVER a slot — it derives from
+   * each screen's `nav` field only. */
   componentSlots: z.array(z.object({
     name: z.string().regex(/^[A-Z][A-Za-z0-9]*$/, "PascalCase name"),
     purpose: z.string().min(8).max(120),
     usedBy: z.array(z.enum(["home", "detail"])).min(1),
-  })).min(4).max(6),
+  })).min(2).max(4).superRefine((slots, ctx) => {
+    for (const s of slots) {
+      if (s.name === "Sidebar" || s.name === "Topbar") {
+        ctx.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: `"${s.name}" is navigation chrome, never a component slot — nav derives from each screen's nav field`,
+          path: [slots.indexOf(s), "name"],
+        });
+      }
+    }
+  }),
   rationale: z.string().max(300).optional(),
 });
 
@@ -204,6 +247,7 @@ export function buildModeVocabulary(mode: ProductMode): string {
     "- No region outside this enum. A block that is not listed does not exist for this product.",
     "- Exactly ONE dominant moment per screen (emphasis: true) — the largest, statement-scale region.",
     "- Custom regions (block: \"custom\") mount a PascalCase component from componentSlots; every componentSlots entry must be mounted by at least one custom region.",
+    "- componentSlots holds ONLY product-specific custom components: at most TWO per screen and FOUR total. Navigation chrome (Sidebar/Topbar) is NEVER a component slot — each screen's nav field decides the chrome automatically.",
     "- Pair hints: at most two per screen; each pair references two regions that render side-by-side (2/3 + 1/3). The dominant moment is never paired.",
   ].join("\n");
 }
@@ -213,10 +257,15 @@ export function buildModeVocabulary(mode: ProductMode): string {
 // Every run's inventory includes the SHELL + common primitives so the
 // builder produces a per-run, product-specific version of each — never the
 // generic base component shipped verbatim. The composer mounts these by name.
+//
+// V24: navigation chrome (Sidebar/Topbar) is NOT in this list — it derives
+// from each screen's `nav` field and is mounted by the deterministic
+// NavAdapter in the composed shell, never by the model. The remaining names
+// are SHELL PRIMITIVES: deterministic helpers the composer may reach for,
+// exempt from the per-block mount contract (they are mounted by the body or
+// the shell wrapper, not by a wireframe block).
 
 const SHELL_COMPONENTS: Array<{ name: string; purpose: string; usedBy: string[] }> = [
-  { name: "Topbar", purpose: "Product header with brand, page title, and user context", usedBy: ["home", "detail"] },
-  { name: "Sidebar", purpose: "Product navigation rail with brand and destinations", usedBy: ["home", "detail"] },
   { name: "Button", purpose: "Product action button with primary/secondary/ghost variants", usedBy: ["home", "detail"] },
   { name: "Avatar", purpose: "User avatar with initials and brand hue", usedBy: ["home", "detail"] },
   { name: "Badge", purpose: "Status and notification badges", usedBy: ["home", "detail"] },
@@ -224,6 +273,15 @@ const SHELL_COMPONENTS: Array<{ name: string; purpose: string; usedBy: string[] 
   { name: "Select", purpose: "Dropdown select controls", usedBy: ["home", "detail"] },
   { name: "Separator", purpose: "Section and row dividers", usedBy: ["home", "detail"] },
 ];
+
+/** V24: shell primitives — built per run, exempt from the block mount
+ *  contract and the custom-component budget (they are deterministic helpers,
+ *  not product components). */
+export const SHELL_PRIMITIVES = new Set(SHELL_COMPONENTS.map((s) => s.name));
+
+/** V24: navigation chrome names — never built, never a slot, mounted only
+ *  by the shell's NavAdapter. */
+export const NAV_CHROME = new Set(["Sidebar", "Topbar"]);
 
 export function withShellComponents(inventory: ComponentInventory): ComponentInventory {
   const names = new Set(inventory.components.map((c) => c.name));
@@ -246,25 +304,25 @@ function defaultHomeRegions(mode: ProductMode, brief: ProductBrief): GenomeRegio
   const customName = defaultCustomSlot(mode, "home", brief);
   if (mode === "browse" || mode === "transact") {
     return [
-      { block: "hero", variant: "app", surface: "tonal-band", emphasis: true, content: title },
+      { block: "hero", variant: "app", surface: "tonal-band", emphasis: true, primaryAction: true, content: title },
       { block: "search", variant: "dropdown", surface: "plain", content: "find and filter" },
-      { block: "list", variant: "cards", surface: "soft-wash", content: "product grid" },
+      { block: "list", variant: "cards", surface: "soft-wash", minRows: 6, content: "product grid" },
       { block: "custom", variant: "default", surface: "plain", component: customName, content: "signature section" },
     ];
   }
   if (mode === "social") {
     return [
-      { block: "list", variant: "activity", surface: "divided-list", emphasis: true, content: "community feed" },
+      { block: "list", variant: "activity", surface: "divided-list", emphasis: true, minRows: 5, content: "community feed" },
       { block: "stats", variant: "scoreboard", surface: "soft-wash", content: "community pulse" },
-      { block: "custom", variant: "default", surface: "plain", component: customName, content: "signature section" },
+      { block: "custom", variant: "default", surface: "plain", component: customName, primaryAction: true, content: "signature section" },
     ];
   }
   // track / create / operate / learn — the dashboard shape (no hero, no search).
   return [
     { block: "stats", variant: "scoreboard", surface: "soft-wash", emphasis: true, content: "today's headline metrics" },
     { block: "chart", variant: "band", surface: "soft-wash", content: "trend" },
-    { block: "list", variant: mode === "learn" ? "sequence" : "rows", surface: "divided-list", content: "recent records" },
-    { block: "custom", variant: "default", surface: "plain", component: customName, content: "signature section" },
+    { block: "list", variant: mode === "learn" ? "sequence" : "rows", surface: "divided-list", minRows: 4, content: "recent records" },
+    { block: "custom", variant: "default", surface: "plain", component: customName, primaryAction: true, content: "signature section" },
   ];
 }
 
@@ -276,9 +334,9 @@ function defaultDetailRegions(mode: ProductMode, brief: ProductBrief): GenomeReg
   const regions: GenomeRegion[] = [];
   if (mediaDetail) regions.push({ block: "media", variant: "gallery", surface: "plain", emphasis: true, content: "gallery" });
   else regions.push({ block: "detail", variant: "pane", surface: "inset-panel", emphasis: true, content: "record detail" });
-  if (mode === "social") regions.push({ block: "list", variant: "activity", surface: "divided-list", content: "replies" });
+  if (mode === "social") regions.push({ block: "list", variant: "activity", surface: "divided-list", minRows: 4, content: "replies" });
   regions.push({ block: "custom", variant: "default", surface: "plain", component: customName, content: "signature section" });
-  regions.push({ block: "cta", variant: "band", surface: "tonal-band", content: "primary action" });
+  regions.push({ block: "cta", variant: "band", surface: "tonal-band", primaryAction: true, content: "primary action" });
   return regions.slice(0, 6);
 }
 
@@ -334,6 +392,7 @@ export function defaultGenome(mode: ProductMode, brief: ProductBrief): LayoutGen
         title: "Home",
         purpose: brief.screenPurposes.find((p) => p.id === "home")?.purpose ?? "The primary workflow",
         nav: "topbar",
+        maxEmptyViewport: 0.2,
         regions: defaultHomeRegions(mode, brief),
         // The dominant moment is never paired — pair the secondary sections.
         // (Social homes are feed-led: the feed IS the dominant moment, so no
@@ -345,6 +404,7 @@ export function defaultGenome(mode: ProductMode, brief: ProductBrief): LayoutGen
         title: "Detail",
         purpose: brief.screenPurposes.find((p) => p.id === "detail")?.purpose ?? "The focused record view",
         nav: "topbar",
+        maxEmptyViewport: 0.2,
         regions: defaultDetailRegions(mode, brief),
         pairHints: [],
       },
@@ -364,6 +424,8 @@ export interface GenomeDerived {
   wireframe: WireframePlan;
   inventory: ComponentInventory;
   ux: UxDesignPlan;
+  /** V24: the classified mode — the layout template selection key. */
+  mode: LayoutGenome["mode"];
   notes: string[];
 }
 
@@ -376,6 +438,8 @@ export function genomeToWireframe(genome: LayoutGenome, brief: ProductBrief): Ge
       variant: r.variant ?? (r.block === "custom" ? "default" : ""),
       ...(r.emphasis ? { emphasis: true } : {}),
       ...(r.content ? { content: r.content } : {}),
+      ...(r.minRows ? { minRows: r.minRows } : {}),
+      ...(r.primaryAction ? { primaryAction: true } : {}),
       ...(r.component ? { component: r.component } : {}),
     }));
 
@@ -440,7 +504,7 @@ export function genomeToWireframe(genome: LayoutGenome, brief: ProductBrief): Ge
     }),
   };
 
-  return { wireframe: enforced.plan, inventory: withShell, ux, notes };
+  return { wireframe: enforced.plan, inventory: withShell, ux, mode: genome.mode, notes };
 }
 
 /** The genome's own surfaces when present; else the canonical surface map. */
@@ -472,7 +536,7 @@ export function buildLayoutPlanFromGenomeDerived(
   visual: VisualIntent | null,
   copy: CopyPlan,
 ): V21LayoutPlan {
-  return buildLayoutPlanFromGenome({ wireframe: derived.wireframe, ux: derived.ux }, visual, copy);
+  return buildLayoutPlanFromGenome({ wireframe: derived.wireframe, ux: derived.ux, mode: derived.mode }, visual, copy);
 }
 
 /** Deterministic mode classification first — the genome call is mode-scoped. */

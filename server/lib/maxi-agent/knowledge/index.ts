@@ -278,55 +278,108 @@ export async function scoreCompanies(prompt: string): Promise<CompanyScore[]> {
 
 // ── Compact prompt block (token-efficient knowledge injection) ──────────
 
+/**
+ * V24 — derive the company's VISUAL MOOD from its manifest instead of
+ * injecting its literal brand tokens.
+ *
+ * v23 injected the company's exact `:root { --primary: <hex>; ... }` tokens
+ * into every prompt, so a fitness app inspired by Nike was prompted to
+ * reproduce Nike's literal colors (the v23 ISSUES #37 class: the sidebar
+ * read as "generic white panel" precisely because the model was copying
+ * token values without any mood). The mood block keeps everything the model
+ * needs to adapt the company's LOOK — contrast level, accent frequency,
+ * corner language, density, motion character, type voice — without ever
+ * shipping a hex value. Literal brand/color reproduction is only legal when
+ * the product IS that brand.
+ */
+export function visualMoodBlock(m: CompanyManifest): string {
+  const t = m.light;
+  const fgBg = contrastRatio(t.foreground, t.background);
+  const mutedBg = contrastRatio(t.mutedForeground, t.background);
+  const primaryBg = contrastRatio(t.primary, t.background);
+  const contrast = fgBg >= 12 ? "very high" : fgBg >= 7 ? "high" : fgBg >= 4.5 ? "AA-balanced" : "soft";
+  void mutedBg;
+  void primaryBg;
+
+  const corpus = `${m.description} ${m.tagline} ${m.voiceAndTone}`.toLowerCase();
+  const accentFreq = /accent|bold color|vivid|energy|bright|electric|pop of color/i.test(corpus)
+    ? "generous"
+    : /monochrome|single accent|quiet/i.test(corpus)
+      ? "minimal"
+      : "moderate";
+
+  const corner = m.radius.md <= 6 ? "sharp" : m.radius.md >= 16 ? "soft-pill" : "soft";
+  const density = m.density ?? (m.sectionGap >= 48 ? "generous" : m.sectionGap <= 24 ? "dense" : "balanced");
+
+  const moves = `${m.interactionMoves?.join(" ") ?? ""} ${m.signatureMoves.join(" ")}`.toLowerCase();
+  const motion = /snap|instant|energetic|spring|fast|bold|swift|punch/i.test(moves)
+    ? "energetic, decisive"
+    : /calm|gentle|quiet|soft|meditative/i.test(moves)
+      ? "calm, deliberate"
+      : "restrained, functional";
+
+  const displayMax = m.typeScale["4xl"];
+  const typeVoice = `${displayMax >= 40 ? "statement-scale display" : "standard display"} (${m.fonts.display}) with ${m.fonts.body} body`;
+
+  return [
+    `## Visual mood (derived — adapt the MOOD, never copy the brand's literal colors)`,
+    `- Contrast: ${contrast} (foreground/background ${fgBg.toFixed(1)}:1)`,
+    `- Accent frequency: ${accentFreq}`,
+    `- Corner language: ${corner}`,
+    `- Density: ${density}`,
+    `- Motion character: ${motion}`,
+    `- Type voice: ${typeVoice}`,
+  ].join("\n");
+}
+
+/**
+ * V24 — strip literal hex values from authored company prose (rules,
+ * signature moves, avoid patterns, descriptions). Some manifests embed
+ * their brand hexes in prose; the prompt contract is: mood and words, never
+ * literal brand color values.
+ */
+export function stripHexLiterals(text: string): string {
+  return text
+    .replace(/\(\s*#[0-9a-fA-F]{3,8}(?:\s*,\s*#[0-9a-fA-F]{3,8})*\s*\)/g, "")
+    .replace(/#[0-9a-fA-F]{3,8}\b/g, "the brand color")
+    .replace(/\s{2,}/g, " ")
+    .trim();
+}
+
 export async function compileCompanyBlock(slug: string): Promise<string> {
   const m = await loadCompany(slug);
   const lines: string[] = [
     `# ${m.name} — design language`,
-    m.description,
+    stripHexLiterals(m.description),
     "",
     "## Voice & tone",
-    m.voiceAndTone,
+    stripHexLiterals(m.voiceAndTone),
     "",
-    "## Tokens",
-    ":root {",
-    `  --background: ${m.light.background};`,
-    `  --foreground: ${m.light.foreground};`,
-    `  --card: ${m.light.card};`,
-    `  --primary: ${m.light.primary};`,
-    `  --primary-foreground: ${m.light.primaryForeground};`,
-    `  --secondary: ${m.light.secondary};`,
-    `  --muted: ${m.light.muted};`,
-    `  --muted-foreground: ${m.light.mutedForeground};`,
-    `  --accent: ${m.light.accent};`,
-    `  --destructive: ${m.light.destructive};`,
-    `  --success: ${m.light.success};`,
-    `  --warning: ${m.light.warning};`,
-    `  --border: ${m.light.border};`,
-    `  --input: ${m.light.input};`,
-    "}",
-    `Fonts: display="${m.fonts.display}", body="${m.fonts.body}"${m.fonts.mono ? `, mono="${m.fonts.mono}"` : ""}`,
+    visualMoodBlock(m),
     "",
     "## Composition rules",
-    ...m.rules.map((r) => `- ${r}`),
+    ...m.rules.map((r) => `- ${stripHexLiterals(r)}`),
     "",
     "## Signature moves",
-    ...m.signatureMoves.map((s) => `- ${s}`),
+    ...m.signatureMoves.map((s) => `- ${stripHexLiterals(s)}`),
     "",
     "## Avoid",
-    ...m.avoidPatterns.map((a) => `- ${a}`),
+    ...m.avoidPatterns.map((a) => `- ${stripHexLiterals(a)}`),
     "",
     "## v16 visual adaptation",
     `Suitable product modes: ${(m.suitableModes ?? ["any"]).join(", ")}`,
-    `Layout moves: ${(m.layoutMoves ?? []).join(", ") || "Adapt hierarchy and rhythm to the product contract."}`,
-    `Interaction moves: ${(m.interactionMoves ?? []).join(", ") || "Use clear, accessible state changes."}`,
-    `Media direction: ${m.mediaDirection ?? "Use media only when the product contract calls for it."}`,
+    `Layout moves: ${stripHexLiterals((m.layoutMoves ?? []).join(", ")) || "Adapt hierarchy and rhythm to the product contract."}`,
+    `Interaction moves: ${stripHexLiterals((m.interactionMoves ?? []).join(", ")) || "Use clear, accessible state changes."}`,
+    `Media direction: ${stripHexLiterals(m.mediaDirection ?? "") || "Use media only when the product contract calls for it."}`,
     `Density: ${m.density ?? "balanced"}`,
   ];
-  // V10: when the company ships reference imagery, every agent knows it
-  // exists (the visual review attaches the actual images).
+  // V10/V24: when the company ships reference imagery, every agent knows it
+  // exists (the visual review attaches the actual images). V24 rewording:
+  // the imagery is reference for typography/spacing/motion patterns —
+  // NEVER brand/color reproduction unless the product IS that brand.
   const images = companyImageFiles(slug);
   if (images.length > 0) {
-    lines.push("", "## Reference imagery", `Shipped files: ${images.join(", ")} — use them as the ground truth for brand fidelity.`);
+    lines.push("", "## Reference imagery", `Shipped files: ${images.join(", ")} — use them as reference for typography, spacing, and motion patterns. Never reproduce the brand's literal colors or logo unless the product IS that brand.`);
   }
   return lines.join("\n");
 }

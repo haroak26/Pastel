@@ -16,9 +16,11 @@ import { datasetPrompt, type MockDataset } from "../lib/content";
  * the dominant token cost; the design law + tokens carry the style).
  */
 
-/** Shell components whose specs are deterministic (no model call). */
+/** Shell components whose specs are deterministic (no model call).
+ * V24: navigation chrome (Sidebar/Topbar) is NOT planned or built — it is
+ * the static NavAdapter in the composed shell. */
 export const SHELL_COMPONENT_NAMES = new Set([
-  "Topbar", "Sidebar", "Button", "Avatar", "Badge", "Input", "Select", "Separator",
+  "Button", "Avatar", "Badge", "Input", "Select", "Separator",
 ]);
 
 export interface PlannerInput {

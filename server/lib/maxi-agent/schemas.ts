@@ -510,6 +510,11 @@ export const blockInstanceSchema = z.object({
   emphasis: z.boolean().optional(),
   content: z.string().optional(),
   component: z.string().optional(),
+  /** V24: density floor — the model-declared minimum populated rows for
+   * list/table blocks (schema-validated ≥ 3 at the genome call). */
+  minRows: z.number().int().min(3).max(12).optional(),
+  /** V24: exactly one block per screen is the primary action. */
+  primaryAction: z.boolean().optional(),
 });
 
 export type BlockInstance = z.infer<typeof blockInstanceSchema>;
@@ -655,6 +660,15 @@ export const v21SectionSchema = z.object({
     title: z.string(),
     action: z.string().optional(),
   }).optional(),
+  /** V24: this section renders interactive controls — visible labels and
+   * :focus-visible rings are required by the layout template's a11y
+   * contract (a template property, not a per-run check). */
+  a11y: z.boolean().optional(),
+  /** V24: density floor — minimum populated rows this section must render
+   * (declared by the genome, schema-validated). */
+  minRows: z.number().int().min(3).max(12).optional(),
+  /** V24: this section carries the screen's single primary action. */
+  primaryAction: z.boolean().optional(),
   emphasis: z.boolean().optional(),
 });
 

@@ -242,7 +242,7 @@ export function navFor(wireframe: WireframePlan, data?: MockDataset) {
   }).slice(0, 5);
 }
 
-function composeShell(input: ComposeInput): string {
+export function composeShell(input: ComposeInput): string {
   const lucideNames = Object.values(ICONS).sort();
   const aliased = lucideNames.includes("SettingsIcon") ? `Settings as SettingsIcon` : null;
   const lucideList = (aliased ? [aliased, ...lucideNames.filter((n) => n !== "SettingsIcon")] : lucideNames).sort();
@@ -273,6 +273,91 @@ export function SectionHeader({ eyebrow, title, action, className = "" }) {
         </h2>
       </div>
       {action ? <div className="shrink-0">{action}</div> : null}
+    </div>
+  );
+}
+
+// V24 static navigation adapter — the ONLY navigation chrome in the app.
+// Its prop contract is locked: nav / activeId / onNavigate come from
+// deterministic run state, brand / title / subtitle / user from DATA and the
+// copy plan. The model never renders this component and never passes props
+// to it — so the v23 "Sidebar rendered with the wrong props" defect is
+// structurally impossible. Authored once: every interactive element carries
+// a visible label and a :focus-visible ring by construction (v23 issues
+// #35/#36), and the shell collapses to a clean mobile topbar under lg.
+export function NavAdapter({ nav, activeId, onNavigate, brand, title, subtitle, user, children }) {
+  const hasSidebar = nav === "sidebar" || nav === "sidebar+topbar";
+  const hasTopbar = nav === "topbar" || nav === "sidebar+topbar";
+  if (!hasSidebar && !hasTopbar) return <>{children}</>;
+
+  const topbarInner = hasTopbar ? (
+    <header className="sticky top-0 z-20 flex h-16 items-center gap-4 border-b border-border bg-background/95 px-4 backdrop-blur md:px-6">
+      <a href="#" onClick={(e) => e.preventDefault()} className="flex shrink-0 items-center gap-2" aria-label={\`\${brand} home\`}>
+        <span className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] bg-primary text-sm font-bold text-primary-foreground">{brand ? brand.slice(0, 1) : "•"}</span>
+        <span className="hidden truncate font-semibold sm:inline" style={{ fontFamily: "var(--font-display)" }}>{brand}</span>
+      </a>
+      {title ? (
+        <div className="min-w-0 flex-1">
+          <h1 className="truncate text-base font-semibold" style={{ fontFamily: "var(--font-display)" }}>{title}</h1>
+          {subtitle ? <p className="hidden truncate text-xs text-muted-foreground md:block">{subtitle}</p> : null}
+        </div>
+      ) : <div className="flex-1" />}
+      {user ? (
+        <div className="flex shrink-0 items-center gap-2">
+          <span aria-label={user.name ?? "User"} className="flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: user.hue !== undefined ? \`hsl(\${user.hue} 30% 92%)\` : "var(--muted)", color: user.hue !== undefined ? \`hsl(\${user.hue} 45% 35%)\` : "var(--muted-foreground)" }}>{user.initials ?? "?"}</span>
+          <span className="hidden text-sm font-medium md:inline">{user.name}</span>
+        </div>
+      ) : null}
+    </header>
+  ) : null;
+
+  if (!hasSidebar) {
+    return (
+      <>
+        {topbarInner}
+        <main className="w-full min-w-0">{children}</main>
+      </>
+    );
+  }
+
+  return (
+    <div className="flex min-h-screen">
+      <aside className="sticky top-0 hidden h-screen w-60 shrink-0 flex-col border-r border-border bg-background lg:flex">
+        <a href="#" onClick={(e) => e.preventDefault()} className="flex h-16 items-center gap-2 px-6" aria-label={\`\${brand} home\`}>
+          <span className="flex h-8 w-8 items-center justify-center rounded-[var(--radius-md)] bg-primary text-sm font-bold text-primary-foreground">{brand ? brand.slice(0, 1) : "•"}</span>
+          <span className="truncate font-semibold" style={{ fontFamily: "var(--font-display)" }}>{brand}</span>
+        </a>
+        <nav className="mt-2 flex-1 space-y-1 px-4" aria-label="Primary navigation">
+          {NAV.map((item) => {
+            const current = item.id === activeId;
+            return (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => onNavigate(item.id)}
+                aria-current={current ? "page" : undefined}
+                className={"flex w-full items-center gap-3 rounded-[var(--radius-md)] px-4 py-2 text-sm focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring " + (current ? "bg-muted/50 font-medium text-foreground" : "text-muted-foreground hover:bg-muted/30 hover:text-foreground")}
+              >
+                <IconOf name={item.icon} className="h-4 w-4 shrink-0" />
+                <span className="truncate">{item.label}</span>
+              </button>
+            );
+          })}
+        </nav>
+        <div className="border-t border-border p-4">
+          <div className="flex items-center gap-3">
+            <span aria-label={user ? user.name : "User"} className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-semibold" style={{ backgroundColor: user && user.hue !== undefined ? \`hsl(\${user.hue} 30% 92%)\` : "var(--muted)", color: user && user.hue !== undefined ? \`hsl(\${user.hue} 45% 35%)\` : "var(--muted-foreground)" }}>{user ? user.initials : "?"}</span>
+            <div className="min-w-0">
+              <p className="truncate text-sm font-medium">{user ? user.name : "Account"}</p>
+              {user && user.role ? <p className="truncate text-xs text-muted-foreground">{user.role}</p> : null}
+            </div>
+          </div>
+        </div>
+      </aside>
+      <div className="flex min-w-0 flex-1 flex-col">
+        {topbarInner}
+        <main className="w-full min-w-0">{children}</main>
+      </div>
     </div>
   );
 }
@@ -394,40 +479,31 @@ export function composeScreenV20(input: ComposeInput, screen: WireframeScreen, b
   const isApp = ctx !== "marketing" && ctx !== "onboarding";
   const shell: string[] = [];
 
-  // V20: shell renders BUILT Topbar/Sidebar (produced by the builder) —
-  // there are no base templates left to fall back to.
+  // V20/V24: the shell renders navigation chrome through the static
+  // NavAdapter (lib/shell.jsx) — the ONLY chrome mount in the pipeline.
+  // Its prop contract is locked: nav/activeId/onNavigate come from
+  // deterministic run state (the screen's nav field + useState), brand/
+  // title/user from DATA and the copy plan — never from anything the model
+  // emits. The composer body can never mount Sidebar/Topbar because they are
+  // not in its available components.
   const copy = copyFor(input.copy, screen.id);
-  const showSearch = isBrowseProduct(input);
   const showUser = ctx !== "marketing" && ctx !== "onboarding";
   const brand = input.brief.title;
+  const nav = screen.nav;
 
-  if (screen.nav === "sidebar+topbar" || screen.nav === "sidebar") {
-    comps.add("Sidebar");
-    comps.add("Avatar");
-    shell.push(`<Sidebar`);
-    shell.push(`  brand={DATA.productTitle}`);
-    shell.push(`  nav={NAV}`);
-    shell.push(`  activeId={active}`);
-    shell.push(`  onNavigate={setActive}`);
-    shell.push(`  iconOf={(name) => <IconOf name={name} />}`);
-    shell.push(`  user={DATA.people[0]}`);
-    shell.push(`/>`);
-    shell.push(`<div className="flex min-h-screen">`);
-    shell.push(`  <div className="flex-1 min-w-0">`);
-  }
-
-  if (screen.nav === "topbar" || screen.nav === "sidebar+topbar") {
-    comps.add("Topbar");
-    comps.add("Input");
-    comps.add("Avatar");
-    const props: string[] = [
-      `title={${jstr(copy.headline)}}`,
-      `subtitle={${jstr(copy.overline ?? `${brand} — ${input.brief.description.slice(0, 60)}`)}}`,
+  if (nav !== "none" && nav !== "tabbar" && isApp) {
+    const navProps: string[] = [
+      `nav="${nav}"`,
+      `activeId={active}`,
+      `onNavigate={setActive}`,
+      `brand={${jstr(brand)}}`,
     ];
-    if (showSearch) props.push("search");
-    if (showUser) props.push("user={DATA.people[0]}");
-    props.push("actions={<></>}");
-    shell.push(`    <Topbar\n    ${props.join("\n    ")}\n  />`);
+    if (nav === "topbar" || nav === "sidebar+topbar") {
+      navProps.push(`title={${jstr(copy.headline)}}`);
+      navProps.push(`subtitle={${jstr(copy.overline ?? `${brand} — ${input.brief.description.slice(0, 60)}`)}}`);
+    }
+    if (showUser) navProps.push("user={DATA.people[0]}");
+    shell.push(`<NavAdapter\n    ${navProps.join("\n    ")}\n  >`);
   }
 
   const mainOpen = isApp ? `    <main className="w-full min-w-0">` : null;
@@ -439,8 +515,7 @@ export function composeScreenV20(input: ComposeInput, screen: WireframeScreen, b
     ...bodyJsx.split("\n").map((l) => (l.trim() ? `    ${l}` : l)),
     ...(mainOpen ? [`    </main>`] : []),
   ];
-  if (screen.nav === "sidebar+topbar" || screen.nav === "sidebar") inner.push(`  </div>`);
-  if (screen.nav === "sidebar+topbar" || screen.nav === "sidebar") inner.push(`</div>`);
+  if (shell.length > 0) inner.push(`</NavAdapter>`);
 
   return renderFile(input, screen, comps, icons, preludes, indent(inner.join("\n"), 1));
 }
@@ -461,7 +536,7 @@ function renderFile(input: ComposeInput, screen: WireframeScreen, comps: Set<str
     `import { useState } from "react";`,
     ...imports,
     `import { ${lucideList.join(", ")} } from "lucide-react";`,
-    `import { TONE, signed, NAV, IconOf, SectionHeader } from "../lib/shell.jsx";`,
+    `import { TONE, signed, NAV, IconOf, SectionHeader, NavAdapter } from "../lib/shell.jsx";`,
     `import { DATA } from "../data.js";`,
   ];
 
@@ -641,9 +716,11 @@ export function screenNeedsComponents(screen: WireframeScreen): string[] {
   for (const b of screen.blocks) {
     if (b.component) needs.add(b.component);
   }
-  // Shell chrome the renderFile wrapper mounts for this screen's nav + the
-  // primitives the composer may reach for.
-  for (const n of ["Topbar", "Sidebar", "Button", "Avatar", "Badge", "Input", "Select", "Separator"]) {
+  // Shell primitives the composer body may reach for. V24: navigation
+  // chrome (Sidebar/Topbar) is NOT here — it is mounted by the deterministic
+  // NavAdapter in the shell wrapper, so the model can never mount it (the
+  // v23 prop-mismatch defect is structurally impossible, not just caught).
+  for (const n of ["Button", "Avatar", "Badge", "Input", "Select", "Separator"]) {
     needs.add(n);
   }
   return [...needs].sort();

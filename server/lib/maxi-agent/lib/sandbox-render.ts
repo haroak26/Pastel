@@ -140,6 +140,16 @@ interface PooledSandbox {
 const pool: PooledSandbox[] = [];
 let poolWarming: Promise<void> | null = null;
 
+// Waiters queue: jobs beyond the pool's capacity WAIT for a released slot
+// instead of failing the run (v24 test2: captureScreenshots fires screen ×
+// viewport jobs — 2 × 3 with a 3-sandbox pool — and the old code threw
+// "e2b sandbox pool exhausted" whenever more jobs arrived than slots).
+const waiters: Array<() => void> = [];
+
+function wakeWaiter(): void {
+  waiters.shift()?.();
+}
+
 /** Number of warm sandboxes currently held (monitoring/tests). */
 export function warmPoolSize(): number {
   return pool.filter((p) => !p.inUse).length;
@@ -176,29 +186,37 @@ export interface SandboxLease {
 
 export async function acquireSandbox(): Promise<SandboxLease> {
   if (!e2bConfigured()) throw new Error("E2B sandboxing is not configured — set E2B_API_KEY");
-  if (poolWarming) await poolWarming;
-  poolWarming = warmPoolToSize();
-  await poolWarming;
-  poolWarming = null;
+  for (;;) {
+    if (poolWarming) await poolWarming;
+    poolWarming = warmPoolToSize();
+    await poolWarming;
+    poolWarming = null;
 
-  const fresh = pool.filter((p) => !p.inUse && Date.now() - p.createdAt < SANDBOX_TTL_MS);
-  const slot = fresh[0];
-  if (!slot) throw new Error("e2b sandbox pool exhausted");
-  slot.inUse = true;
-  let released = false;
-  return {
-    sandbox: slot.sandbox,
-    release: async () => {
-      if (released) return;
-      released = true;
-      if (Date.now() - slot.createdAt >= SANDBOX_TTL_MS) {
-        slot.sandbox.kill().catch(() => {});
-        pool.splice(pool.indexOf(slot), 1);
-      } else {
-        slot.inUse = false;
-      }
-    },
-  };
+    const fresh = pool.filter((p) => !p.inUse && Date.now() - p.createdAt < SANDBOX_TTL_MS);
+    const slot = fresh[0];
+    if (slot) {
+      slot.inUse = true;
+      let released = false;
+      return {
+        sandbox: slot.sandbox,
+        release: async () => {
+          if (released) return;
+          released = true;
+          if (Date.now() - slot.createdAt >= SANDBOX_TTL_MS) {
+            slot.sandbox.kill().catch(() => {});
+            pool.splice(pool.indexOf(slot), 1);
+          } else {
+            slot.inUse = false;
+          }
+          // Hand the slot to the next waiting job (also after a kill: the
+          // waiter re-runs the loop, warms the pool, and takes a fresh one).
+          wakeWaiter();
+        },
+      };
+    }
+    // Pool fully busy — queue behind a released slot instead of failing.
+    await new Promise<void>((resolve) => waiters.push(resolve));
+  }
 }
 
 /** Test seam: kill every sandbox and reset the pool. */
@@ -208,6 +226,7 @@ export async function resetSandboxPool(): Promise<void> {
   }
   pool.length = 0;
   poolWarming = null;
+  while (waiters.length > 0) wakeWaiter();
 }
 
 // ── Smoke render (runtime verification, sandboxed) ────────────────────────

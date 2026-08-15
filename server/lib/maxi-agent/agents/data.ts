@@ -208,8 +208,18 @@ export async function runData(input: DataInput): Promise<DataOutput> {
     ...input.brief.screenPurposes.map((s) => `- ${s.id}: ${s.purpose}`),
   ].join("\n");
 
+  // V24 WS5: the domain-contract cross-check runs on the cheap-tier output
+  // BEFORE the build — wrong-domain units and stale dates (the v23 issues
+  // #32/#34 class) fail here and are retried with the mismatch named
+  // explicitly, never shipped to the composer.
+  const contractBlock = async (plan: DataPlan): Promise<string[]> => {
+    const { validateDomainContract } = await import("../lib/domain-contract");
+    const ds = datasetFromPlan(plan, hashSeed(input.seed), domain, strengthMode);
+    return validateDomainContract({ brief: input.brief, domain, data: ds, copy: null }).map((v) => v.message);
+  };
+
   try {
-    const plan = await chatJSON<DataPlan>(
+    let plan = await chatJSON<DataPlan>(
       [
         { role: "system", content: SYSTEM },
         {
@@ -226,14 +236,43 @@ export async function runData(input: DataInput): Promise<DataOutput> {
       },
     );
 
+    // One bounded corrective retry naming the contract mismatches.
+    const mismatches = await contractBlock(plan);
+    if (mismatches.length > 0) {
+      console.warn(`[maxi-agent] data contract mismatches: ${mismatches.join(" | ")} — one corrective retry`);
+      plan = await chatJSON<DataPlan>(
+        [
+          { role: "system", content: SYSTEM },
+          {
+            role: "user",
+            content: `${briefBlock}\n\nDOMAIN: ${domain}\nCONTENT GUARDRAILS:\n${guardrails}\n\n### CORRECTION REQUIRED\nYour previous content violated the product's domain contract:\n${mismatches.map((m) => `- ${m}`).join("\n")}\nFix exactly those mismatches (units, dates) and re-emit the complete content plan as JSON.`,
+          },
+        ],
+        {
+          model: "data",
+          temperature: 0.5,
+          maxTokens: MAX_TOKENS_PER_CALL.data,
+          validate: (v) => dataPlanSchema.parse(v),
+          onUsage: input.onUsage,
+        },
+      );
+      notes.push(`data contract: corrective retry after ${mismatches.length} mismatch(es) (${mismatches[0]})`);
+    }
+
     const { plan: clean, fatal, corrected } = sanitizeDataPlan(plan, domain);
     if (fatal.length > 0) {
       notes.push(`data plan failed sanitization: ${fatal.join("; ")}`);
       throw new Error(`Data plan sanitization failed: ${fatal.join("; ")}`);
     }
     if (corrected.length > 0) notes.push(`data plan corrected: ${corrected.join(", ")}`);
+    const ds = datasetFromPlan(clean, hashSeed(input.seed), domain, strengthMode);
+    const remaining = (await contractBlock(clean)).length;
+    if (remaining > 0) {
+      notes.push(`data plan still violates the domain contract after the corrective retry — using the deterministic domain pack`);
+      throw new Error("Data plan still violates the domain contract after the corrective retry");
+    }
     return {
-      data: datasetFromPlan(clean, hashSeed(input.seed), domain, strengthMode),
+      data: ds,
       usedFallback: false,
       notes,
     };

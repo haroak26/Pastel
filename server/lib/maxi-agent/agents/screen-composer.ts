@@ -77,7 +77,9 @@ Placement rules:
 - Do not exceed ${"4"} custom components mounted on one screen (mount only the planned component mounts listed in the plan).
 - Never duplicate a custom component on one screen.
 - Use ONLY the custom components listed under "AVAILABLE COMPONENTS" and the primitives (Card/Table/Button/Avatar/Badge/Input/Select/Separator/Progress) + SectionHeader — NEVER invent a component name.
+- V24 HARD: never render <Sidebar>, <Topbar>, or <NavAdapter> in the body — navigation chrome is mounted by the shell wrapper only, and these components are NOT in your available set. If the plan shows them, ignore them.
 - Every custom component you mount MUST receive the exact props its spec declares (the specs are listed). Pass REAL data from the DATA object into those props — never empty arrays, never placeholder values.
+- A11Y CONTRACT (V24 — every interactive element): every input/select must have a visible <label> (never placeholder-only), every button/link a visible text or aria-label, and every interactive element a focus-visible ring or outline (focus-visible:outline-2 focus-visible:outline-ring). This is not optional polish — the gate checks it.
 - You may use IconOf (from ../lib/shell.jsx) for icons: <IconOf name="heart" />. Icon names: home, list, chart, settings, users, bell, search, plus, download, filter, arrowRight, mail, alert, file, edit, check, zap, card, trendingUp, play, heart, mapPin, star, clock, image, more, chevronDown, calendarDays.
 - lucide-react icons are NOT imported in the shell — use IconOf only.
 
@@ -272,7 +274,10 @@ function layoutPlanPromptFor(plan: V21LayoutPlan, screenId: string): string {
       : " header[none — dominant moment]";
     const comp = sec.component ? ` component=${sec.component}` : "";
     const surface = sec.surface ? ` surface=${sec.surface}` : "";
-    lines.push(`- ${sec.block}:${sec.variant ?? "default"} placement=${sec.placement} width=${sec.width} height=${sec.heightIntent}${surface}${comp}${header}`);
+    const a11y = sec.a11y ? " A11Y[interactive — visible <label> + :focus-visible ring required]" : "";
+    const floors = sec.minRows ? ` minRows=${sec.minRows}` : "";
+    const action = sec.primaryAction ? " PRIMARY_ACTION[mount the screen's one visible primary action]" : "";
+    lines.push(`- ${sec.block}:${sec.variant ?? "default"} placement=${sec.placement} width=${sec.width} height=${sec.heightIntent}${surface}${comp}${a11y}${floors}${action}${header}`);
   }
   lines.push("Render these sections in EXACTLY this order with EXACTLY these placements. Never add, merge, reorder, or drop a section.");
   return lines.join("\n");

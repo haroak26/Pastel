@@ -2,10 +2,182 @@
 
 This document records the agent's architecture rather than only its release
 labels. Version names are historical milestones; the active implementation is
-the **Maxi Agent v23 ("Endgame")** described below. Everything before v23 is
-historical record — v22 and earlier pipelines were retired in the v23 rebuild.
+the **Maxi Agent v24** described below. Everything before v24 is historical
+record — v23 and earlier pipelines were retired in the v24 rebuild.
 
-## Maxi Agent V23 - "Endgame" (Active)
+## Maxi Agent V24 (Active)
+
+V24 is the correctness + speed rebuild of v23 ("Endgame"), built against the
+reproduced `agenttests/agentv23` e2e failure (37 issues, 62/100 review,
+0/100 gate, 375s wall with a ~159s invisible tail). The v23 architectural
+decisions that were right are kept unchanged: the wave executor, the
+schema-constrained JSON genome instead of prose wireframes, and sandboxed
+e2b as the only code-execution path. V24 fixes what v23 got wrong at the
+*source*: navigation chrome is no longer model-authored, layout comes from
+hand-authored templates instead of a freeform solver, content density and
+domain contracts are schema/enforced floors instead of review findings, and
+geometry is measured at 375px as a hard gate.
+
+### New
+
+- **Deterministic nav chrome** (`lib/genome-reconcile.ts`, `compose.ts`):
+  `sidebar`/`topbar` are no longer possible `componentSlots` entries (schema
+  rejects them, prompt never offers them). Navigation derives ONLY from each
+  screen's `nav` field and mounts through one static `NavAdapter` in the
+  composed shell with a locked prop contract (`nav`/`activeId`/`onNavigate`
+  wired from deterministic run state — never from the model). The v23
+  #30/#31 Sidebar prop-mismatch is structurally impossible, and the v23
+  "planned but no block mounts it" (#3-#19) and "9 custom components"
+  (#26/#28) gate failures are gone by construction.
+- **Genome reconciliation** (`lib/genome-reconcile.ts`): a plain code pass
+  right after the genome call — nav-chrome slots dropped, per-screen slot
+  budget capped at 2 (merge into a plausible kept slot or drop), unmounted
+  slots dropped, duplicate region mounts merged, `usedBy` resynced — all in
+  ONE fixed point so the cap and the mount contract can never disagree.
+  Every drop/merge is a recorded note surfaced through `emitActivity`.
+- **Template-based placement** (`lib/layout-templates/`): the freeform
+  per-run derivation is gone. A closed, hand-authored set of grid templates
+  keyed by (mode-family × nav × section-count-bucket) — 3 families
+  (catalog/dashboard/social) × 3 navs × 3 buckets × 2 roles, each with an
+  explicit 8px-multiple spacing scale (gutter/gap/section-gap/content-max)
+  and a named slot sequence (`[dominant-full, pair(2/3+1/3), full, full]`).
+  `layoutForScreen` classifies, selects, and maps regions onto slots in
+  order; a region count no template fits FAILS LOUDLY (extend the template
+  set — never improvise). Every template is geometry-tested at 1440/768/375
+  in the sandbox (`maxi-templates-geometry.test.ts`): zero horizontal
+  overflow — the v23 `home-mobile.png` clipping is fixed at the template,
+  not by patching a solver. The a11y contract (visible labels +
+  `:focus-visible` rings on interactive slots) is a template property.
+- **Density floors as schema** (`lib/genome.ts`): the v17-density checks
+  stay as a regression net but are no longer the only enforcement. List/
+  table regions MUST declare `minRows ≥ 3`, exactly one region per screen
+  MUST carry `primaryAction`, every screen MUST declare
+  `maxEmptyViewport ≤ 0.2` — all hard-validated at the Wave-1 call, with
+  one bounded corrective retry naming the exact violations before the
+  deterministic default. Under-filled genomes never reach Wave 2.
+- **Inspiration as mood** (`knowledge/index.ts`): the literal
+  `:root { --primary: <hex>; ... }` company tokens are gone from prompts.
+  `compileCompanyBlock` ships a derived visual-mood block (contrast level,
+  accent frequency, corner language, density, motion character, type voice)
+  and strips any hex literals embedded in authored prose. The reference-
+  imagery line is reference-for-*typography/spacing/motion*, never
+  brand/color reproduction unless the product IS that brand — reusing the
+  user-upload path's guardrail verbatim ("Match its composition… Do not
+  copy its domain, text, brand, or page archetype").
+- **Domain-contract cross-check** (`lib/domain-contract.ts`): before the
+  build, generated stat units/labels and dates are validated against the
+  brief's declared domain and any supplied dataset (currency legality,
+  domain unit vocabulary, strength-units-in-running detection, declared
+  date-range conformance), and table/list field completeness is validated
+  against the layout template's declared table contract. The data call
+  fails cheap and retries with the mismatch named; the orchestrator
+  enforces deterministically pre-compose (domain-pack regeneration, date
+  remap into the declared range, unfillable column drop). The v23 #32-#34
+  review findings now fail at Wave 1/pre-build. The deterministic fitness
+  fallback itself speaks running vocabulary for running briefs.
+- **Geometry as a hard gate** (`checks/geometry.ts`, `screenshots.ts`):
+  every screen renders at 1440 / 768 / 375 in the sandbox; horizontal
+  overflow at ANY width is a blocking high issue (the v16 standard, now
+  actually enforced). `geometryIssuesFor` is the pure gate mapping the
+  regression suite asserts against the recreated v23 `home-mobile`
+  overflow fixture.
+- **Builder convergence fallback** (`agents/builder.ts`): two consecutive
+  corrective retries failing on the same theme-violation class converge
+  through `generateComponentWithFidelity`'s deterministic base-anchored
+  path instead of shipping the violation (the v23 "still 1 theme violations
+  in Button after corrective retry" class).
+- **Stale-error clear** (`run-store.ts`): the orchestrator's final
+  `updateRun` for a completed run explicitly clears `error` — a run
+  mid-flight during a server boot no longer carries the
+  `cleanupStaleRuns` interruption stamp in its final row.
+- **Wave-4 timing visibility** (`orchestrator.ts`, `lib/timing.ts`): repair,
+  re-verify, and final-review wall time are recorded as wave-4 stages in
+  `docs/timing/TimingReport.json`, the manifest `timing` field, and the
+  RUN_SUMMARY wave table (the v23 ~159s gap between w0-w3 and the wall time
+  is visible, not implied). The e2e release gate asserts normal-run wall
+  time lands in 120-180s with per-wave ceilings and waves-sum ≈ wall.
+
+### Changed
+
+- `lib/genome.ts`: genome schema adds `minRows`/`primaryAction`/
+  `maxEmptyViewport` density floors; `componentSlots` capped at 4 total /
+  2 per screen and rejects `Sidebar`/`Topbar`; shell inventory drops nav
+  chrome (primitives stay, exempt from the block-mount contract);
+  `GenomeDerived` carries the classified mode for template selection.
+- `lib/layout-plan.ts`: `layoutForScreen` is template select-and-fill
+  (was freeform derivation); `buildLayoutPlanFromGenome` accepts the mode;
+  `layoutPlanPrompt` renders the a11y/density/primary-action contract.
+- `compose.ts`: the shell mounts the static `NavAdapter` (was model-built
+  Topbar/Sidebar); `screenNeedsComponents` no longer offers nav chrome to
+  the composer; `composeShell` exports the authored NavAdapter.
+- `agents/genome.ts`: prompt + bounded retry for the density floors;
+  reconcile after the call; exported prompt builders for the mood
+  regression test.
+- `agents/data.ts`: domain-contract check + one corrective retry before the
+  deterministic fallback.
+- `agents/builder.ts` / `agents/planner.ts`: shell lists drop Topbar/Sidebar
+  (never built); `correctThemeViolations` convergence loop.
+- `screenshots.ts` / `orchestrator.ts`: 3-viewport capture; gate consumes
+  every viewport; wave-4 timing; final `updateRun` clears `error`.
+- `checks/review.ts`: shell primitives exempt from the block-mount audit.
+- `checks/layout.ts`: the custom-component budget counts ONLY genome slots.
+- `lib/content.ts`: running-brief deterministic fallback (km/pace/kcal —
+  the fallback itself can no longer ship the strength-unit defect).
+
+### Acceptance
+
+The v24 release gate is the e2e harness (`server/tests/maxi-e2e-modes.test.ts`,
+`MAXI_E2E=1`): one cold run per product mode, each asserting ≥2 verified
+screens, five-wave timing with per-wave ceilings (w0≤60, w1≤30, w2≤70, w3≤55,
+w4≤35), normal-run wall time in 120-180s, waves-sum ≈ wall (±12s), zero hard
+fidelity failures, zero prop-contract violations, and recorded kb-slices.
+The deterministic suite covers: genome density floors, genome reconciliation
+(slots/nav/dup/idempotence), template selection + 8px-grid static audit +
+sandboxed 1440/768/375 geometry for all 54 templates, inspiration-mood hex
+regression, domain-contract (#32-#34) regressions, the geometry gate
+(overflow-blocking + recreated v23 mobile fixture), builder convergence
+fallback, and the stale-error clear.
+
+### Validation Standard
+
+1. `npx tsc --noEmit` — no agent errors (the repo's other, pre-existing
+   product errors are unrelated).
+2. `npm test` — deterministic suite green (agent tests + the untouched
+   product tests; the pre-existing Stalwart/inbound-email failures are
+   environment/module issues outside the agent).
+3. `MAXI_E2E=1 node --import tsx --test server/tests/maxi-e2e-modes.test.ts`
+   — the release gate, including the 120-180s timing assertion.
+4. Manual: `agenttests/agentv24/screenshots/home-mobile.png` and
+   `detail-mobile.png` — zero clipped text, zero dead-space skeleton
+   blocks (the geometry gate + template tests enforce the same contract
+   mechanically).
+
+### Active Files
+
+- `orchestrator.ts` is the wave executor; `engine.ts` the production entry.
+- `agents/genome.ts` (Wave 1) + `lib/genome.ts` (schema + vocabulary) +
+  `lib/genome-reconcile.ts` (deterministic reconciliation).
+- `lib/layout-templates/` (the closed template set) + `lib/layout-plan.ts`
+  (select-and-fill) + `lib/layout-templates/fixture.ts` (geometry proofs).
+- `compose.ts` (static NavAdapter + deterministic shell).
+- `lib/domain-contract.ts` (pre-build contract checks) + `agents/data.ts`.
+- `checks/geometry.ts` (hard gate at 1440/768/375) + `screenshots.ts`.
+- `agents/builder.ts` (convergence fallback), `run-store.ts` (stale-error
+  clear), `knowledge/index.ts` (visual-mood compilation).
+
+---
+
+## V23 and earlier (Historical)
+
+The following sections are the historical record of the retired pipelines
+(Pastel Agent v6-v22, Picasso v2-v8, Maxi Agent v23). They describe
+architecture that no longer exists in `server/lib/maxi-agent/` — notably the
+sequential waterfall orchestrator, the prose wireframe stage with its fragile
+`BLOCK_CATALOG`, the local unsandboxed Chromium render path, the Picasso
+cold-start install-tax sandbox, and the v23 freeform layout derivation with
+model-authored nav chrome. They are preserved for provenance.
+
+## Maxi Agent V23 - "Endgame" (Historical)
 
 V23 retires Picasso and the sequential waterfall (`discovery → design → brief
 → data → wireframe → ux → build → assemble → present → review`, ~9 serial

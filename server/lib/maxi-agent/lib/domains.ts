@@ -257,7 +257,7 @@ function distance(rnd: () => number): string {
   return (rnd() * 16 + 3).toFixed(1);
 }
 
-function dateStr(rnd: () => number): string {
+export function dateStr(rnd: () => number): string {
   const MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   return `${MONTHS[Math.floor(rnd() * 12)]} ${Math.floor(rnd() * 28) + 1}`;
 }

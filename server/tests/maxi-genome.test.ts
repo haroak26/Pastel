@@ -48,22 +48,24 @@ const GENOME_JSON = (over: Partial<LayoutGenome> = {}): LayoutGenome => ({
     {
       id: "home",
       nav: "topbar",
+      maxEmptyViewport: 0.2,
       regions: [
         { block: "stats", variant: "scoreboard", surface: "soft-wash", emphasis: true },
         { block: "chart", variant: "band", surface: "soft-wash" },
-        { block: "list", variant: "rows", surface: "divided-list" },
-        { block: "custom", variant: "default", surface: "plain", component: "InsightPanel" },
+        { block: "list", variant: "rows", surface: "divided-list", minRows: 4 },
+        { block: "custom", variant: "default", surface: "plain", component: "InsightPanel", primaryAction: true },
       ],
       pairHints: [["chart", "list"]],
     },
     {
       id: "detail",
       nav: "topbar",
+      maxEmptyViewport: 0.2,
       regions: [
         { block: "detail", variant: "pane", surface: "inset-panel", emphasis: true },
-        { block: "list", variant: "activity", surface: "divided-list" },
+        { block: "list", variant: "activity", surface: "divided-list", minRows: 4 },
         { block: "custom", variant: "default", surface: "plain", component: "SummaryBar" },
-        { block: "cta", variant: "band", surface: "tonal-band" },
+        { block: "cta", variant: "band", surface: "tonal-band", primaryAction: true },
       ],
     },
   ],
@@ -108,20 +110,104 @@ test("layout genome: region count is 3..6 per screen", () => {
   assert.throws(() => layoutGenomeSchema.parse(tooMany));
 });
 
-test("layout genome: componentSlots are 4..6 PascalCase", () => {
+test("layout genome: componentSlots are 2..4 PascalCase (V24 budget)", () => {
   const bad = GENOME_JSON();
-  bad.componentSlots = bad.componentSlots.slice(0, 2);
+  bad.componentSlots = bad.componentSlots.slice(0, 1);
   assert.throws(() => layoutGenomeSchema.parse(bad));
+
+  const tooMany = GENOME_JSON();
+  tooMany.componentSlots = [
+    ...tooMany.componentSlots,
+    { name: "ExtraOne", purpose: "extra home widget", usedBy: ["home"] },
+    { name: "ExtraTwo", purpose: "extra detail widget", usedBy: ["detail"] },
+    { name: "ExtraThree", purpose: "extra overflow widget", usedBy: ["home"] },
+  ];
+  assert.throws(() => layoutGenomeSchema.parse(tooMany), /componentSlots/i);
 
   const camel = GENOME_JSON();
   camel.componentSlots[0].name = "insightPanel";
   assert.throws(() => layoutGenomeSchema.parse(camel));
 });
 
+test("layout genome: nav chrome (Sidebar/Topbar) is rejected as a component slot", () => {
+  const withSidebar = GENOME_JSON();
+  withSidebar.componentSlots.push({ name: "Sidebar", purpose: "nav chrome that must never ship", usedBy: ["home", "detail"] });
+  assert.throws(() => layoutGenomeSchema.parse(withSidebar), /navigation chrome/);
+
+  const withTopbar = GENOME_JSON();
+  withTopbar.componentSlots.push({ name: "Topbar", purpose: "nav chrome that must never ship", usedBy: ["home", "detail"] });
+  assert.throws(() => layoutGenomeSchema.parse(withTopbar), /navigation chrome/);
+});
+
 test("layout genome: content strings are bounded (genome stays small)", () => {
   const verbose = GENOME_JSON();
   verbose.screens[0].regions[0].content = "x".repeat(81);
   assert.throws(() => layoutGenomeSchema.parse(verbose));
+});
+
+// ── V24 density floors — schema, not advisory ─────────────────────────────
+
+test("layout genome: a list/table region without minRows is rejected", () => {
+  const g = GENOME_JSON();
+  g.screens[0].regions[2] = { block: "list", variant: "rows", surface: "divided-list" };
+  assert.throws(() => layoutGenomeSchema.parse(g), /minRows/);
+});
+
+test("layout genome: minRows below 3 is rejected; at/above 3 is accepted", () => {
+  const low = GENOME_JSON();
+  low.screens[0].regions[2] = { block: "list", variant: "rows", surface: "divided-list", minRows: 2 };
+  assert.throws(() => layoutGenomeSchema.parse(low), /minRows/);
+
+  const ok = GENOME_JSON();
+  ok.screens[0].regions[2] = { block: "list", variant: "rows", surface: "divided-list", minRows: 3 };
+  layoutGenomeSchema.parse(ok);
+});
+
+test("layout genome: exactly one primary-action region per screen", () => {
+  const none = GENOME_JSON();
+  for (const s of none.screens) {
+    for (const r of s.regions) delete r.primaryAction;
+  }
+  assert.throws(() => layoutGenomeSchema.parse(none), /NO primary-action region/);
+
+  const two = GENOME_JSON();
+  two.screens[0].regions[1] = { block: "chart", variant: "band", surface: "soft-wash", primaryAction: true };
+  assert.throws(() => layoutGenomeSchema.parse(two), /2 primary-action regions/);
+});
+
+test("layout genome: maxEmptyViewport is required and capped at 0.2", () => {
+  const missing = GENOME_JSON();
+  delete (missing.screens[0] as { maxEmptyViewport?: number }).maxEmptyViewport;
+  assert.throws(() => layoutGenomeSchema.parse(missing), /maxEmptyViewport/);
+
+  const over = GENOME_JSON();
+  over.screens[0].maxEmptyViewport = 0.5;
+  assert.throws(() => layoutGenomeSchema.parse(over), /maxEmptyViewport/);
+});
+
+test("layout genome: a genome at/above the density floors parses", () => {
+  const parsed = layoutGenomeSchema.parse(GENOME_JSON());
+  assert.equal(parsed.screens[0].maxEmptyViewport, 0.2);
+  const homeList = parsed.screens[0].regions.find((r) => r.block === "list")!;
+  assert.ok(homeList.minRows! >= 3, "list region keeps its minRows floor");
+  const actions = parsed.screens.flatMap((s) => s.regions).filter((r) => r.primaryAction);
+  assert.equal(actions.length, 2, "one primary action per screen");
+});
+
+test("defaultGenome: every mode-default genome satisfies the density floors", () => {
+  for (const mode of MODES) {
+    const g = defaultGenome(mode, brief(mode));
+    layoutGenomeSchema.parse(g);
+    for (const screen of g.screens) {
+      const actions = screen.regions.filter((r) => r.primaryAction);
+      assert.equal(actions.length, 1, `${mode} ${screen.id}: one primary action`);
+      for (const r of screen.regions) {
+        if (r.block === "list" || r.block === "table") {
+          assert.ok(r.minRows !== undefined && r.minRows >= 3, `${mode} ${screen.id}: list declares minRows`);
+        }
+      }
+    }
+  }
 });
 
 // ── Mode-scoped vocabulary (the core wireframe-quality fix) ───────────────
@@ -269,13 +355,17 @@ test("defaultGenome: pair hints never involve the dominant block", () => {
   }
 });
 
-test("genomeToWireframe: shell components are added once and only if missing", () => {
+test("genomeToWireframe: shell primitives are added once and only if missing (nav chrome is never built)", () => {
   const g = GENOME_JSON();
   const derived = genomeToWireframe(g, brief("track"));
   const names = derived.inventory.components.map((c) => c.name);
-  for (const shell of ["Topbar", "Sidebar", "Button", "Avatar", "Badge", "Input", "Select", "Separator"]) {
+  for (const shell of ["Button", "Avatar", "Badge", "Input", "Select", "Separator"]) {
     assert.ok(names.includes(shell), `shell ${shell} present`);
   }
+  // V24: navigation chrome derives from each screen's nav field — it is
+  // never an inventory component and never built.
+  assert.ok(!names.includes("Topbar"), "Topbar is not an inventory component (static NavAdapter chrome)");
+  assert.ok(!names.includes("Sidebar"), "Sidebar is not an inventory component (static NavAdapter chrome)");
   const again = withShellComponents(derived.inventory);
   assert.equal(again.components.length, derived.inventory.components.length, "idempotent");
 });

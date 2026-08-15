@@ -148,7 +148,9 @@ export async function generateComponent(
   // V21: custom components are designed by the MID tier; shell chrome stays
   // on the CHEAP tier. Components are the visible design surface — building
   // them on the pipeline's weakest model was the quality bottleneck.
-  const shell = spec.name === "Topbar" || spec.name === "Sidebar" || spec.name === "Button"
+  // V24: navigation chrome (Topbar/Sidebar) is never built — the static
+  // NavAdapter in the composed shell is the only navigation chrome.
+  const shell = spec.name === "Button"
     || spec.name === "Avatar" || spec.name === "Badge" || spec.name === "Input"
     || spec.name === "Select" || spec.name === "Separator";
   const model: "builder" | "builderCustom" = shell ? "builder" : "builderCustom";
@@ -219,37 +221,100 @@ export async function generateComponent(
 
   let code = (extractFencedBlock(raw, "jsx") ?? extractFencedBlock(raw, "js") ?? raw).trim();
 
-  // Bounded token-discipline self-check: one corrective retry listing the
-  // offending literals (cheap, only fires when the gate would fail).
-  const hits = hardcodedColorHits(code);
-  if (hits.length > 0) {
-    const retry = await chatText(
-      [
-        { role: "system" as const, content: componentSystemPrompt() },
+  // V24 (WS7): bounded corrective retries on the token/theme law — if TWO
+  // consecutive corrective retries fail on the SAME violation class, the
+  // deterministic base-anchored fidelity path replaces the output instead
+  // of shipping the violation (the v23 "still 1 theme violations in Button
+  // after corrective retry" log line shipped exactly that).
+  const corrected = await correctThemeViolations({
+    initialCode: code,
+    violationHits: hardcodedColorHits,
+    attempt: async (feedback) => {
+      const retry = await chatText(
+        [
+          { role: "system" as const, content: componentSystemPrompt() },
+          { role: "user" as const, content: `${textPart}\n\n### CORRECTION REQUIRED\n${feedback}\n\nRe-emit the full corrected component. Output ONLY the jsx fenced block.` },
+        ],
         {
-          role: "user" as const,
-          content: `${textPart}\n\n### CORRECTION REQUIRED\nYour previous output violates the token/theme law. Replace EVERY one of these with theme tokens and the radius/control scale:\n${hits.map((h) => `- ${h}`).join("\n")}\n- raw radii → rounded-[var(--radius-md)] / var(--radius-lg)\n- raw heights → h-[var(--control-sm)] / h-[var(--control-md)] / h-[var(--control-lg)]\n\nRe-emit the full corrected component. Output ONLY the jsx fenced block.`,
+          model,
+          temperature: 0.2,
+          maxTokens: MAX_TOKENS_PER_CALL[model],
+          onUsage: opts?.onUsage,
         },
-      ],
-      {
-        model,
-        temperature: 0.2,
-        maxTokens: MAX_TOKENS_PER_CALL[model],
-        onUsage: opts?.onUsage,
-      },
-    );
-    const corrected = (extractFencedBlock(retry, "jsx") ?? extractFencedBlock(retry, "js") ?? retry).trim();
-    if (corrected.length > 0) {
-      const remaining = hardcodedColorHits(corrected);
-      if (remaining.length === 0) {
-        code = corrected;
-      } else {
-        console.warn(`[maxi-agent] builder color self-check: still ${remaining.length} theme violations in ${spec.name} after corrective retry`);
-      }
-    }
+      );
+      return (extractFencedBlock(retry, "jsx") ?? extractFencedBlock(retry, "js") ?? retry).trim() || null;
+    },
+    fallback: async () => {
+      const repaired = await repairWithFidelity(spec, theme, { onUsage: opts?.onUsage, productContext: `${spec.purpose}` }).catch(() => null);
+      return repaired?.code ?? null;
+    },
+    onStillViolating: (name, count) => {
+      console.warn(`[maxi-agent] builder color self-check: still ${count} theme violations in ${name} after corrective retries`);
+    },
+    componentName: spec.name,
+  });
+  if (corrected.usedFallback) {
+    console.warn(`[maxi-agent] builder color self-check: ${spec.name} fell back to the deterministic base-anchored path after 2 failed corrective retries`);
   }
+  code = corrected.code;
 
   return code;
+}
+
+/**
+ * V24 (WS7) — the corrective-retry convergence loop, extracted for tests.
+ *
+ * A targeted corrective retry that fails TWICE on the same violation class
+ * falls back to the deterministic base-anchored path
+ * (lib/fidelity.ts::generateComponentWithFidelity via repairWithFidelity)
+ * instead of shipping the violation. Returns the final code and whether the
+ * fallback path was taken.
+ */
+export interface ThemeCorrectionOpts {
+  initialCode: string;
+  /** Re-scan a candidate output for violations of the same class. */
+  violationHits: (code: string) => string[];
+  /** One targeted corrective retry; null when it produced nothing usable. */
+  attempt: (feedback: string) => Promise<string | null>;
+  /** The deterministic fallback path (never ships the violation). */
+  fallback: () => Promise<string | null>;
+  onStillViolating?: (componentName: string, count: number) => void;
+  componentName: string;
+}
+
+export async function correctThemeViolations(opts: ThemeCorrectionOpts): Promise<{ code: string; usedFallback: boolean }> {
+  let code = opts.initialCode;
+  const hits = opts.violationHits(code);
+  if (hits.length === 0) return { code, usedFallback: false };
+
+  const MAX_CORRECTIVE_RETRIES = 2;
+  let remaining = hits;
+  let usedFallback = false;
+  for (let attempt = 0; attempt < MAX_CORRECTIVE_RETRIES && remaining.length > 0; attempt++) {
+    const feedback = [
+      "Your previous output violates the token/theme law. Replace EVERY one of these with theme tokens and the radius/control scale:",
+      ...remaining.map((h) => `- ${h}`),
+      "- raw radii → rounded-[var(--radius-md)] / var(--radius-lg)",
+      "- raw heights → h-[var(--control-sm)] / h-[var(--control-md)] / h-[var(--control-lg)]",
+    ].join("\n");
+    const candidate = await opts.attempt(feedback);
+    if (!candidate) break;
+    code = candidate;
+    remaining = opts.violationHits(candidate);
+  }
+
+  if (remaining.length > 0) {
+    // Two consecutive same-class failures — converge via the deterministic
+    // base-anchored path rather than shipping the violation.
+    const fallbackCode = await opts.fallback();
+    if (fallbackCode && opts.violationHits(fallbackCode).length === 0) {
+      code = fallbackCode;
+      usedFallback = true;
+    } else {
+      opts.onStillViolating?.(opts.componentName, remaining.length);
+    }
+  }
+  return { code, usedFallback };
 }
 
 /**
@@ -272,7 +337,7 @@ export async function repairWithFidelity(spec: ComponentUISpec, theme: ResolvedT
   const { generateComponentWithFidelity } = await import("../lib/fidelity");
   const { maxiTokensFromTheme } = await import("../lib/base-components");
   const tokens = maxiTokensFromTheme(theme);
-  const shell = ["Topbar", "Sidebar", "Button", "Avatar", "Badge", "Input", "Select", "Separator"].includes(spec.name);
+  const shell = ["Button", "Avatar", "Badge", "Input", "Select", "Separator"].includes(spec.name);
 
   const entry: ComponentBuildSpec = {
     id: spec.name,

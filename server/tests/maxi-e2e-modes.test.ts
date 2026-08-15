@@ -82,7 +82,7 @@ async function runOneMode(mode: string, prompt: string): Promise<Record<string, 
     failedScreens: manifest.failedScreens,
     wallSeconds: timing?.wallSeconds,
     waves: timing?.stages
-      ? Object.fromEntries([0, 1, 2, 3].map((w) => [w, Math.round((timing!.stages!.filter((s) => s.wave === w).reduce((n, s) => n + s.ms, 0) / 1000) * 10) / 10]))
+      ? Object.fromEntries([0, 1, 2, 3, 4].map((w) => [w, Math.round((timing!.stages!.filter((s) => s.wave === w).reduce((n, s) => n + s.ms, 0) / 1000) * 10) / 10]))
       : null,
     totalCalls: Object.values(callsByRole).reduce((a, b) => a + (b as number), 0),
     callsByRole,
@@ -99,6 +99,22 @@ async function runOneMode(mode: string, prompt: string): Promise<Record<string, 
 
 const RESULTS: Array<Record<string, unknown>> = [];
 
+/**
+ * V24 timing acceptance — per-wave ceilings (a regression is attributable
+ * to a specific wave, not just "the run got slower") plus the v23 gap
+ * regression: w0-w3 summed to 216s of a 375s wall time in v23; with wave 4
+ * (repair + final review) timed explicitly, the waves must account for the
+ * wall time. Normal (non-thinking) runs must land in 120-180s.
+ */
+const WAVE_CEILINGS_S: Record<number, number> = {
+  0: 60, // discovery + design/brief one-call (v23: 51.1)
+  1: 30, // genome + deterministic derivation (v23: 19.8)
+  2: 70, // components ∥ content ∥ copy ∥ compose (v23: 131.6 — cut by the slot budget)
+  3: 55, // compile + 3-viewport sandbox render + gates + review (v23: 13.7 for desktop-only)
+  4: 35, // bounded repair + re-verify + final review (v23: the ~159s invisible tail)
+};
+const WALL_SECONDS_RANGE: [number, number] = [120, 180];
+
 test("golden path: one cold run per product mode (release gate)", { skip: !ENABLED && "release gate — set MAXI_E2E=1 to run (real models + e2b, costs money)" }, async () => {
   const { db } = await import("../db");
   assert.ok(db, "DATABASE_URL must be reachable for the e2e harness");
@@ -108,8 +124,21 @@ test("golden path: one cold run per product mode (release gate)", { skip: !ENABL
     assert.notEqual(summary.status, "error", `${mode}: run must not hard-error (got ${summary.status})`);
     assert.ok(Array.isArray(summary.screens) && (summary.screens as string[]).length >= 2, `${mode}: ≥2 screens verified (got ${JSON.stringify(summary.screens)})`);
     const waves = summary.waves as Record<string, number> | null;
-    assert.ok(waves && waves[0] !== undefined && waves[1] !== undefined && waves[2] !== undefined && waves[3] !== undefined, `${mode}: timing carries all four waves`);
+    assert.ok(waves && waves[0] !== undefined && waves[1] !== undefined && waves[2] !== undefined && waves[3] !== undefined && waves[4] !== undefined, `${mode}: timing carries all five waves (w0..w4)`);
     assert.ok(typeof summary.wallSeconds === "number", `${mode}: wall time recorded`);
+
+    // V24 timing acceptance.
+    const wall = summary.wallSeconds as number;
+    assert.ok(wall >= WALL_SECONDS_RANGE[0] && wall <= WALL_SECONDS_RANGE[1], `${mode}: normal-run wall time ${wall}s must land in ${WALL_SECONDS_RANGE[0]}-${WALL_SECONDS_RANGE[1]}s`);
+    for (const [w, ceiling] of Object.entries(WAVE_CEILINGS_S)) {
+      const got = waves![Number(w)] ?? 0;
+      assert.ok(got <= ceiling, `${mode}: wave ${w} took ${got}s — over its ${ceiling}s ceiling (WS9 per-wave attribution)`);
+    }
+    // WS9: the ~159s v23 gap is gone — the waves must account for the wall
+    // time (the only unmeasured stretches are the error paths).
+    const wavesSum = Object.values(waves!).reduce((a, b) => a + (b as number), 0);
+    assert.ok(Math.abs(wavesSum - wall) <= 12, `${mode}: waves sum ${wavesSum}s ≈ wall ${wall}s (v23 gap was ~159s)`);
+
     const gate = summary.gate as { score?: number } | null;
     assert.ok(gate && typeof gate.score === "number", `${mode}: quality gate ran with a score`);
     const fidelity = summary.fidelity as { total?: number; passed?: number; failed?: number } | null;

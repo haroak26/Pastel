@@ -12,7 +12,7 @@
  * runs, repair cycles, and reference rendering.
  */
 
-import { mulberry32, hashSeed, pickDomain, domainPeople, briefText, REVIEW_PHRASES, REVIEW_HEADING, TRUST_ITEMS, DOMAIN_PRIMARY_CTA, DOMAIN_HOME_CTA, PRICE_SUFFIX, type BriefLike } from "./domains";
+import { mulberry32, hashSeed, pickDomain, domainPeople, briefText, dateStr, REVIEW_PHRASES, REVIEW_HEADING, TRUST_ITEMS, DOMAIN_PRIMARY_CTA, DOMAIN_HOME_CTA, PRICE_SUFFIX, type BriefLike } from "./domains";
 
 export interface Person {
   name: string;
@@ -117,6 +117,60 @@ export const SUBJECT_OF_DOMAIN: Record<string, string> = {
   finance: "graph",
 };
 
+/** V24: a brief that is a RUNNING product (not adaptive strength) — the
+ * deterministic fallback must speak km/pace, never sets/lb. */
+const RUNNING_BRIEF_RE = /\b(run|runs|running|pace|splits?|distance|km|miles?|marathon|5k|10k|half-marathon)\b/i;
+
+/** Deterministic running-session rows (fitness fallback for running briefs). */
+function runningItems(rnd: () => number): Array<Omit<TableRow, "owner">> {
+  const names = ["Riverside Tempo", "Recovery jog", "Long run", "Hill repeats", "Easy 5K", "Interval session", "Park loop", "Fartlek session"];
+  const detail = ["Tempo run", "Easy run", "Long run", "Speed work", "Base run", "Intervals", "Easy run", "Speed play"];
+  return names.map((name, i) => ({
+    id: `run${1000 + i}`,
+    name,
+    detail: `${detail[i % detail.length]} · zone ${(i % 4) + 1}`,
+    amount: `${(rnd() * 14 + 4).toFixed(1)} km`,
+    status: "complete",
+    date: dateStr(rnd),
+    fields: ["Tempo", "Complete"],
+  }));
+}
+
+/** V24: running-mode fallback content — metrics/series/values in running
+ * vocabulary, so the deterministic floor can never ship the v23 #32
+ * strength-unit defect. */
+function runningContent(rnd: () => number): Pick<MockDataset, "metrics" | "series" | "detailFields" | "detailValues"> {
+  return {
+    metrics: [
+      { label: "Weekly distance", unit: "km", value: (rnd() * 20 + 30).toFixed(1), delta: Math.round(rnd() * 14 - 4), positive: true, note: "vs last week", spark: Array.from({ length: 12 }, () => Math.round(rnd() * 5 + 2)) },
+      { label: "Avg pace", unit: "min/km", value: `5:${String(Math.floor(rnd() * 30) + 12).padStart(2, "0")}`, delta: -Math.round(rnd() * 4 + 1), positive: true, note: "faster than last week", spark: Array.from({ length: 12 }, () => Math.round(rnd() * 3 + 4)) },
+      { label: "Training streak", unit: "days", value: String(Math.floor(rnd() * 18 + 3)), delta: Math.round(rnd() * 6), positive: true, note: "best 24 days", spark: Array.from({ length: 12 }, () => Math.round(rnd() * 2 + 1)) },
+      { label: "Calories", unit: "kcal", value: String(Math.floor(rnd() * 800 + 900)), delta: Math.round(rnd() * 12 - 4), positive: true, note: "solid week", spark: Array.from({ length: 12 }, () => Math.round(rnd() * 200 + 100)) },
+    ],
+    series: [
+      { label: "Weekly distance", unit: "km", points: weekly(rnd, 7, 24, 48) },
+      { label: "Avg pace", unit: "min/km", points: weekly(rnd, 7, 5, 7) },
+      { label: "Calories", unit: "kcal", points: weekly(rnd, 7, 700, 1800) },
+    ],
+    detailFields: ["Distance", "Pace", "Splits", "Effort"],
+    detailValues: [`${(rnd() * 14 + 4).toFixed(1)} km`, `5:${String(Math.floor(rnd() * 30) + 12).padStart(2, "0")}`, "5:01 / 5:03 / 5:00", pick2(rnd)],
+  };
+}
+
+function weekly(rnd: () => number, n: number, min: number, max: number, decimals = 1): Array<{ x: string; y: number }> {
+  let v = min + rnd() * (max - min) * 0.4;
+  const out: Array<{ x: string; y: number }> = [];
+  for (let i = 0; i < n; i++) {
+    v = Math.max(min, Math.min(max, v + (rnd() - 0.42) * (max - min) * 0.3));
+    out.push({ x: `W${i + 1}`, y: Number(v.toFixed(decimals)) });
+  }
+  return out;
+}
+
+function pick2(rnd: () => number): string {
+  return ["Moderate", "Hard", "Controlled", "Easy"][Math.floor(rnd() * 4)]!;
+}
+
 /** Normalize a unit string for comparison: lowercase, no spaces, and "·"
  * treated the same as "/" (min·km ≡ min/km). */
 export function normalizeUnit(u: string | undefined | null): string {
@@ -130,8 +184,14 @@ export function mockDataset(input: string | BriefLike, seedInput?: string): Mock
   const pack = pickDomain(briefText(brief));
   const strengthMode = pack.slug === "fitness" && /adaptive|personal trainer|suggested load|form cue|readiness|recovery block/i.test(briefText(brief));
 
+  // V24: a RUNNING brief must never fall back to the strength pack — the
+  // deterministic fallback itself was the v23 #32 defect ("Weekly volume in
+  // sets", "Next PR in lb" in a running app). When the brief is
+  // running-oriented, the fallback generates running vocabulary.
+  const runningMode = pack.slug === "fitness" && !strengthMode && RUNNING_BRIEF_RE.test(briefText(brief));
+
   const people = domainPeople(rnd);
-  const items = pack.items(rnd);
+  const items = runningMode ? runningItems(rnd) : pack.items(rnd);
   const owners = people.map((p) => p.name);
 
   const rows: TableRow[] = items.map((it, i) => ({
@@ -160,18 +220,20 @@ export function mockDataset(input: string | BriefLike, seedInput?: string): Mock
     text: phrases[i % phrases.length],
   }));
 
+  const running = runningMode ? runningContent(rnd) : null;
+
   return {
     seed,
     domain: pack.slug,
     strengthMode,
     mediaSubject: SUBJECT_OF_DOMAIN[pack.slug] ?? "generic",
     people,
-    metrics: pack.metrics(rnd),
-    series: pack.series(rnd),
+    metrics: running?.metrics ?? pack.metrics(rnd),
+    series: running?.series ?? pack.series(rnd),
     rows,
     activity: pack.activity(rnd),
-    detailFields: pack.detailFields(),
-    detailValues: pack.detailValues(rnd),
+    detailFields: running?.detailFields ?? pack.detailFields(),
+    detailValues: running?.detailValues ?? pack.detailValues(rnd),
     settingsSections: pack.settingsSections(),
     searchPlaceholder: pack.searchPlaceholder(),
     emptyTitle: pack.emptyTitle(),

@@ -36,15 +36,11 @@ const JSX_TAG_RE = /<\/?([A-Z][A-Za-z0-9]*)\b/g;
 export function auditV21Layout(
   plan: V21LayoutPlan | null,
   files: Record<string, string>,
-  builtComponents: Record<string, string>,
+  budgetNames: Set<string>,
 ): GateIssue[] {
   if (!plan) return [];
   const issues: GateIssue[] = [];
-  const builtNames = new Set(
-    Object.keys(builtComponents)
-      .filter((p) => p.startsWith("src/components/") && p.endsWith(".jsx"))
-      .map((p) => p.replace(/^src\/components\//, "").replace(/\.jsx$/, "")),
-  );
+  const builtNames = budgetNames;
 
   for (const screen of plan.screens) {
     const code = files[`src/screens/${screen.screenId}.jsx`] ?? "";
@@ -88,6 +84,9 @@ export function auditScreen(
   }
 
   // 3. Custom component budget — at most 2 custom components per screen.
+  // V24: the budget counts ONLY the genome's custom slots — deterministic
+  // shell chrome (NavAdapter) and shell primitives never count against the
+  // "fewer, richer components" law.
   const mounted = new Set<string>();
   for (const m of code.matchAll(JSX_TAG_RE)) {
     if (builtNames.has(m[1])) mounted.add(m[1]);
@@ -128,7 +127,7 @@ export function auditGenomeLayout(
   genome: LayoutGenome | null,
   plan: V21LayoutPlan | null,
   files: Record<string, string>,
-  builtComponents: Record<string, string>,
+  _builtComponents: Record<string, string>,
 ): GateIssue[] {
   if (!genome) return [];
   const issues: GateIssue[] = [];
@@ -167,6 +166,12 @@ export function auditGenomeLayout(
     }
   }
 
-  issues.push(...auditV21Layout(plan, files, builtComponents));
+  issues.push(...auditV21Layout(plan, files, customSlotNames(genome)));
   return issues;
+}
+
+/** The genome's custom slot names — the only components the budget law
+ *  counts (V24: shell chrome and primitives are never product components). */
+function customSlotNames(genome: LayoutGenome): Set<string> {
+  return new Set(genome.componentSlots.map((s) => s.name));
 }
