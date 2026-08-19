@@ -33,18 +33,39 @@ import {
 
 const STRIPE_API_VERSION = "2026-02-25.clover" as const;
 type PaidPlan = "free" | "pro" | "team" | "enterprise";
+const CURRENCIES = ["usd", "gbp", "eur"] as const;
+type Currency = (typeof CURRENCIES)[number];
 
-function stripePriceFor(plan: PaidPlan, billingPeriod: BillingPeriod = "monthly"): string | null {
-  const key = billingPeriod === "annual" ? `${plan.toUpperCase()}_ANNUAL` : plan.toUpperCase();
-  return process.env[`STRIPE_PRICE_${key}`] || null;
+// Env var name variants to try per plan, in priority order.
+// New naming first (PRO/TEAM/ENTERPRISE), legacy fallbacks (HOBBY/PROFESSIONAL).
+const PRICE_ENV_NAMES: Record<Exclude<PaidPlan, "free">, string[]> = {
+  pro: ["PRO", "HOBBY"],
+  team: ["TEAM", "PROFESSIONAL"],
+  enterprise: ["ENTERPRISE"],
+};
+
+function stripePriceFor(plan: PaidPlan, billingPeriod: BillingPeriod = "monthly", currency: Currency = "usd"): string | null {
+  const names = PRICE_ENV_NAMES[plan as Exclude<PaidPlan, "free">] ?? [];
+  const cur = [currency.toUpperCase()];
+  const combos = billingPeriod === "annual"
+    ? [[...cur, "ANNUAL"], ["ANNUAL", ...cur], ["ANNUAL"]]
+    : [cur, []];
+  for (const name of names) {
+    for (const combo of combos) {
+      const value = process.env[`STRIPE_PRICE_${name}${combo.length ? `_${combo.join("_")}` : ""}`];
+      if (value) return value;
+    }
+  }
+  return null;
 }
 
 function planInfoFromPriceId(priceId: string | undefined | null): { plan: PaidPlan; billingPeriod: BillingPeriod } | null {
   if (!priceId) return null;
   for (const plan of ["free", "pro", "team", "enterprise"] as const) {
     for (const bp of ["monthly", "annual"] as const) {
-      const key = bp === "annual" ? `STRIPE_PRICE_${plan.toUpperCase()}_ANNUAL` : `STRIPE_PRICE_${plan.toUpperCase()}`;
-      if (priceId === process.env[key]) return { plan, billingPeriod: bp };
+      for (const currency of CURRENCIES) {
+        if (priceId === stripePriceFor(plan, bp, currency)) return { plan, billingPeriod: bp };
+      }
     }
   }
   return null;
@@ -152,13 +173,19 @@ export function registerRemainingRoutes(app: Express): void {
     try {
       const stripe = new Stripe(stripeSecretKey, { apiVersion: STRIPE_API_VERSION });
       const user = req.user as User;
-      const { plan, billingPeriod } = z.object({
+      const { plan, billingPeriod, currency } = z.object({
         plan: z.enum(["free", "pro", "team", "enterprise"]),
         billingPeriod: z.enum(["monthly", "annual"]).optional().default("monthly"),
+        currency: z.enum(CURRENCIES).optional().default("usd"),
       }).parse(req.body);
       if (plan === "free") return res.status(400).json({ message: "Free plan cannot be purchased" });
-      const priceId = stripePriceFor(plan, billingPeriod);
-      if (!priceId) return res.status(400).json({ message: `Plan "${plan}" is not configured` });
+      const priceId = stripePriceFor(plan, billingPeriod, currency);
+      if (!priceId) return res.status(400).json({ message: `Plan "${plan}" is not configured for ${currency.toUpperCase()}` });
+      try {
+        await stripe.prices.retrieve(priceId);
+      } catch {
+        return res.status(400).json({ message: `Plan "${plan}" price for ${currency.toUpperCase()} is not configured correctly. Please contact support.` });
+      }
       const fullUser = await storage.getUserById(user.id);
       if (!fullUser) return res.status(404).json({ message: "User not found" });
       let sub = await storage.getSubscription(user.id);
@@ -179,13 +206,21 @@ export function registerRemainingRoutes(app: Express): void {
         const currentItem = liveSub.items.data[0];
         if (!currentItem?.id) return res.status(409).json({ message: "Subscription is missing billable items. Please contact support." });
         if (currentItem?.price?.id === priceId && !liveSub.cancel_at_period_end) return res.status(400).json({ message: "You are already on this plan" });
-        const items = [{ id: currentItem.id, price: priceId, quantity: currentItem.quantity ?? 1 }, ...liveSub.items.data.slice(1).map((item) => ({ id: item.id, deleted: true }))] as Stripe.BillingPortal.SessionCreateParams.FlowData.SubscriptionUpdateConfirm.Item[];
-        const portalSession = await stripe.billingPortal.sessions.create({ customer: customerId, return_url: `${getPublicUrl(req)}/account?billing=success&plan=${plan}`, flow_data: { type: "subscription_update_confirm", subscription_update_confirm: { subscription: liveSub.id, items } } });
-        sub = await storage.updateSubscription(fullUser.id, { stripeSubscriptionId: liveSub.id, billingPeriod });
-        return res.json({ url: portalSession.url });
+        const subCurrency = liveSub.currency ?? "usd";
+        if (subCurrency === currency) {
+          const items = [{ id: currentItem.id, price: priceId, quantity: currentItem.quantity ?? 1 }, ...liveSub.items.data.slice(1).map((item) => ({ id: item.id, deleted: true }))] as Stripe.SubscriptionUpdateParams.Item[];
+          const updatedSub = await stripe.subscriptions.update(liveSub.id, { items, proration_behavior: "create_prorations", cancel_at_period_end: false });
+          const renewsAt = (updatedSub as unknown as { current_period_end?: number }).current_period_end;
+          await storage.updateSubscription(fullUser.id, {
+            stripeCustomerId: customerId, stripeSubscriptionId: updatedSub.id,
+            plan, billingPeriod, subscriptionStatus: updatedSub.status,
+            cancelAtPeriodEnd: false, planRenewsAt: renewsAt ? new Date(renewsAt * 1000) : null,
+          });
+          return res.json({ ok: true, message: `Switched to the ${plan} plan` });
+        }
       }
       sub = await storage.updateSubscription(fullUser.id, { billingPeriod });
-      const session = await stripe.checkout.sessions.create({ mode: "subscription", payment_method_types: ["card"], allow_promotion_codes: true, line_items: [{ price: priceId, quantity: 1 }], customer: customerId, success_url: `${getPublicUrl(req)}/account?billing=success&plan=${plan}`, cancel_url: `${getPublicUrl(req)}/account?billing=cancelled`, metadata: { userId: String(fullUser.id), plan }, subscription_data: { metadata: { userId: String(fullUser.id), plan } } });
+      const session = await stripe.checkout.sessions.create({ mode: "subscription", payment_method_types: ["card"], allow_promotion_codes: true, currency, line_items: [{ price: priceId, quantity: 1 }], customer: customerId, success_url: `${getPublicUrl(req)}/account?billing=success&plan=${plan}`, cancel_url: `${getPublicUrl(req)}/account?billing=cancelled`, metadata: { userId: String(fullUser.id), plan, currency }, subscription_data: { metadata: { userId: String(fullUser.id), plan, currency } } });
       return res.json({ url: session.url });
     } catch (err) {
       if (err instanceof z.ZodError) return res.status(400).json({ message: err.errors[0].message });
@@ -647,12 +682,18 @@ export function registerRemainingRoutes(app: Express): void {
       if (!fullUser) return res.status(404).json({ message: "User not found" });
       let sub = await storage.getSubscription(user.id);
       let customerId = sub?.stripeCustomerId ?? null;
+      if (customerId) {
+        try { const c = await stripe.customers.retrieve(customerId); if ((c as Stripe.DeletedCustomer).deleted) customerId = null; } catch { customerId = null; }
+      }
       if (!customerId) {
         const customers = await stripe.customers.list({ email: fullUser.email, limit: 1 });
         customerId = customers.data[0]?.id ?? null;
-        if (customerId) sub = await storage.createSubscription(fullUser.id, { stripeCustomerId: customerId });
       }
-      if (!customerId) return res.status(404).json({ message: "No billing account found." });
+      if (!customerId) {
+        const created = await stripe.customers.create({ email: fullUser.email, name: fullUser.displayName ?? fullUser.username, metadata: { userId: String(fullUser.id) } });
+        customerId = created.id;
+        await storage.createSubscription(fullUser.id, { stripeCustomerId: customerId });
+      }
       const portalSession = await stripe.billingPortal.sessions.create({ customer: customerId, return_url: `${getPublicUrl(req)}/account` });
       return res.json({ url: portalSession.url });
     } catch { return res.status(500).json({ message: "Failed to open billing portal" }); }
@@ -707,6 +748,15 @@ export function registerRemainingRoutes(app: Express): void {
             billingPeriod: isLive && priceInfo ? priceInfo.billingPeriod : "monthly",
             subscriptionStatus: stripeSub.status, planRenewsAt: renewsAt ? new Date(renewsAt * 1000) : null, cancelAtPeriodEnd: !!stripeSub.cancel_at_period_end,
           });
+          if (isLive) {
+            const customerSubs = await stripe.subscriptions.list({ customer: customerId, status: "all", limit: 100 });
+            for (const s of customerSubs.data) {
+              if (s.id === stripeSub.id) continue;
+              if (s.status === "active" || s.status === "trialing" || s.status === "past_due" || s.status === "unpaid") {
+                try { await stripe.subscriptions.cancel(s.id); } catch {}
+              }
+            }
+          }
           if (isLive && user.email && priceInfo) {
             const planLabel = priceInfo.plan.charAt(0).toUpperCase() + priceInfo.plan.slice(1);
             const isNewSub = event.type === "checkout.session.completed" || !prevSub?.stripeSubscriptionId;

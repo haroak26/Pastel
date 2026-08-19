@@ -539,38 +539,31 @@ async function getPlanTier(userId: string): Promise<PlanTier> {
 }
 
 /**
- * Picasso run cost estimate.
+ * Maxi Agent v25 run cost estimate.
  *
- * Call graph (full 8-stage pipeline):
- *   discovery (brief, mid)   × 1
- *   directions (design, mid) × 1
- *   tokens + motion (mid)    × 1
- *   architecture (mid)       × 1
- *   content (cheap)          × 1
- *   components (cheap)       × ~8 (parallel, retries possible)
- *   screens (cheap)          × ~3 (parallel)
- *   visual QA (mid + image)  × ~3
- *   finalize (deterministic) × $0
+ * Call graph (the Auteur pipeline):
+ *   direction (strong)       × 1   — the concept blueprint
+ *   author (strong)          × ~11 — components ∥ screens in parallel
+ *   repair (strong)          × 0-3 — bounded polish
+ *   review (strong)          × 1   — advisory scorecard
  */
 function estimateRunCredits(prompt: string): number {
   const customComponents = 8;
   const screens = 3;
+  const repairs = 2;
 
-  const discoveryCost = calcCost(MODELS.brief, prompt.length + 3000, 500);
-  const directionsCost = calcCost(MODELS.design, prompt.length + 5000, 3000);
-  const tokensCost = calcCost(MODELS.design, prompt.length + 6000, 4000);
-  const architectureCost = calcCost(MODELS.wireframe, prompt.length + 5000, 6000);
-  const contentCost = calcCost(MODELS.data, prompt.length + 4000, 4000);
-  const componentCost = calcCost(MODELS.builderCustom, 3000, 6000);
-  const screenCost = calcCost(MODELS.compose, 12000, 9000);
-  const visualCost = calcCost(MODELS.visualReview, prompt.length + 3000, 2500);
+  const directionCost = calcCost(MODELS.direction, prompt.length + 6000, 9000);
+  const componentCost = calcCost(MODELS.author, 4000, 5000);
+  const screenCost = calcCost(MODELS.author, 9000, 6000);
+  const repairCost = calcCost(MODELS.repair, 6000, 5000);
+  const reviewCost = calcCost(MODELS.review, prompt.length + 3000, 1500);
 
-  const subtotal = [
-    discoveryCost, directionsCost, tokensCost, architectureCost, contentCost,
-  ].reduce((s, c) => s + c.costDollars, 0)
+  const subtotal =
+    directionCost.costDollars
     + componentCost.costDollars * customComponents * 1.2
     + screenCost.costDollars * screens
-    + visualCost.costDollars * screens;
+    + repairCost.costDollars * repairs
+    + reviewCost.costDollars;
 
   const totalDollars = subtotal * 1.15 + 0.002;
   return Math.max(3, Math.ceil(totalDollars * CREDIT_PER_DOLLAR * 100) / 100);

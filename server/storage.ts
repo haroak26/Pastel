@@ -192,11 +192,10 @@ class DatabaseStorage implements IStorage {
 
   async createSubscription(userId: string, data?: Partial<Subscription>): Promise<Subscription> {
     const { subscriptions } = await import("@shared/schema");
+    const existing = await this.getSubscription(userId);
+    if (existing) return this.updateSubscription(userId, data ?? {});
     const [sub] = await db.insert(subscriptions).values({
       userId, ...data, updatedAt: new Date(),
-    }).onConflictDoUpdate({
-      target: subscriptions.userId,
-      set: { ...data, updatedAt: new Date() },
     }).returning();
     return sub;
   }

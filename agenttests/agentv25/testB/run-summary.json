@@ -1,0 +1,33 @@
+{
+  "runId": "a53ac40b-8e41-48d7-8d21-ce3bd92136dc",
+  "brief": "A running tracker for competitive runners that logs sessions and shows coach-grade pace metrics",
+  "title": "STRIDE/LAB",
+  "status": "error",
+  "wallSeconds": 72.1,
+  "models": {
+    "clarify": null,
+    "direction": "google/gemini-3.7-flash",
+    "author": "google/gemini-3.7-flash",
+    "review": "google/gemini-3.7-flash",
+    "repair": "google/gemini-3.7-flash"
+  },
+  "cost": null,
+  "screens": [],
+  "failedScreens": [],
+  "gate": {
+    "passed": false
+  },
+  "advisory": null,
+  "calls": null,
+  "fingerprint": null,
+  "waves": {
+    "w0": 0,
+    "w1": 0,
+    "w2": 0,
+    "w3": 0,
+    "w4": 0
+  },
+  "fileCount": 15,
+  "docCount": 6,
+  "screenshotFiles": []
+}

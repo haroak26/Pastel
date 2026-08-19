@@ -23,6 +23,15 @@ export default defineConfig(async () => {
       },
     },
     root: path.resolve(import.meta.dirname, "client"),
+    optimizeDeps: {
+      include: [
+        "tailwindcss-animate",
+        "@tailwindcss/typography",
+        "react",
+        "react-dom",
+        "react-dom/client",
+      ],
+    },
     build: {
       outDir: path.resolve(import.meta.dirname, "dist/public"),
       emptyOutDir: true,

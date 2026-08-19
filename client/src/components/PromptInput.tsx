@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback, useEffect } from 'react';
+import { useState, useRef, useCallback, useEffect, useMemo, forwardRef, useImperativeHandle } from 'react';
 import { Button } from '@/components/button';
 import { ArrowUp, Plus, Sparkles, ChevronRight, Settings2, FolderOpen, Link, Box, ComponentIcon, X } from 'lucide-react';
 
@@ -14,6 +14,16 @@ type Props = {
   placeholder?: string;
   systemError?: boolean;
   initialValue?: string;
+  compact?: boolean;
+  /** Rotating typewriter examples shown while the input is empty. */
+  examples?: string[];
+};
+
+export type PromptInputHandle = {
+  /** Set the prompt value from outside (e.g. clicking a suggested example). */
+  setValue: (v: string) => void;
+  /** Type a prompt into the box with the typewriter effect (clears the current example first). */
+  typePrompt: (text: string) => void;
 };
 
 const MODELS = [
@@ -72,7 +82,8 @@ function MenuRow({ label, current, onClick }: { label: string; current: React.Re
   );
 }
 
-export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you like to design?', systemError, initialValue }: Props) {
+export const PromptInput = forwardRef<PromptInputHandle, Props>(
+  function PromptInput({ onSubmit, isLoading, placeholder = 'What would you like to design?', systemError, initialValue, compact = false, examples }, ref) {
   const [prompt, setPrompt] = useState(initialValue ?? '');
   const [model, setModel] = useState<string>(MODELS[0].value);
   const [mode, setMode] = useState<string>(MODES[0].value);
@@ -82,9 +93,77 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
   const [panelView, setPanelView] = useState<PanelView>('main');
   const [attachOpen, setAttachOpen] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [exampleIndex, setExampleIndex] = useState(0);
+  const [typed, setTyped] = useState(0);
+  const [examplePhase, setExamplePhase] = useState<'type' | 'pause' | 'delete'>('type');
+  const [typeTarget, setTypeTarget] = useState<string | null>(null);
+  const [focused, setFocused] = useState(false);
   const customizeRef = useRef<HTMLDivElement>(null);
   const attachRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  /* Slow typewriter reveal for the rotating example placeholders. */
+  useEffect(() => {
+    if (systemError) return;
+    let t: ReturnType<typeof setTimeout>;
+    if (typeTarget) {
+      /* Chip-triggered prompt: type the chip prompt right away (no wipe of the current example), faster and in the foreground color. */
+      if (focused) {
+        setTypeTarget(null);
+        setTyped(0);
+        setExamplePhase('type');
+        return;
+      }
+      if (examplePhase === 'type') {
+        if (typed < typeTarget.length) {
+          t = setTimeout(() => setTyped((v) => v + 1), 12);
+        } else {
+          setPrompt(typeTarget);
+          setTypeTarget(null);
+          setTyped(0);
+          setExamplePhase('type');
+          textareaRef.current?.focus();
+          return;
+        }
+      }
+      return () => clearTimeout(t);
+    }
+    if (!examples?.length || prompt) return;
+    const current = examples[exampleIndex % examples.length];
+    if (focused) {
+      /* Focused and empty: quickly wipe the example, then the placeholder takes over. */
+      if (typed > 0) {
+        if (examplePhase !== 'delete') setExamplePhase('delete');
+        t = setTimeout(() => setTyped((v) => v - 1), 8);
+      }
+      return () => clearTimeout(t);
+    }
+    if (examplePhase === 'type') {
+      if (typed < current.length) {
+        t = setTimeout(() => setTyped((v) => v + 1), 42);
+      } else {
+        t = setTimeout(() => setExamplePhase('pause'), 2400);
+      }
+    } else if (examplePhase === 'pause') {
+      t = setTimeout(() => setExamplePhase('delete'), 2400);
+    } else {
+      if (typed > 0) {
+        t = setTimeout(() => setTyped((v) => v - 1), 16);
+      } else {
+        setExampleIndex((i) => (i + 1) % examples.length);
+        setExamplePhase('type');
+        return;
+      }
+    }
+    return () => clearTimeout(t);
+  }, [examplePhase, typed, exampleIndex, examples, prompt, focused, systemError, typeTarget]);
+
+  /* Rough row count so the box grows to fit the typed/entered prompt instead of clipping it. */
+  const visibleRows = useMemo(() => {
+    const text = prompt || (typeTarget ?? '');
+    if (!text) return 2;
+    return Math.min(6, Math.max(2, Math.ceil(text.length / 58)));
+  }, [prompt, typeTarget]);
 
   useEffect(() => {
     const handler = (e: MouseEvent) => {
@@ -120,6 +199,21 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
     }
   }, [handleSubmit]);
 
+  useImperativeHandle(ref, () => ({
+    setValue: (v: string) => {
+      setPrompt(v);
+      setTyped(0);
+      textareaRef.current?.focus();
+    },
+    typePrompt: (text: string) => {
+      setPrompt('');
+      setFocused(false);
+      setTypeTarget(text);
+      setExamplePhase('type');
+      setTyped(0);
+    },
+  }));
+
   const addAttachment = useCallback((type: Attachment['type']) => {
     const names: Record<string, string> = {
       image: 'Attached image',
@@ -151,15 +245,27 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
             <span className="text-[11px] text-fg-faint">Please try again later</span>
           </div>
         )}
-        <textarea
-          ref={textareaRef}
-          value={systemError ? '' : prompt}
-          onChange={(e) => { if (!systemError) setPrompt(e.target.value); }}
-          onKeyDown={systemError ? undefined : handleKeyDown}
-          placeholder={systemError ? 'System error' : placeholder}
-          rows={2}
-          className="w-full resize-none bg-transparent text-[14px] outline-none border-none leading-relaxed placeholder:text-fg-faint px-3 sm:px-3 pt-3 sm:pt-3 pb-0 sm:pb-1 text-foreground"
-        />
+        <div className="relative">
+          <textarea
+            ref={textareaRef}
+            value={systemError ? '' : prompt}
+            onChange={(e) => { if (!systemError) setPrompt(e.target.value); }}
+            onKeyDown={systemError ? undefined : handleKeyDown}
+            onFocus={() => setFocused(true)}
+            onBlur={() => setFocused(false)}
+            placeholder={systemError ? 'System error' : focused && typed === 0 ? 'Design anything...' : examples?.length ? '' : placeholder}
+            rows={visibleRows}
+            className="w-full resize-none bg-transparent text-[14px] outline-none border-none leading-relaxed placeholder:text-fg-faint pl-4 pr-3 sm:pl-4 sm:pr-3 pt-3 sm:pt-3 pb-0 sm:pb-1 text-foreground"
+          />
+          {!!examples?.length && !systemError && (
+            <div
+              aria-hidden
+              className={`pointer-events-none absolute left-4 top-3 max-w-[calc(100%-28px)] text-left text-[14px] leading-relaxed transition-opacity duration-300 ${typeTarget ? '' : 'truncate'} ${prompt || (focused && typed === 0) ? 'opacity-0' : 'opacity-100'} ${typeTarget ? 'text-foreground' : 'text-fg-faint'}`}
+            >
+              {(typeTarget ?? examples[exampleIndex % examples.length]).slice(0, typed)}
+            </div>
+          )}
+        </div>
         {attachments.length > 0 && (
           <div className="flex items-center gap-2 px-3 pb-2 flex-wrap">
             {attachments.map((att) => (
@@ -193,7 +299,8 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
           </div>
         )}
 
-        <div className="flex items-end justify-between px-3 pb-3">
+        <div className={`flex items-end ${compact ? 'justify-end' : 'justify-between'} px-3 pb-3`}>
+          {!compact && (
           <div className="flex items-center gap-2">
             {/* Attach dropdown */}
             <div className="relative max-md:hidden" ref={attachRef}>
@@ -337,6 +444,7 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
               )}
             </div>
           </div>
+          )}
 
           <Button
             onClick={handleSubmit}
@@ -351,4 +459,5 @@ export function PromptInput({ onSubmit, isLoading, placeholder = 'What would you
       </div>
     </div>
   );
-}
+});
+PromptInput.displayName = "PromptInput";

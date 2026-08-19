@@ -1,6 +1,5 @@
 import { EventEmitter } from "node:events";
 import { desc, eq, and, sql } from "drizzle-orm";
-import { db } from "../../db";
 import {
   agentRuns,
   agentDocuments,
@@ -19,7 +18,23 @@ import type { MaxiEvent, AgentManifest } from "./types";
  * broadcasts every event to an in-memory emitter. SSE clients attach/detach
  * freely: on (re)connect they receive the full event log replay, then live
  * events. Refreshing the browser never loses a run.
+ *
+ * The db module is imported LAZILY: importing the orchestrator (and its
+ * run-store) must not require a database — the deterministic test suite
+ * runs the whole pipeline with persistence failures absorbed by the
+ * orchestrator's warn-and-continue helpers.
  */
+
+type Db = typeof import("../../db")["db"];
+let cachedDb: Db | null = null;
+
+async function getDb(): Promise<Db> {
+  if (!cachedDb) {
+    const mod = await import("../../db");
+    cachedDb = mod.db;
+  }
+  return cachedDb;
+}
 
 interface RunEntry {
   runId: string;
@@ -64,6 +79,7 @@ export async function createRun(opts: {
     failedScreens: [],
   };
 
+  const db = await getDb();
   const [run] = await db
     .insert(agentRuns)
     .values({
@@ -105,6 +121,7 @@ export async function updateRun(
   }>,
 ): Promise<void> {
   try {
+    const db = await getDb();
     await db
       .update(agentRuns)
       .set({ ...patch, updatedAt: new Date() })
@@ -125,8 +142,15 @@ export async function mergeManifest(
 
   await previous;
   try {
-    const [run] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId)).limit(1);
-    const current = (run?.manifest ?? {}) as unknown as AgentManifest;
+    let current: AgentManifest = { screens: [], docs: [], brandKit: null, styleSeed: null, phases: {}, failedScreens: [] };
+    try {
+      const db = await getDb();
+      const [run] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId)).limit(1);
+      current = (run?.manifest ?? {}) as unknown as AgentManifest;
+    } catch {
+      // DB unavailable (deterministic test runs) — merge over the empty base
+      // so the manifest merge itself never kills a run.
+    }
     const merged: AgentManifest = {
       ...current,
       ...patch,
@@ -149,6 +173,7 @@ export async function persistDoc(
   runId: string,
   doc: { path: string; title: string; kind: string; content: string },
 ): Promise<void> {
+  const db = await getDb();
   await db
     .insert(agentDocuments)
     .values({ runId, ...doc })
@@ -162,6 +187,7 @@ export async function persistFile(
   runId: string,
   file: { path: string; kind: string; content: string },
 ): Promise<void> {
+  const db = await getDb();
   await db
     .insert(agentFiles)
     .values({ runId, ...file })
@@ -181,6 +207,7 @@ export interface RunState {
 }
 
 export async function getRunState(runId: string): Promise<RunState | null> {
+  const db = await getDb();
   const [run] = await db.select().from(agentRuns).where(eq(agentRuns.id, runId)).limit(1);
   if (!run) return null;
 
@@ -203,6 +230,7 @@ export async function getRunState(runId: string): Promise<RunState | null> {
 }
 
 export async function getLatestRunForProject(projectId: string): Promise<RunState | null> {
+  const db = await getDb();
   const [run] = await db
     .select()
     .from(agentRuns)
@@ -222,6 +250,7 @@ export async function getLatestCompletedFilesForProject(
   projectId: string,
   excludeRunId?: string,
 ): Promise<Record<string, string>> {
+  const db = await getDb();
   const runs = await db
     .select({ id: agentRuns.id })
     .from(agentRuns)
@@ -277,6 +306,7 @@ export function getRunLiveStatus(runId: string): { status: string; phase: string
  */
 export async function cleanupStaleRuns(): Promise<void> {
   try {
+    const db = await getDb();
     const staleRuns = await db
       .select({ id: agentRuns.id })
       .from(agentRuns)

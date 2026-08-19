@@ -12,12 +12,11 @@ export function PastelLogoCSS({
 }) {
   return (
     <img
-      src="/PastelIcon.svg"
+      src="/UpdatePastel.svg?v=2"
       alt="Pastel"
-      width={size}
       height={size}
-      className={cn("shrink-0", className)}
-      style={{ width: size, height: size }}
+      className={cn("w-auto shrink-0", className)}
+      style={{ height: size }}
     />
   );
 }

@@ -31,7 +31,9 @@ import {
 } from "@/components/settings-ui";
 
 import TeamPageView from "@/pages/TeamPage";
-import { PLAN_LIMITS, type PlanTier } from "@shared/schema";
+import { PLAN_LIMITS, type PlanTier, type BillingPeriod } from "@shared/schema";
+import { CURRENCIES, CURRENCY_CODES, type CurrencyCode } from "@/lib/billing";
+import { CanvasDropdown } from "@/components/CanvasDropdown";
 import { cn } from "@/lib/utils";
 
 // ── Helpers ────────────────────────────────────────────────────────────────
@@ -789,13 +791,16 @@ function SecurityAuthPage() {
   );
 }
 
-function BillingPage({ planInfo, cancelMutation, portalMutation }: any) {
+function BillingPage({ planInfo, checkoutMutation, cancelMutation, portalMutation }: any) {
   const currentPlan: Plan = planInfo?.plan ?? "free";
   const limits = PLAN_LIMITS[currentPlan] ?? PLAN_LIMITS.free;
   const price = limits.prices.monthly;
   const renewsLabel = planInfo?.renewsAt
     ? new Date(planInfo.renewsAt).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" })
     : null;
+
+  const [billingPeriod, setBillingPeriod] = useState<BillingPeriod>("monthly");
+  const [currency, setCurrency] = useState<CurrencyCode>("USD");
 
   const { data: transactionsData } = useQuery<{ transactions: Array<{ id: string; description: string; amount: number; date: string; status: string }> }>({
     queryKey: ['/api/credits/transactions'],
@@ -808,6 +813,7 @@ function BillingPage({ planInfo, cancelMutation, portalMutation }: any) {
   });
 
   const transactions = transactionsData?.transactions ?? [];
+  const paidTiers: PlanTier[] = ["pro", "team", "enterprise"];
 
   return (
     <div className="py-4 space-y-6">
@@ -816,7 +822,7 @@ function BillingPage({ planInfo, cancelMutation, portalMutation }: any) {
         description="Your active subscription."
         action={
           <div className="flex items-center gap-2">
-            {!planInfo?.cancelAtPeriodEnd && (
+            {!planInfo?.cancelAtPeriodEnd && currentPlan !== "free" && (
               <Button design="ghost" size="xs" onClick={() => cancelMutation.mutate()} disabled={cancelMutation.isPending}>
                 {cancelMutation.isPending ? "Cancelling…" : "Cancel"}
               </Button>
@@ -841,6 +847,72 @@ function BillingPage({ planInfo, cancelMutation, portalMutation }: any) {
           {renewsLabel && (
             <p className="text-[12px] text-fg-muted mt-0.5">Renews {renewsLabel}</p>
           )}
+        </div>
+      </SettingsSection>
+
+      <SettingsSection
+        title="Change Plan"
+        description="Upgrade or downgrade anytime. Switching is prorated by Stripe."
+        action={
+          <div className="flex items-center gap-2">
+            <CanvasDropdown
+              value={currency}
+              onChange={(code) => setCurrency(code as CurrencyCode)}
+              options={CURRENCY_CODES.map((code) => ({
+                value: code,
+                label: (
+                  <span className="flex w-full items-center justify-between gap-3">
+                    <span>{CURRENCIES[code].label}</span>
+                    <span className="font-semibold">{code}</span>
+                  </span>
+                ),
+              }))}
+              align="right"
+            >
+              <button className="flex items-center gap-1 h-7 px-2.5 rounded-full border border-border bg-background text-[12px] font-semibold text-foreground hover:border-brand/40 transition-colors cursor-pointer">
+                {currency}
+                <ChevronDown size={12} strokeWidth={2.5} />
+              </button>
+            </CanvasDropdown>
+            <button
+              onClick={() => setBillingPeriod(p => p === "monthly" ? "annual" : "monthly")}
+              className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${billingPeriod === "annual" ? "bg-brand" : "bg-border"}`}
+              title={billingPeriod === "annual" ? "Switch to monthly billing" : "Switch to annual billing (save ~20%)"}
+            >
+              <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform ${billingPeriod === "annual" ? "translate-x-6" : "translate-x-1"}`} />
+            </button>
+          </div>
+        }
+      >
+        <div className="space-y-2">
+          {paidTiers.map((key) => {
+            const tierLimits = PLAN_LIMITS[key];
+            const usdPerUnit = CURRENCIES[currency].usdPerUnit;
+            const displayPrice = billingPeriod === "annual" ? tierLimits.prices.annual / 12 : tierLimits.prices.monthly;
+            const convertedPrice = Math.round(displayPrice / usdPerUnit);
+            const convertedAnnual = Math.round(tierLimits.prices.annual / usdPerUnit);
+            const isCurrent = key === currentPlan && planInfo?.billingPeriod === billingPeriod;
+            return (
+              <div key={key} className="flex items-center justify-between gap-3 py-3 border-b border-border/60 last:border-0">
+                <div className="min-w-0">
+                  <p className="text-[13.5px] font-medium text-foreground">{tierLimits.label}</p>
+                  <p className="text-[11.5px] text-fg-muted mt-0.5">
+                    {CURRENCIES[currency].symbol}{convertedPrice}/mo
+                    {billingPeriod === "annual" && ` · ${CURRENCIES[currency].symbol}${convertedAnnual} billed annually`}
+                  </p>
+                </div>
+                <Button
+                  design={key === currentPlan ? "secondary" : "primary"}
+                  size="xs"
+                  onClick={() => checkoutMutation.mutate({ plan: key, billingPeriod, currency: currency.toLowerCase() })}
+                  disabled={isCurrent || checkoutMutation.isPending}
+                  isLoading={checkoutMutation.isPending}
+                >
+                  {isCurrent ? "Current plan" : key === currentPlan ? "Switch" : "Upgrade"}
+                </Button>
+              </div>
+            );
+          })}
         </div>
       </SettingsSection>
 
@@ -1196,15 +1268,26 @@ export default function Account() {
   });
 
   const checkoutMutation = useMutation({
-    mutationFn: async ({ plan, billingPeriod }: { plan: PlanTier; billingPeriod?: string }) => {
+    mutationFn: async ({ plan, billingPeriod, currency }: { plan: PlanTier; billingPeriod?: string; currency?: string }) => {
       const r = await fetch("/api/billing/checkout", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        credentials: "include", body: JSON.stringify({ plan, billingPeriod }),
+        credentials: "include", body: JSON.stringify({ plan, billingPeriod: billingPeriod ?? "monthly", currency: currency?.toLowerCase() ?? "usd" }),
       });
-      if (!r.ok) throw new Error("Failed");
-      return r.json() as Promise<{ url?: string }>;
+      if (!r.ok) {
+        const err = await r.json().catch(() => ({ message: "Failed to create checkout session" }));
+        throw new Error(err.message ?? "Failed to create checkout session");
+      }
+      return r.json() as Promise<{ url?: string; ok?: boolean; message?: string }>;
     },
-    onSuccess: (d) => { if (d.url) { window.location.href = d.url; return; } toast({ title: "Billing unavailable", variant: "destructive" }); },
+    onSuccess: (d) => {
+      if (d.url) { window.location.href = d.url; return; }
+      if (d.ok) {
+        toast({ title: "Plan updated", description: d.message, variant: "success" });
+        queryClient.invalidateQueries({ queryKey: ["/api/me/plan"] });
+        return;
+      }
+      toast({ title: "Billing unavailable", variant: "destructive" });
+    },
     onError: (err) => toast({ title: "Billing unavailable", description: (err as Error).message, variant: "destructive" }),
   });
 

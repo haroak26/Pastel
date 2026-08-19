@@ -52,7 +52,7 @@ export async function setupVite(server: Server, app: Express) {
       );
       let page = await vite.transformIndexHtml(url, template);
       page = injectMeta(page, url);
-      res.status(200).set({ "Content-Type": "text/html" }).end(page);
+      res.status(200).set({ "Content-Type": "text/html", "Cache-Control": "no-store, max-age=0" }).end(page);
     } catch (e) {
       vite.ssrFixStacktrace(e as Error);
       next(e);

@@ -222,8 +222,8 @@ export interface GenerateComponentInput {
   creativeSeed: string;
   baseSources?: Record<string, BaseComponentInfo>;
   extraContext?: string;
-  /** Gateway role for the generation calls (default "builderCustom"). */
-  model?: "builderCustom" | "builder";
+  /** Gateway role for the generation calls (v25: the strong author tier). */
+  model?: "author";
   onUsage?: (rec: import("../gateway").UsageRecord) => void;
 }
 
@@ -234,7 +234,7 @@ export interface GenerateComponentResult {
 
 export async function generateComponentWithFidelity(input: GenerateComponentInput): Promise<GenerateComponentResult> {
   const { entry, tokens, productContext, creativeSeed, baseSources, extraContext } = input;
-  const model = input.model ?? "builderCustom";
+  const model = input.model ?? "author";
   const base = baseSources?.[entry.baseComponent] ?? loadBaseComponent(entry.baseComponent);
   if (!base) {
     return { code: fallbackStub(entry), fidelity: {

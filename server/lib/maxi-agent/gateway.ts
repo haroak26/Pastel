@@ -1,27 +1,20 @@
 import { MergeGateway, type ThinkingConfig } from "merge-gateway-sdk";
 
 /**
- * Maxi Agent v14 — hybrid model gateway.
+ * Maxi Agent v25 — hybrid model gateway.
  *
- * V14 strategy: TWO models only. A CHEAP model (claude-haiku-4-5) carries the
- * bulk mechanical work — clarify, per-component planner, per-component builder,
- * and repair. A MID model (gpt-5.6-luna) handles every judgment stage —
- * design (tokens), data (all page content), brief, wireframe, copy (the
- * product voice), review, and visual review on rendered screenshots.
+ * V25 strategy (the "Auteur" decision: strong model everywhere): the STRONG
+ * default (gpt-5.6-luna) carries every DESIGN call — direction (the concept
+ * blueprint) and author (components + screens + repair). The CHEAP default
+ * remains only for `clarify` (pre-run Q&A). Rationale: ~10–15 strong calls
+ * cost no more than v24's 43 mixed calls, and components are where the
+ * visible design quality lives.
  *
- * V5 TUNING (Picasso): With v3 prop-contract enforcement + runtime smoke tests
- * and v4 anti-slop hard gate in place, mechanical/constrained tasks can safely
- * use the CHEAP model because incorrect output is caught by automated gates.
- * Judgment tasks (directions, visual critique, design tokens) stay on MID.
- *
- * V7 (Picasso): `chatJSON` gains a salvage phase — caller-supplied `repair`
- * and `fallback` hooks run before the hard throw, so a model occasionally
- * underfilling descriptive fields can never kill a pipeline that already
- * spent money. New `brandKit` role: a smaller, cheaper model call for the
- * stage-3 brand kit + UX plan (split from the giant wireframe call).
- *
- * Routes CHEAP for: builderCustom (components), compose (screens), data (content)
- * Routes MID for: design (tokens/directions), brief, copy, review, visualReview
+ * History: v14 introduced the two-model split (cheap mechanical / mid
+ * judgment); v23/v24 kept it while adding schema+gate enforcement so cheap
+ * models could do constrained fill-in work. v25 removes the constrained
+ * fill-in stages entirely — what remains is design work, and design work
+ * runs on the strong model.
  *
  * Override any role via env: PASTEL_MODEL_{ROLE}.
  */
@@ -31,39 +24,11 @@ export const MID_DEFAULT = "openai/gpt-5.6-luna";
 
 export const MODELS = {
   clarify:      process.env.PASTEL_MODEL_CLARIFY      || CHEAP_DEFAULT,
-  discovery:    process.env.PASTEL_MODEL_DISCOVERY    || MID_DEFAULT,
-  design:       process.env.PASTEL_MODEL_DESIGN        || MID_DEFAULT,
-  /** V5: Content generation routed to CHEAP — data shapes and copy are
-   * constrained by the layout plan + content schema; v3/v4 gates catch issues. */
-  /** Content + copy — one call per run; the product voice lives here. */
-  data:         process.env.PASTEL_MODEL_DATA          || MID_DEFAULT,
-  brief:        process.env.PASTEL_MODEL_BRIEF        || MID_DEFAULT,
-  /** V23: the layout genome is a small schema-validated document with a hard
-   * deterministic gate downstream (layoutGenomeSchema + enforceUxDesign +
-   * checks/layout.ts) — it is a mechanical task, not a judgment task, so the
-   * cheap tier is the default. The old prose wireframe was the judgment call;
-   * the genome is the constrained call. */
-  wireframe:    process.env.PASTEL_MODEL_WIREFRAME    || CHEAP_DEFAULT,
-  /** V23: the combined Wave-0 design-tokens + product-brief call. One call on
-   * the cheap tier: every field is zod-validated and the deterministic
-   * contrast/radius floors (design.ts) check the output. */
-  plan:         process.env.PASTEL_MODEL_PLAN         || CHEAP_DEFAULT,
-  /** V23: the layout-genome call — see wireframe above. */
-  genome:       process.env.PASTEL_MODEL_GENOME       || CHEAP_DEFAULT,
-  /** V7: brandKit + UX plan call (stage 3 Call B) — smaller, judgment-heavy. */
-  brandKit:     process.env.PASTEL_MODEL_BRAND_KIT    || MID_DEFAULT,
-  planner:      process.env.PASTEL_MODEL_PLANNER      || CHEAP_DEFAULT,
-  /** V5: Component generation routed to CHEAP — prop contracts and runtime
-   * smoke tests catch incorrect output; no need for the large model per component. */
-  builderCustom: process.env.PASTEL_MODEL_BUILDER_CUSTOM || CHEAP_DEFAULT,
-  builder:      process.env.PASTEL_MODEL_BUILDER      || CHEAP_DEFAULT,
-  copy:         process.env.PASTEL_MODEL_COPY         || MID_DEFAULT,
-  assemble:     process.env.PASTEL_MODEL_ASSEMBLE     || CHEAP_DEFAULT,
-  /** V5: Screen composition routed to CHEAP — layout constraints + prop contracts
-   * make this a constrained mechanical task, not a judgment task. */
-  compose:      process.env.PASTEL_MODEL_COMPOSE       || CHEAP_DEFAULT,
+  /** V25: the Wave-0 Direction call — the concept blueprint. Strong model. */
+  direction:    process.env.PASTEL_MODEL_DIRECTION    || MID_DEFAULT,
+  /** V25: Wave-1 component + screen authoring and Wave-3 repair. Strong model. */
+  author:       process.env.PASTEL_MODEL_AUTHOR       || MID_DEFAULT,
   review:       process.env.PASTEL_MODEL_REVIEW       || MID_DEFAULT,
-  visualReview: process.env.PASTEL_MODEL_VISUAL_REVIEW || MID_DEFAULT,
   repair:       process.env.PASTEL_MODEL_REPAIR       || MID_DEFAULT,
 } as const;
 
@@ -71,25 +36,13 @@ export type ModelRole = keyof typeof MODELS;
 
 export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
   clarify:      Number(process.env.PASTEL_MAX_TOKENS_CLARIFY)      || 2500,
-  discovery:    Number(process.env.PASTEL_MAX_TOKENS_DISCOVERY)    || 3000,
-  design:       Number(process.env.PASTEL_MAX_TOKENS_DESIGN)       || 5000,
-  data:         Number(process.env.PASTEL_MAX_TOKENS_DATA)         || 6000,
-  brief:        Number(process.env.PASTEL_MAX_TOKENS_BRIEF)        || 4000,
-  wireframe:    Number(process.env.PASTEL_MAX_TOKENS_WIREFRAME)    || 6000,
-  plan:         Number(process.env.PASTEL_MAX_TOKENS_PLAN)         || 6000,
-  genome:       Number(process.env.PASTEL_MAX_TOKENS_GENOME)       || 4000,
-  brandKit:     Number(process.env.PASTEL_MAX_TOKENS_BRAND_KIT)    || 5000,
-  planner:      Number(process.env.PASTEL_MAX_TOKENS_PLANNER)      || 6000,
-  builderCustom: Number(process.env.PASTEL_MAX_TOKENS_BUILDER_CUSTOM) || 9000,
-  builder:      Number(process.env.PASTEL_MAX_TOKENS_BUILDER)      || 6500,
-  copy:         Number(process.env.PASTEL_MAX_TOKENS_COPY)         || 3000,
-  assemble:     Number(process.env.PASTEL_MAX_TOKENS_ASSEMBLE)     || 5000,
-  compose:      Number(process.env.PASTEL_MAX_TOKENS_COMPOSE)      || 10000,
+  /** V25: the blueprint is the largest structured output in the pipeline —
+   * three concepts + tokens + manifest + data schema in one JSON document. */
+  direction:    Number(process.env.PASTEL_MAX_TOKENS_DIRECTION)    || 16000,
+  /** V25: one complete component or screen file per call. */
+  author:       Number(process.env.PASTEL_MAX_TOKENS_AUTHOR)       || 9000,
   review:       Number(process.env.PASTEL_MAX_TOKENS_REVIEW)       || 4000,
-  visualReview: Number(process.env.PASTEL_MAX_TOKENS_VISUAL_REVIEW) || 4000,
-  /** V22: a screen-level structural rewrite (new chart with axes/gridlines,
-   * restructured detail layout) needs the same budget the builder gets for a
-   * full file — not the smallest tier in the table. */
+  /** V25: a full-file targeted rewrite (same budget as author). */
   repair:       Number(process.env.PASTEL_MAX_TOKENS_REPAIR)       || 9000,
 } as const;
 
@@ -100,10 +53,8 @@ const MAX_TRUNCATION_RETRIES = 2;
  *  at the base budget; it needs real headroom or screens/components ship
  *  mid-expression (unterminated regexes, unclosed JSX tags). */
 const ESCALATION_CAP: Partial<Record<ModelRole, number>> = {
-  wireframe: 32000,
-  compose: 24000,
-  assemble: 24000,
-  builderCustom: 24000,
+  direction: 32000,
+  author: 24000,
   repair: 24000,
 };
 
@@ -141,7 +92,7 @@ function thinkingConfig(role?: ModelRole): ThinkingConfig | Record<string, unkno
  * v6 defaults ALL roles to thinking-off (cheap + fast); set PASTEL_THINKING_BUDGET
  * to a number to enable it. */
 export const LIGHT_ROLES: ReadonlySet<ModelRole> = new Set<ModelRole>([
-  "clarify", "discovery", "design", "data", "brief", "wireframe", "plan", "genome", "brandKit", "planner", "builder", "builderCustom", "copy", "assemble", "compose", "review", "visualReview", "repair",
+  "clarify", "direction", "author", "review", "repair",
 ]);
 
 let cachedClient: MergeGateway | null = null;

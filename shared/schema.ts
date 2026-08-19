@@ -167,7 +167,7 @@ export const bulkInviteMemberSchema = z.object({
 
 export const subscriptions = pgTable("subscriptions", {
   id: uuid("id").primaryKey().defaultRandom(),
-  userId: uuid("user_id").notNull().references(() => users.id, { onDelete: "cascade" }),
+  userId: uuid("user_id").notNull().unique().references(() => users.id, { onDelete: "cascade" }),
   plan: text("plan").notNull().default("free"),
   subscriptionStatus: text("subscription_status"),
   planRenewsAt: timestamp("plan_renews_at"),

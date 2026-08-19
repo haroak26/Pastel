@@ -19,7 +19,7 @@ export function CookieBar() {
   if (!visible) return null;
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-white border-border/60">
+    <div className="fixed bottom-0 left-0 right-0 z-50 border-t bg-background border-border/60">
       <div className="w-full max-w-[1060px] mx-auto px-6 md:px-8 py-4 flex flex-col sm:flex-row sm:items-center gap-3 sm:gap-6">
         <p className="flex-1 text-[12px] font-medium leading-[1.6] text-muted-foreground">
           We use cookies to keep Pastel running smoothly and improve your experience. See our{" "}

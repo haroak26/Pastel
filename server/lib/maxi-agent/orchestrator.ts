@@ -3,60 +3,57 @@ import type { MaxiPhase, PhaseStatus, AgentManifest, VisualReference } from "./t
 import type { UsageRecord } from "./gateway";
 import { ledgerFromUsage } from "./lib/ledger";
 import * as creditService from "../credit-service";
-import type { ProductBrief, WireframePlan, ComponentInventory, CopyPlan, ResolvedTheme, V6ReviewResult, UxDesignPlan, VisualIntent, V21LayoutPlan, ComponentUISpec } from "./schemas";
-import { compileCompanyBlock, megadesignBlock, loadCompanyDoc, selectCompanyReferences, compileDesignKnowledge } from "./knowledge/index";
-import { compileStyles, compileStylesForRun } from "./compile";
-import type { MockDataset } from "./lib/content";
-import { generateCompositionSummary } from "./compose";
-import { auditFiles, type GateReport } from "./checks/audit";
-import { auditContent } from "./checks/content";
-import { auditScreenComposition } from "./checks/review";
-import { geometryPasses } from "./checks/geometry";
-import { buildV16DesignPlan, enforceV16Plan, auditV16Review } from "./contract";
-import { lintAllGeneratedFiles } from "./checks/lint";
-import { RunTiming, waveMs, type TimingReport } from "./lib/timing";
-import { genomeToWireframe, type LayoutGenome } from "./lib/genome";
+import { compileStylesForRun } from "./compile";
 import { captureScreenshots } from "./screenshots";
+import { IncrementalScreenVerifier, type SandboxError } from "./sandbox";
+import { RunTiming, waveMs, type TimingReport } from "./lib/timing";
+import { auditFiles, type GateReport, type GateIssue } from "./checks/audit";
+import { lintAllGeneratedFiles } from "./checks/lint";
+import { geometryIssuesFor } from "./checks/geometry";
+import type { GeometryReport } from "./checks/geometry";
+import { splitIssues, a11yScan, densityNotes, type GateSplit } from "./checks/hard-gate";
+import { auditScreenProps, applyPropAutoFix, type PropContract } from "./lib/prop-validation";
+import { selectCompanyReferences } from "./knowledge/index";
+import type { DesignBlueprint } from "./lib/blueprint";
+import type { BlueprintDerivation } from "./lib/blueprint-derive";
+import { generateDataset, composeDataJs, type V25Dataset } from "./lib/data-gen";
+import { composeShellJsx, composeAppJsx, composePackageJson, composeReadme } from "./lib/shell-gen";
+import { buildFileManifest, uniquenessFingerprint, type FileManifest } from "./lib/file-manifest";
+import type { ModelChat } from "./lib/model-chat";
+import type { AdvisoryReview } from "./agents/advisory-review";
+import type { ResolvedTheme } from "./schemas";
 
 /**
- * Maxi Agent v23 ("Endgame") — dependency-graph wave executor.
+ * Maxi Agent v25 ("Auteur") — the wave executor.
  *
- * Replaces the v20-v22 sequential waterfall (discovery → design → brief →
- * data → wireframe → ux → build → assemble → present → review, ~9 serial
- * network round-trips ≈ 8 minutes) with four waves:
+ *   WAVE 0 · DIRECTION (1 strong call, ~15s)
+ *     Deterministic inspiration scoring → ONE Direction call → the
+ *     deterministic derive pass (WCAG repair, divergence veto, token
+ *     expansion, manifest lint) → the dataset (exemplars → 6-8 dense rows).
+ *     Replaces v24's plan → genome → planner → data → copy chain.
  *
- *   WAVE 0 (<20s): discovery = deterministic nearest-neighbor company
- *                  scoring (no model call); design tokens + product brief =
- *                  ONE combined cheap-tier call (agents/plan.ts).
- *   WAVE 1 (<15s): mode classification (deterministic) → ONE schema-
- *                  constrained call producing the layout genome
- *                  (agents/genome.ts) → deterministic enforcement →
- *                  V21 placement plan (lib/layout-plan.ts).
- *   WAVE 2 (<45s): component build fans out in parallel (capped at
- *                  MAXI_COMPONENT_CONCURRENCY); content/copy run concurrent
- *                  with the build; each screen composes as soon as ITS
- *                  components are ready — not after every component finishes.
- *   WAVE 3 (<30s): one CSS compile (the only serialization point — Tailwind
- *                  needs every screen's classes), then per-screen
- *                  bundle + sandboxed smoke + sandboxed render + geometry
- *                  + deterministic gates + visual review, all concurrent
- *                  against the warm e2b pool (lib/sandbox-render.ts).
- *   WAVE 4: bounded repair — only screens that actually fail a gate get one
- *                  targeted pass. Persistent failures ship FLAGGED in the
- *                  run report (done_needs_review), never silently swallowed.
+ *   WAVE 1 · SYNTHESIS (~35-60s)
+ *     Components ∥ screens in ONE parallel batch (screens code against the
+ *     manifest API, not built code) + the deterministic shared files
+ *     (shell.jsx, data.js, App.jsx) + lint + prop-contract auto-fix.
  *
- * The SSE phase-event wire contract is preserved (phase/status/message
- * events with the client's phase names); real per-wave timing is persisted
- * (docs/timing/TimingReport.json + manifest.timing).
+ *   WAVE 2 · VERIFY (deterministic, warm e2b pool)
+ *     One CSS compile → esbuild bundles → e2b smoke → 3-viewport renders →
+ *     geometry → the HARD/ADVISORY gate split.
  *
- * Sandboxing: generated/untrusted code NEVER executes on the app server.
- * esbuild compiles locally (a compiler, no execution); the smoke render and
- * the Chromium screenshot+geometry render run inside the e2b sandbox.
+ *   WAVE 3 · POLISH (0-3 repair calls, hard failures only)
+ *     One repair call per failing FILE with the gate errors + the rendered
+ *     screenshot; one re-verify round; persistent failures ship FLAGGED.
+ *
+ *   WAVE 4 · ADVISORY REVIEW (1 call, non-blocking)
+ *     A scorecard for the user. It never triggers repair and never gates —
+ *     the v24 118s wave-4 tail is structurally gone.
+ *
+ * The SSE phase-event wire contract and the run-store/credits/manifest
+ * contracts are preserved from v24 — the client UI works unchanged.
  */
 
-export type V6Phase = "discovery" | "design" | "brief" | "data" | "wireframe" | "build" | "assemble" | "review" | "present";
-
-export interface V6RunState {
+export interface V25RunState {
   runId: string;
   prompt: string;
   answers: Record<string, string>;
@@ -67,67 +64,37 @@ export interface V6RunState {
   maxCredits: number;
   visualReference?: VisualReference;
 
-  brief: ProductBrief | null;
-  designTokens: VisualIntent extends never ? never : import("./schemas").DesignTokens | null;
-  visualIntent: VisualIntent | null;
-  hintCompanySlug: string | null;
-  attachedCompanies: string[];
-  /** V23: the layout genome (Wave 1) — the schema-constrained layout contract. */
-  genome: LayoutGenome | null;
-  genomeNotes: string[];
-  wireframe: WireframePlan | null;
-  inventory: ComponentInventory | null;
-  ux: UxDesignPlan | null;
-  layoutPlan: V21LayoutPlan | null;
-  componentSpecs: Record<string, ComponentUISpec>;
-  copy: CopyPlan | null;
-  theme: ResolvedTheme | null;
-  data: MockDataset | null;
-  styles: string;
-  fontFamilies: string[];
+  derivation: BlueprintDerivation | null;
+  dataset: V25Dataset | null;
+  dataNotes: string[];
 
   generatedFiles: Record<string, string>;
   bundles: Record<string, string>;
   generatedScreens: string[];
   failedScreens: string[];
-  sandboxErrors: Array<{ file?: string; message: string }>;
+  sandboxErrors: SandboxError[];
   screenshots: string[];
   screenshotNames: string[];
+  geometryReportsByViewport: Record<number, Record<string, GeometryReport>>;
 
+  gateSplit: GateSplit | null;
   gateReport: GateReport | null;
-  reviewResult: V6ReviewResult | null;
-  visualReviewResult: V6ReviewResult | null;
-  repairCycles: number;
-  composerRetries: Record<string, number>;
-  /** V23: prop-contract audit + auto-fix outcome (docs/review/PropContractReport.json). */
-  propContractReport: import("./lib/prop-validation").ScreenPropAudit & { screens: string[]; autoFixedCount: number; persisted: boolean } | null;
+  propViolations: number;
+  advisory: AdvisoryReview | null;
+  repairCalls: number;
 
   costs: UsageRecord[];
-  /** V23: per-wave wall-clock timing — the regression surface. */
-  timing: TimingReport | null;
-  /** V23: knowledge-base slice sizes per stage (prompt-token lever). */
-  kbSlices: Record<string, { chars: number; files: string[] }>;
-  /** V23: model call count per role (the Wave-0 merge lever). */
   callsByRole: Record<string, number>;
+  timing: TimingReport | null;
+  kbChars: number;
 
+  fingerprint: string | null;
   status: "running" | "done" | "done_needs_review" | "error";
   error: string | null;
-
-  geometryReports: Record<string, import("./checks/geometry").GeometryReport>;
-  /** V24 (WS6): geometry per viewport width — the gate checks every one. */
-  geometryReportsByViewport: Record<number, Record<string, import("./checks/geometry").GeometryReport>>;
 }
 
-const MAX_REPAIR_CYCLES = 1; // V23: bounded repair — one targeted pass only.
-const MAX_COMPOSER_RETRIES = 1;
-
-/** V23: component build concurrency (renamed from PASTEL_PICASSO_*). */
-const COMPONENT_CONCURRENCY = Number(process.env.MAXI_COMPONENT_CONCURRENCY) || 6;
-
-/** Per-run spend ceiling: the chargeable hold when present, else maxCredits. */
-function chargeCeiling(s: V6RunState): number {
-  return s.holdAmount !== undefined ? Math.max(s.holdAmount, s.maxCredits) : s.maxCredits;
-}
+const MAX_REPAIR_CALLS = Number(process.env.MAXI_MAX_REPAIR_CALLS) || 3;
+const AUTHOR_CONCURRENCY = Number(process.env.MAXI_AUTHOR_CONCURRENCY) || 8;
 
 function createState(opts: {
   runId: string;
@@ -139,7 +106,7 @@ function createState(opts: {
   holdAmount?: number;
   maxCredits: number;
   visualReference?: VisualReference;
-}): V6RunState {
+}): V25RunState {
   return {
     runId: opts.runId,
     prompt: opts.prompt,
@@ -150,23 +117,9 @@ function createState(opts: {
     holdAmount: opts.holdAmount,
     maxCredits: opts.maxCredits,
     visualReference: opts.visualReference,
-    brief: null,
-    designTokens: null,
-    visualIntent: null,
-    hintCompanySlug: null,
-    attachedCompanies: [],
-    genome: null,
-    genomeNotes: [],
-    wireframe: null,
-    inventory: null,
-    ux: null,
-    layoutPlan: null,
-    componentSpecs: {},
-    copy: null,
-    theme: null,
-    data: null,
-    styles: "",
-    fontFamilies: [],
+    derivation: null,
+    dataset: null,
+    dataNotes: [],
     generatedFiles: {},
     bundles: {},
     generatedScreens: [],
@@ -174,24 +127,23 @@ function createState(opts: {
     sandboxErrors: [],
     screenshots: [],
     screenshotNames: [],
+    geometryReportsByViewport: {},
+    gateSplit: null,
     gateReport: null,
-    reviewResult: null,
-    visualReviewResult: null,
-    repairCycles: 0,
+    propViolations: 0,
+    advisory: null,
+    repairCalls: 0,
     costs: [],
-    timing: null,
-    kbSlices: {},
     callsByRole: {},
+    timing: null,
+    kbChars: 0,
+    fingerprint: null,
     status: "running",
     error: null,
-    geometryReports: {},
-    geometryReportsByViewport: {},
-    composerRetries: {},
-    propContractReport: null,
   };
 }
 
-function usageHook(s: V6RunState) {
+function usageHook(s: V25RunState) {
   return (rec: UsageRecord) => {
     s.costs.push(rec);
     s.callsByRole[rec.role] = (s.callsByRole[rec.role] ?? 0) + 1;
@@ -202,46 +154,58 @@ function emitActivity(runId: string, message: string) {
   emitEvent(runId, { type: "activity", message });
 }
 
-function setPhase(s: V6RunState, phase: MaxiPhase, status: PhaseStatus, message?: string) {
+function setPhase(s: V25RunState, phase: MaxiPhase, status: PhaseStatus, message?: string) {
   emitEvent(s.runId, { type: "phase", phase, status });
   if (message) emitActivity(s.runId, message);
 }
 
-async function persistJsonDoc(runId: string, path: string, title: string, kind: string, value: unknown): Promise<void> {
+function fileKind(path: string): string {
+  if (path.startsWith("src/screens/")) return "screen";
+  if (path.startsWith("src/components/")) return "component";
+  if (path.startsWith("src/lib/")) return "component";
+  if (path === "src/data.js") return "data";
+  if (path.endsWith(".css")) return "style";
+  if (path === "README.md" || path === "package.json" || path === "manifest.json" || path === "src/App.jsx") return "build";
+  return "build";
+}
+
+async function persistGeneratedFile(runId: string, path: string, content: string): Promise<void> {
+  const kind = fileKind(path);
+  // The SSE event flows even when persistence fails — clients render from
+  // the event stream; the DB is durability, not the delivery path.
+  emitEvent(runId, { type: "file", file: { path, kind, content } });
   try {
-    const content = JSON.stringify(value, null, 2);
+    await persistFile(runId, { path, kind, content });
+  } catch (err) {
+    console.warn(`[maxi-agent] failed to persist file ${path}:`, err instanceof Error ? err.message : err);
+  }
+}
+
+async function persistJsonDoc(runId: string, path: string, title: string, kind: string, value: unknown): Promise<void> {
+  const content = JSON.stringify(value, null, 2);
+  emitEvent(runId, { type: "doc", doc: { path, title, kind, content } });
+  try {
     await persistDoc(runId, { path, title, kind, content });
-    emitEvent(runId, { type: "doc", doc: { path, title, kind, content } });
   } catch (err) {
     console.warn(`[maxi-agent] failed to persist doc ${path}:`, err instanceof Error ? err.message : err);
   }
 }
 
 async function persistDocRaw(runId: string, path: string, title: string, kind: string, content: string): Promise<void> {
+  emitEvent(runId, { type: "doc", doc: { path, title, kind, content } });
   try {
     await persistDoc(runId, { path, title, kind, content });
-    emitEvent(runId, { type: "doc", doc: { path, title, kind, content } });
   } catch (err) {
     console.warn(`[maxi-agent] failed to persist doc ${path}:`, err instanceof Error ? err.message : err);
   }
 }
 
-async function persistGeneratedFile(runId: string, path: string, content: string): Promise<void> {
-  const kind = path.startsWith("src/screens/") ? "screen"
-    : path.startsWith("src/components/") ? "component"
-    : path === "src/styles.css" ? "style"
-    : path === "src/data.js" ? "data"
-    : "build";
-  try {
-    await persistFile(runId, { path, kind, content });
-    emitEvent(runId, { type: "file", file: { path, kind, content } });
-  } catch (err) {
-    console.warn(`[maxi-agent] failed to persist file ${path}:`, err instanceof Error ? err.message : err);
-  }
+function chargeCeiling(s: V25RunState): number {
+  return s.holdAmount !== undefined ? Math.max(s.holdAmount, s.maxCredits) : s.maxCredits;
 }
 
 // ═══════════════════════════════════════════════════════════════════════
-// MAIN PIPELINE — the wave executor
+// MAIN PIPELINE
 // ═══════════════════════════════════════════════════════════════════════
 
 export async function startAgentLoop(
@@ -251,7 +215,7 @@ export async function startAgentLoop(
   projectId?: string,
   holdId?: string,
   userId?: string,
-  opts?: { maxCredits?: number; holdAmount?: number; visualReference?: VisualReference },
+  opts?: { maxCredits?: number; holdAmount?: number; visualReference?: VisualReference; chat?: ModelChat },
 ): Promise<void> {
   const s = createState({
     runId, prompt, answers,
@@ -264,448 +228,167 @@ export async function startAgentLoop(
   const t = new RunTiming();
 
   try {
-    // ══ WAVE 0 — DISCOVERY (deterministic) + DESIGN+BRIEF (one call) ══
+    // ══ WAVE 0 — DIRECTION (1 call) + deterministic derive + data ══
     t.begin(0, "discovery");
     setPhase(s, "discovery", "running", "Matching your product to design references…");
-    // Deterministic nearest-neighbor scoring — NO model call (was a MID call).
     const references = await selectCompanyReferences(prompt, "track", answers.inspiration?.trim().toLowerCase());
-    s.hintCompanySlug = references.primary.manifest.slug;
     t.end();
 
-    t.begin(0, "plan");
-    setPhase(s, "design", "running", "Designing tokens + product brief in one pass…");
-    const { runPlanAgent } = await import("./agents/plan");
-    const planOut = await runPlanAgent({
+    t.begin(0, "direction");
+    setPhase(s, "design", "running", "Designing three directions and choosing one…");
+    const { runDirectionAgent } = await import("./agents/direction");
+    const direction = await runDirectionAgent({
       prompt,
       answers,
       hintManifest: references.primary.manifest,
       visualReference: s.visualReference,
+      chat: opts?.chat,
       onUsage,
     });
-    s.designTokens = planOut.tokens;
-    s.theme = planOut.theme;
-    s.visualIntent = planOut.visual;
-    s.brief = planOut.brief;
-    s.attachedCompanies = planOut.attachedCompanies;
-    for (const note of planOut.notes) emitActivity(runId, note);
-    if (planOut.usedFallback.length > 0) emitActivity(runId, `Deterministic fallback used for: ${planOut.usedFallback.join(", ")}`);
-    t.end(`calls=${s.callsByRole.plan ?? 0}`);
+    const d = direction.derivation;
+    s.derivation = d;
+    s.kbChars = 0; // kb slice accounting happens inside the direction prompt assembly
+    if (direction.usedFallback) emitActivity(runId, "Direction: deterministic fallback blueprint used (model call unavailable)");
+    for (const note of direction.notes) emitActivity(runId, `Direction: ${note}`);
+    t.end(`calls=${s.callsByRole.direction ?? 0}`);
 
-    const { css, fontFamilies } = compileStyles(s.theme);
-    s.styles = css;
-    s.fontFamilies = fontFamilies;
+    const bp = d.blueprint;
+    await updateRun(runId, { title: bp.brief.title });
+    emitEvent(runId, { type: "title", title: bp.brief.title });
+    emitActivity(runId, `${bp.brief.title} — ${bp.brief.productType} · mode ${bp.brief.mode} · concept "${d.concept.name}" · inspired by ${bp.brief.inspiration.primary}`);
 
-    await updateRun(runId, { title: s.brief.title });
-    emitEvent(runId, { type: "title", title: s.brief.title });
-    emitActivity(runId, `${s.brief.title} — ${s.brief.productType} · mode ${s.brief.mode ?? "?"} · inspired by ${s.brief.inspiration.primary}`);
-
-    await persistJsonDoc(runId, "docs/brief/ProductBrief.json", "Product Brief", "brief", s.brief);
-    await persistJsonDoc(runId, "docs/design/DesignTokens.json", "Design Tokens", "design-tokens", s.designTokens);
-    await persistJsonDoc(runId, "docs/design/VisualIntent.json", "Visual Intent", "visual-intent", s.visualIntent);
-    await persistDocRaw(runId, "docs/design/V16DesignKnowledge.md", "V16 Design Knowledge", "design-knowledge", compileDesignKnowledge(references.primary, references.secondary, references.capabilities));
-    await persistDocRaw(runId, "docs/design/megadesign.md", "Megadesign — Universal Design Law", "megadesign", await megadesignBlock());
-    for (const slug of s.attachedCompanies) {
-      const doc = await loadCompanyDoc(slug);
-      if (doc) await persistDocRaw(runId, `docs/design/${slug}.md`, `${slug} — Design Reference`, "company-design", doc);
-    }
-    setPhase(s, "design", "done");
     setPhase(s, "brief", "done");
-    setPhase(s, "discovery", "done");
-    emitActivity(runId, `Wave 0 done — design + brief in ONE call (was two)`);
+    setPhase(s, "design", "done");
 
-    // ══ WAVE 1 — MODE CLASSIFICATION + LAYOUT GENOME (one call) ══
-    t.begin(1, "genome");
-    setPhase(s, "wireframe", "running", "Classifying the product mode and deriving the layout genome…");
-    const { runGenomeAgent } = await import("./agents/genome");
-    const { retrieveKnowledge } = await import("./knowledge/retrieval");
-    const kb = await retrieveKnowledge({ company: s.brief.inspiration.primary, mode: s.brief.mode });
-    s.kbSlices["wave1-genome"] = { chars: kb.chars, files: kb.files };
-    t.stageNote(`kb=${kb.chars} chars`);
+    await persistJsonDoc(runId, "docs/brief/Blueprint.json", "Design Blueprint", "blueprint", bp);
+    await persistJsonDoc(runId, "docs/design/DesignTokens.json", "Design Tokens", "design-tokens", d.tokens);
+    await persistDocRaw(
+      runId,
+      "docs/design/Concepts.md",
+      "Design Concepts",
+      "concepts",
+      [
+        `# Three directions for ${bp.brief.title}`,
+        "",
+        ...bp.concepts.map(
+          (c, i) => `## ${i + 1}. ${c.name}${i === d.chosenIndex ? " — CHOSEN" : ""}\n\n${c.thesis}\n\n- Fonts: ${c.fonts.display} + ${c.fonts.body}\n- Density: ${c.density} · Corners: ${c.cornerLanguage} · Motion: ${c.motion}\n- Signature moves: ${c.signatureMoves.join("; ")}\n- Primary: ${c.palette.primary} on ${c.palette.background}\n`,
+        ),
+      ].join("\n"),
+    );
+    await persistJsonDoc(runId, "docs/planning/ComponentManifest.json", "Component Manifest", "component-manifest", bp.componentManifest);
 
-    const genomeOut = await runGenomeAgent({ brief: s.brief, visualReference: s.visualReference, onUsage });
-    s.genome = genomeOut.genome;
-    s.genomeNotes = genomeOut.notes;
-    if (genomeOut.usedFallback) emitActivity(runId, `Layout genome: deterministic ${genomeOut.mode} default used`);
-    for (const note of genomeOut.notes) emitActivity(runId, `Genome: ${note}`);
-    t.end(`mode=${genomeOut.mode}`);
-
-    // Deterministic derivation: genome → enforced wireframe + inventory + UX.
-    const derived = genomeToWireframe(genomeOut.genome, s.brief);
-    s.wireframe = derived.wireframe;
-    s.inventory = derived.inventory;
-    s.ux = derived.ux;
-    for (const note of derived.notes) emitActivity(runId, note);
-
-    // V16 product contract (safety net — required blocks, inventory sanity).
-    const v16 = enforceV16Plan(s.brief, s.wireframe, s.inventory, buildV16DesignPlan(s.brief, references.capabilities.map((c) => c.id)));
-    s.wireframe = v16.plan;
-    s.inventory = v16.inventory;
-    for (const note of v16.notes) emitActivity(runId, note);
-    await persistDocRaw(runId, "docs/design/V16ProductContract.md", "V16 Product Contract", "product-contract", JSON.stringify(v16.design, null, 2));
-
-    await persistJsonDoc(runId, "docs/planning/Genome.json", "Layout Genome", "genome", s.genome);
-    await persistJsonDoc(runId, "docs/planning/WireframePlan.json", "Wireframe Plan", "wireframe-plan", s.wireframe);
-    await persistJsonDoc(runId, "docs/planning/ComponentInventory.json", "Component Inventory", "component-inventory", s.inventory);
-    await persistJsonDoc(runId, "docs/planning/UXDesign.json", "UX Design", "ux-design", s.ux);
-    emitActivity(runId, `${s.wireframe.screens.length} screens wired · ${s.inventory.components.length} components planned`);
     setPhase(s, "wireframe", "done");
-    emitActivity(runId, `Wave 1 done — genome produced (${genomeOut.mode} mode vocabulary)`);
+    emitActivity(runId, `Wave 0 done — blueprint: ${bp.screens.length} screens · ${bp.componentManifest.length} components · 3 concepts`);
 
-    // ══ WAVE 2 — COMPONENTS ∥ CONTENT ∥ COPY ∥ PER-SCREEN COMPOSITION ══
-    t.begin(2, "build");
-    setPhase(s, "data", "running", "Writing content while components build…");
-    setPhase(s, "build", "running", "Building components in parallel…");
-
-    const compositionSummary = generateCompositionSummary(s.wireframe, s.ux, s.visualIntent);
-    const ceiling = chargeCeiling(s);
-    const budgeted = s.inventory.components.filter((item) => {
-      if (ledgerFromUsage(s.costs).totalCredits <= ceiling) return true;
-      emitActivity(runId, `Budget ceiling reached — skipping ${item.name}`);
-      return false;
-    });
-
-    // ── Component build, per component, with per-screen early composition ──
-    // Each component's completion triggers a check: every screen whose whole
-    // component set is ready composes immediately (V23 — the biggest
-    // parallelism win, implemented for this real time).
-    const { runPlanner } = await import("./agents/planner");
-    const { generateComponent } = await import("./agents/builder");
-    const builtByName: Record<string, string> = {};
-
-    // Content + copy run CONCURRENT with the component build (was serial).
-    // The copy agent gets the deterministic dataset (content-shape parity);
-    // the run's real dataset lands when runData resolves and the composer
-    // consumes that one.
-    const { runData } = await import("./agents/data");
-    const { runCopy } = await import("./agents/copy");
-    const { mockDataset } = await import("./lib/content");
-    const dataPromise = runData({ brief: s.brief, seed: prompt + runId, onUsage });
-    const copyPromise = runCopy({ brief: s.brief, wireframe: s.wireframe, theme: s.theme!, data: mockDataset(s.brief, runId), onUsage }).catch((err) => {
-      console.warn("[maxi-agent] copy call failed:", err instanceof Error ? err.message : err);
-      return null;
-    });
-
-    const dataOut = await dataPromise;
-    s.data = dataOut.data;
-    if (dataOut.usedFallback) emitActivity(runId, "Content: deterministic domain-pack fallback used");
-    for (const note of dataOut.notes) emitActivity(runId, note);
-
-    // V24 WS5: domain-contract cross-check BEFORE the build — units and
-    // dates are validated against the brief's declared domain and supplied
-    // dataset, and any violation is repaired deterministically (domain-pack
-    // regeneration / date remap). The mismatch is named here, never left to
-    // surface only in the review verdict.
-    {
-      const { enforceDomainContract } = await import("./lib/domain-contract");
-      const enforced = enforceDomainContract({
-        brief: s.brief!,
-        domain: s.data.domain,
-        data: s.data,
-        copy: null,
-        seed: prompt + runId,
-      });
-      s.data = enforced.data;
-      for (const note of enforced.notes) emitActivity(runId, note);
-    }
-    await persistJsonDoc(runId, "docs/planning/DataPlan.json", "Content & Data Plan", "data-plan", {
-      domain: s.data.domain,
-      people: s.data.people,
-      metrics: s.data.metrics,
-      series: s.data.series,
-      rows: s.data.rows,
-      activity: s.data.activity,
-      detailFields: s.data.detailFields,
-      detailValues: s.data.detailValues,
-      settingsSections: s.data.settingsSections,
-      searchPlaceholder: s.data.searchPlaceholder,
-      emptyTitle: s.data.emptyTitle,
-      emptyBody: s.data.emptyBody,
-      reviews: s.data.reviews,
-      reviewHeading: s.data.reviewHeading,
-      trustItems: s.data.trustItems,
-      primaryCta: s.data.primaryCta,
-      homeCta: s.data.homeCta,
-      priceSuffix: s.data.priceSuffix,
-    });
-    emitActivity(runId, `Content written — ${s.data.rows.length} items · ${s.data.reviews.length} reviews (${s.data.domain} domain)`);
+    t.begin(0, "data");
+    setPhase(s, "data", "running", "Generating the dataset…");
+    const generated = generateDataset(bp, prompt + runId);
+    s.dataset = generated.dataset;
+    s.dataNotes = generated.notes;
+    for (const note of generated.notes) emitActivity(runId, `Data: ${note}`);
+    const dataJs = composeDataJs(generated.dataset);
+    s.generatedFiles["src/data.js"] = dataJs;
+    await persistGeneratedFile(runId, "src/data.js", dataJs);
+    await persistJsonDoc(runId, "docs/planning/DataPlan.json", "Dataset", "data-plan", generated.dataset);
+    emitActivity(runId, `Data: ${generated.dataset.list.rows.length} rows · ${generated.dataset.metrics.length} metrics · ${generated.dataset.activity.length} activity events`);
     setPhase(s, "data", "done");
+    t.end();
 
-    // Copy + layout plan resolve during the build (was serial after it).
-    const { buildLayoutPlanFromGenome: layoutFromGenome } = await import("./lib/layout-plan");
-    const companyBlock = await compileCompanyBlock(s.brief.inspiration.primary).catch(() => "");
-    const megadesign = await megadesignBlock();
-    const layoutPromise = (async (): Promise<V21LayoutPlan> => {
-      const cp = await copyPromise;
-      if (cp) {
-        s.copy = cp;
-      } else {
-        const { fallbackCopy } = await import("./agents/copy");
-        s.copy = fallbackCopy(s.brief!, s.wireframe!, s.data!);
-        emitActivity(runId, "Copy: deterministic fallback used (model call unavailable)");
-      }
-      // V24 WS5.2: table/list field completeness against the layout
-      // template's declared table contract, BEFORE composing — unfillable
-      // columns are dropped deterministically, never shipped.
-      {
-        const { enforceDomainContract } = await import("./lib/domain-contract");
-        const enforced = enforceDomainContract({
-          brief: s.brief!,
-          domain: s.data!.domain,
-          data: s.data!,
-          copy: s.copy!,
-          seed: prompt + runId,
-        });
-        s.data = enforced.data;
-        if (enforced.copy) s.copy = enforced.copy;
-        for (const note of enforced.notes) emitActivity(runId, note);
-      }
-      await persistJsonDoc(runId, "docs/planning/CopyPlan.json", "Copy Plan", "copy-plan", s.copy);
-      emitActivity(runId, `Copy plan written — ${s.copy.screens.length} screen(s)`);
-      s.layoutPlan = layoutFromGenome({ wireframe: s.wireframe!, ux: s.ux!, mode: s.genome?.mode ?? s.brief?.mode }, s.visualIntent, s.copy);
-      await persistJsonDoc(runId, "docs/planning/LayoutPlan.json", "V21 Layout Plan", "layout-plan", s.layoutPlan);
-      emitActivity(runId, "Layout plan derived from the genome — placement, headers, and section budget set");
-      return s.layoutPlan;
-    })();
+    // Deterministic shared files.
+    t.begin(0, "shared-files");
+    const shellJsx = composeShellJsx();
+    s.generatedFiles["src/lib/shell.jsx"] = shellJsx;
+    await persistGeneratedFile(runId, "src/lib/shell.jsx", shellJsx);
+    t.end();
 
-    const specs = await runPlannerBatch(budgeted, s, compositionSummary, onUsage);
-    const componentSpecs: Record<string, ComponentUISpec> = {};
-    for (const spec of specs) componentSpecs[spec.name] = spec;
-    s.componentSpecs = componentSpecs;
-
-    // Dependency tracker: screen → its required component set; a screen's
-    // composition promise resolves as soon as every required component is
-    // built (and the copy/layout plan has landed).
-    const needsByScreen = new Map<string, Set<string>>();
-    const { screenNeedsComponents } = await import("./compose");
-    for (const screen of s.wireframe.screens) {
-      needsByScreen.set(screen.id, new Set(screenNeedsComponents(screen)));
-    }
-    const readyComponents = new Set<string>();
-    const waiting: Array<{ screenId: string; resolve: () => void }> = [];
-    const markComponentReady = (name: string) => {
-      readyComponents.add(name);
-      for (let i = waiting.length - 1; i >= 0; i--) {
-        const w = waiting[i];
-        const needs = needsByScreen.get(w.screenId);
-        if (needs && [...needs].every((n) => readyComponents.has(n))) {
-          waiting.splice(i, 1);
-          w.resolve();
-        }
-      }
-    };
-    const waitForScreenComponents = (screenId: string): Promise<void> => {
-      const needs = needsByScreen.get(screenId);
-      if (needs && [...needs].every((n) => readyComponents.has(n))) return Promise.resolve();
-      return new Promise((resolve) => waiting.push({ screenId, resolve }));
+    // ══ WAVE 1 — SYNTHESIS: components ∥ screens, one parallel batch ══
+    t.begin(1, "synthesis");
+    setPhase(s, "build", "running", `Authoring ${bp.componentManifest.length} components and ${bp.screens.length} screens in parallel…`);
+    const authorModule = await import("./agents/author");
+    const { authorComponent, authorScreen } = authorModule;
+    type AuthorContext = import("./agents/author").AuthorContext;
+    const ctx: AuthorContext = {
+      blueprint: bp,
+      concept: d.concept,
+      theme: d.theme,
+      dataJs,
+      chat: opts?.chat,
+      onUsage,
     };
 
-    // Builder pool: per component, concurrency-capped; each completion
-    // releases the screens waiting on it.
-    const buildPool = async () => {
-      const size = Math.min(COMPONENT_CONCURRENCY, specs.length);
-      let next = 0;
-      const lanes = Array.from({ length: Math.max(1, size) }, async () => {
-        for (;;) {
-          const i = next++;
-          if (i >= specs.length) return;
-          const spec = specs[i];
-          try {
-            const code = await generateComponent(spec, s.theme!, {
-              onUsage,
-              wireframe: s.wireframe!,
-              data: s.data!,
-              visualReference: s.visualReference,
-              compositionSummary,
-            });
-            builtByName[spec.name] = code;
-            s.generatedFiles[`src/components/${spec.name}.jsx`] = code;
-            await persistGeneratedFile(runId, `src/components/${spec.name}.jsx`, code);
-            emitActivity(s.runId, `Built ${spec.name}`);
-          } catch (err) {
-            // V23: transient failure → the base-anchored fidelity repair path
-            // (rewrites the vendored base under the taxonomy floors) so the
-            // screen never loses a component to a model hiccup.
-            const { repairWithFidelity } = await import("./agents/builder");
-            const repaired = await repairWithFidelity(spec, s.theme!, { onUsage, productContext: `${s.brief!.title} — ${s.brief!.productType}` }).catch(() => null);
-            if (repaired) {
-              builtByName[spec.name] = repaired.code;
-              s.generatedFiles[`src/components/${spec.name}.jsx`] = repaired.code;
-              await persistGeneratedFile(runId, `src/components/${spec.name}.jsx`, repaired.code);
-              emitActivity(s.runId, `Built ${spec.name} via fidelity repair (${repaired.verdict.action} — ${(repaired.verdict.similarity * 100).toFixed(0)}% vs base)`);
-            } else {
-              emitActivity(s.runId, `Build of ${spec.name} failed (${err instanceof Error ? err.message : String(err)})`);
-              builtByName[spec.name] = "";
-              // A failed component still "completes" — the screen composition
-              // marks the screen failed rather than deadlocking the batch.
-            }
+    type Job =
+      | { kind: "component"; spec: (typeof bp)["componentManifest"][number] }
+      | { kind: "screen"; screen: (typeof bp)["screens"][number] };
+
+    const jobs: Job[] = [
+      ...bp.componentManifest.map((spec) => ({ kind: "component", spec }) as Job),
+      ...bp.screens.map((screen) => ({ kind: "screen", screen }) as Job),
+    ];
+
+    let next = 0;
+    const failedComponents: string[] = [];
+    const lanes = Array.from({ length: Math.min(AUTHOR_CONCURRENCY, jobs.length) }, async () => {
+      for (;;) {
+        const i = next++;
+        if (i >= jobs.length) return;
+        const job = jobs[i]!;
+        try {
+          if (job.kind === "component") {
+            const out = await authorComponent(ctx, job.spec);
+            const path = `src/components/${job.spec.name}.jsx`;
+            s.generatedFiles[path] = out.code;
+            await persistGeneratedFile(runId, path, out.code);
+            emitActivity(runId, `Built ${job.spec.name}`);
+          } else {
+            const out = await authorScreen(ctx, job.screen);
+            const path = `src/screens/${job.screen.id}.jsx`;
+            s.generatedFiles[path] = out.code;
+            await persistGeneratedFile(runId, path, out.code);
+            emitActivity(runId, `Authored screen ${job.screen.id}`);
           }
-          markComponentReady(spec.name);
+        } catch (err) {
+          const what = job.kind === "component" ? job.spec.name : job.screen.id;
+          const message = err instanceof Error ? err.message : String(err);
+          if (job.kind === "component") {
+            // Last resort: the deterministic fidelity path (v24's lesson).
+            const fallbackCode = await fidelityFallbackComponent(what, job.spec.intent, d.theme, onUsage).catch(() => null);
+            if (fallbackCode) {
+              const path = `src/components/${what}.jsx`;
+              s.generatedFiles[path] = fallbackCode;
+              await persistGeneratedFile(runId, path, fallbackCode);
+              emitActivity(runId, `Built ${what} via the deterministic fidelity fallback (${message})`);
+              continue;
+            }
+            failedComponents.push(what);
+            emitActivity(runId, `Build of ${what} failed — screens mounting it will be flagged (${message})`);
+          } else {
+            s.failedScreens.push(job.screen.id);
+            emitActivity(runId, `Screen ${what} could not be authored — flagged (${message})`);
+          }
         }
-      });
-      await Promise.all(lanes);
-    };
-
-    const buildPromise = buildPool();
-    const { composeOneScreenV20, composeSharedFiles } = await import("./compose");
-
-    // Shared run files (data.js + lib/shell.jsx) — generated ONCE before
-    // per-screen composition; every screen imports them.
-    {
-      const sharedInput = {
-        brief: s.brief!,
-        wireframe: s.wireframe!,
-        inventory: s.inventory!,
-        copy: s.copy!,
-        theme: s.theme!,
-        data: s.data!,
-        ux: s.ux,
-        visual: s.visualIntent,
-        builtComponents: builtByName,
-        componentSpecs,
-        companyBlock,
-        megadesignBlock: megadesign,
-        layoutPlan: s.layoutPlan,
-        visualReference: s.visualReference,
-        onUsage,
-      };
-      const shared = composeSharedFiles(sharedInput);
-      s.generatedFiles = { ...s.generatedFiles, ...shared };
-    }
-
-    // Each screen composes as soon as ITS components + the layout plan land.
-    setPhase(s, "assemble", "running", "Composing screens as their components finish…");
-    const composedFiles: Record<string, string> = {};
-    const composedPrimitives: Record<string, string> = {};
-    const composedFailed: string[] = [];
-    const composedErrors: Record<string, string> = {};
-
-    const composePromises = s.wireframe.screens.map(async (screen) => {
-      await Promise.all([waitForScreenComponents(screen.id), buildPromise, layoutPromise]);
-      const res = await composeOneScreenV20({
-        brief: s.brief!,
-        wireframe: s.wireframe!,
-        inventory: s.inventory!,
-        copy: s.copy!,
-        theme: s.theme!,
-        data: s.data!,
-        ux: s.ux,
-        visual: s.visualIntent,
-        builtComponents: builtByName,
-        componentSpecs,
-        companyBlock,
-        megadesignBlock: megadesign,
-        layoutPlan: s.layoutPlan,
-        visualReference: s.visualReference,
-        onUsage,
-      }, screen);
-      if (res.failed) {
-        composedFailed.push(screen.id);
-        composedErrors[screen.id] = res.error ?? "composer failure";
-      } else {
-        composedFiles[res.path] = res.content;
-        Object.assign(composedPrimitives, res.primitives);
       }
-      return res;
     });
+    await Promise.all(lanes);
 
-    await Promise.all(composePromises);
-    emitActivity(runId, `Assembled ${s.wireframe.screens.length} screens from ${Object.keys(builtByName).filter((n) => builtByName[n]).length} components`);
-
-    // Bounded composer retry (V23: 1 retry) for failed screens.
-    if (composedFailed.length > 0) {
-      emitActivity(runId, `Screen composer retry for: ${composedFailed.join(", ")}`);
-      for (const sid of composedFailed) {
-        s.composerRetries[sid] = (s.composerRetries[sid] ?? 0) + 1;
-      }
-      const retryInput = {
-        brief: s.brief!,
-        wireframe: s.wireframe!,
-        inventory: s.inventory!,
-        copy: s.copy!,
-        theme: s.theme!,
-        data: s.data!,
-        ux: s.ux,
-        visual: s.visualIntent,
-        builtComponents: builtByName,
-        componentSpecs,
-        companyBlock,
-        megadesignBlock: megadesign,
-        layoutPlan: s.layoutPlan,
-        visualReference: s.visualReference,
-        onUsage,
-        retryNotes: composedFailed
-          .map((sid) => composedErrors[sid] ?? `previous layout for ${sid} was rejected`)
-          .filter((n): n is string => Boolean(n)),
-      };
-      for (const screen of s.wireframe.screens) {
-        if (!composedFailed.includes(screen.id)) continue;
-        const res = await composeOneScreenV20(retryInput, screen);
-        if (!res.failed) {
-          composedFiles[res.path] = res.content;
-          Object.assign(composedPrimitives, res.primitives);
-          composedFailed.splice(composedFailed.indexOf(screen.id), 1);
-          delete composedErrors[screen.id];
-        }
+    // Any screen whose components all failed cannot render — flag it.
+    for (const screen of bp.screens) {
+      if (s.failedScreens.includes(screen.id)) continue;
+      const mounted = bp.componentManifest.filter((c) => c.usedBy.includes(screen.id));
+      if (mounted.length > 0 && mounted.every((c) => failedComponents.includes(c.name))) {
+        s.failedScreens.push(screen.id);
+        emitActivity(runId, `Screen ${screen.id} flagged — every component it mounts failed to build`);
       }
     }
 
-    // V23: screens still failing after the bounded retry are NOT a hard
-    // run failure — they ship flagged. The report carries failedScreens.
-    for (const sid of composedFailed) {
-      s.failedScreens.push(sid);
-      emitActivity(runId, `Screen ${sid} could not be composed — flagged in the run report (${composedErrors[sid] ?? "composer failure"})`);
-    }
+    // Project files.
+    const appJsx = composeAppJsx(bp);
+    s.generatedFiles["src/App.jsx"] = appJsx;
+    await persistGeneratedFile(runId, "src/App.jsx", appJsx);
+    const pkg = composePackageJson(bp);
+    s.generatedFiles["package.json"] = pkg;
+    await persistGeneratedFile(runId, "package.json", pkg);
 
-    s.generatedFiles = { ...s.generatedFiles, ...composedFiles };
-    for (const [p, code] of Object.entries(composedPrimitives)) {
-      if (!s.generatedFiles[p]) s.generatedFiles[p] = code;
-    }
-    s.generatedFiles["src/styles.css"] = s.styles;
-
-    // V23: prop-contract audit + deterministic auto-fix (the Picasso
-    // mechanic, wired into the wave executor). Every composed screen is
-    // checked against the planner's declared required props BEFORE it is
-    // persisted or verified; crash-prone chrome-only mounts are replaced
-    // with safe data-mount wrappers so `undefined.map` can't ship.
-    {
-      const propModule = await import("./lib/prop-validation");
-      const { auditScreenProps, applyPropAutoFix } = propModule;
-      type PropContract = import("./lib/prop-validation").PropContract;
-      const contract: PropContract = {
-        generatedAt: new Date().toISOString(),
-        entries: Object.entries(s.componentSpecs).map(([name, spec]) => ({
-          componentId: name,
-          componentName: name,
-          importPath: `src/components/${name}.jsx`,
-          props: Object.fromEntries(
-            spec.props.map((p) => [p.name, { type: p.type, required: p.default === undefined, description: "" }]),
-          ),
-        })),
-      };
-      const screenPaths = Object.keys(s.generatedFiles).filter((p) => /^src\/screens\/[^/]+\.jsx$/.test(p));
-      let violations: import("./lib/prop-validation").PropViolation[] = [];
-      let autoFixedCount = 0;
-      for (const path of screenPaths) {
-        const audit = auditScreenProps(s.generatedFiles[path], contract);
-        if (audit.violations.length === 0) continue;
-        const fixed = applyPropAutoFix(s.generatedFiles[path], audit, contract);
-        if (fixed.fixed.length > 0) {
-          s.generatedFiles[path] = fixed.code;
-          autoFixedCount += fixed.fixed.length;
-        }
-        violations = [...violations, ...fixed.audit.violations];
-      }
-      s.propContractReport = { violations, autoFixed: [], screens: screenPaths, autoFixedCount, persisted: true };
-      if (autoFixedCount > 0) emitActivity(runId, `Prop contract: auto-fixed ${autoFixedCount} crash-prone mount(s) in composed screens`);
-      if (violations.length > 0) emitActivity(runId, `Prop contract: ${violations.length} violation(s) still flagged (${violations.map((v) => v.componentName).join(", ")})`);
-      await persistJsonDoc(runId, "docs/review/PropContractReport.json", "Prop Contract Report", "prop-contract-report", s.propContractReport);
-    }
-
-    for (const [p, content] of Object.entries(s.generatedFiles)) {
-      await persistGeneratedFile(runId, p, content);
-    }
-
-    // V20 lint pass: scan generated files for anti-slop violations and auto-fix them.
+    // Lint auto-fix pass (deterministic, zero calls).
     const lintResult = lintAllGeneratedFiles(s.generatedFiles);
     if (lintResult.issues.length > 0) {
       const high = lintResult.issues.filter((i) => i.severity === "high").length;
@@ -717,180 +400,277 @@ export async function startAgentLoop(
         s.generatedFiles[p] = code;
         await persistGeneratedFile(runId, p, code);
       }
-      emitActivity(runId, `Lint: auto-fixed ${Object.keys(lintResult.fixedFiles).length} file(s)`);
     }
-    t.end(`components=${Object.keys(builtByName).filter((n) => builtByName[n]).length} screens=${s.wireframe.screens.length}`);
+
+    // Prop-contract audit + auto-fix against the manifest API.
+    {
+      const contract: PropContract = {
+        generatedAt: new Date().toISOString(),
+        entries: bp.componentManifest.map((c) => ({
+          componentId: c.name,
+          componentName: c.name,
+          importPath: `src/components/${c.name}.jsx`,
+          props: Object.fromEntries(c.props.map((p) => [p.name, { type: p.type, required: p.required, description: p.description ?? "" }])),
+        })),
+      };
+      let violations = 0;
+      let autoFixed = 0;
+      for (const screen of bp.screens) {
+        const path = `src/screens/${screen.id}.jsx`;
+        const code = s.generatedFiles[path];
+        if (!code) continue;
+        const audit = auditScreenProps(code, contract);
+        if (audit.violations.length === 0) continue;
+        const fixed = applyPropAutoFix(code, audit, contract);
+        if (fixed.fixed.length > 0) {
+          s.generatedFiles[path] = fixed.code;
+          await persistGeneratedFile(runId, path, fixed.code);
+          autoFixed += fixed.fixed.length;
+        }
+        violations += fixed.audit.violations.length;
+      }
+      s.propViolations = violations;
+      if (autoFixed > 0) emitActivity(runId, `Prop contract: auto-fixed ${autoFixed} crash-prone mount(s)`);
+      if (violations > 0) emitActivity(runId, `Prop contract: ${violations} violation(s) flagged for repair`);
+    }
+    t.end(`components=${bp.componentManifest.length - failedComponents.length}/${bp.componentManifest.length} screens=${bp.screens.length - s.failedScreens.length}/${bp.screens.length}`);
     setPhase(s, "build", "done");
 
-    // ══ WAVE 3 — ONE CSS COMPILE, THEN SANDBOXED RENDER + GATES ∥ ══
-    t.begin(3, "compile");
-    setPhase(s, "assemble", "running", "Compiling styles, then verifying every screen in the sandbox…");
-    // The one genuinely unavoidable serialization point: Tailwind needs every
-    // screen's classes before compiling once.
-    const { css: runCss, fontFamilies: runFonts } = compileStylesForRun(s.theme!, s.generatedFiles);
-    s.styles = runCss;
-    s.fontFamilies = runFonts;
-    s.generatedFiles["src/styles.css"] = s.styles;
-    await persistGeneratedFile(runId, "src/styles.css", s.styles);
+    // ══ WAVE 2 — VERIFY (deterministic) ══
+    t.begin(2, "verify");
+    setPhase(s, "assemble", "running", "Compiling, rendering, and gating every screen…");
+    const { css, fontFamilies } = compileStylesForRun(d.theme, s.generatedFiles);
+    s.generatedFiles["src/styles.css"] = css;
+    await persistGeneratedFile(runId, "src/styles.css", css);
+
+    const verifier = new IncrementalScreenVerifier();
+    const verifyRun = async (): Promise<void> => {
+      const result = await verifier.verify(s.generatedFiles);
+      s.bundles = result.bundles;
+      s.generatedScreens = Object.keys(result.bundles);
+      s.sandboxErrors = result.errors;
+      if (result.smoke === "e2b") {
+        emitActivity(runId, `Smoke tests ran in the e2b sandbox (${s.generatedScreens.length} screen(s))`);
+      } else {
+        emitActivity(runId, `Smoke tests ${result.smoke} — ${s.generatedScreens.length} screen(s) bundled (esbuild)`);
+      }
+      for (const err of result.errors.slice(0, 5)) {
+        emitActivity(runId, `Sandbox error — ${err.file ?? "project"}: ${err.message.slice(0, 160)}`);
+      }
+      for (const [name, js] of Object.entries(s.bundles)) {
+        await persistGeneratedFile(runId, `.build/${name}.js`, js);
+      }
+    };
+    await verifyRun();
+
+    const shotRun = async (): Promise<void> => {
+      const shotResult = await captureScreenshots({
+        bundles: s.bundles,
+        styles: css,
+        fonts: fontFamilies,
+        heroScalePx: parseFloat(d.theme.cssVars["--text-4xl"] ?? "36"),
+      });
+      s.screenshots = shotResult.screenshots.map((x) => x.dataUrl);
+      s.screenshotNames = shotResult.screenshots.map((x) => x.name);
+      s.geometryReportsByViewport = shotResult.geometryReportsByViewport ?? {};
+      if (shotResult.reason) emitActivity(runId, `Render: ${shotResult.reason}`);
+      else emitActivity(runId, `${s.screenshots.length} screenshot(s) rendered at 1440/768/375`);
+    };
+    await shotRun();
+    t.end(`screens=${s.generatedScreens.length} sandboxes=${Math.max(1, Number(process.env.MAXI_SANDBOX_POOL_SIZE) || 3)}`);
+
+    // Hard/advisory gate split.
+    t.begin(2, "gates");
+    const gateRun = (): void => {
+      const issues: GateIssue[] = [...auditFiles(d.theme, s.generatedFiles).issues];
+      for (const e of s.sandboxErrors) {
+        const target = e.file && s.generatedFiles[e.file] ? e.file : s.generatedScreens[0] ? `src/screens/${s.generatedScreens[0]}.jsx` : "project";
+        issues.push({ file: target, severity: "high", category: "state", description: `Runtime failure: ${e.message}` });
+      }
+      if (s.propViolations > 0) {
+        issues.push({ file: "src/screens", severity: "high", category: "props", description: `${s.propViolations} prop-contract violation(s) survived the auto-fix — required props are missing at mount sites` });
+      }
+      const pushed = new Set<string>();
+      for (const [width, perScreen] of Object.entries(s.geometryReportsByViewport)) {
+        for (const [name, geo] of Object.entries(perScreen)) {
+          const file = s.generatedFiles[`src/screens/${name}.jsx`] ? `src/screens/${name}.jsx` : name;
+          for (const issue of geometryIssuesFor(name, geo, Number(width))) {
+            const key = `${file}|${issue.description}`;
+            if (pushed.has(key)) continue;
+            pushed.add(key);
+            issues.push({ ...issue, file });
+          }
+        }
+      }
+      issues.push(...a11yScan(s.generatedFiles));
+      issues.push(...densityNotes(bp, s.generatedFiles, s.geometryReportsByViewport));
+
+      const split = splitIssues(issues);
+      s.gateSplit = split;
+      s.gateReport = {
+        passed: split.hard.length === 0,
+        score: Math.max(0, 100 - split.hard.length * 12 - split.advisory.length * 3),
+        issues: issues.slice(0, 40),
+      };
+      emitActivity(runId, `Gate: ${s.gateReport.passed ? "PASS" : "hard failures"} — ${split.hard.length} hard · ${split.advisory.length} advisory`);
+    };
+    gateRun();
+    await persistJsonDoc(runId, "docs/review/GateReport.json", "Quality Gate", "gate-report", s.gateReport);
     t.end();
-
-    // Verification + render: concurrent against the warm e2b pool.
-    t.begin(3, "verify-render");
-    const { IncrementalScreenVerifier } = await import("./sandbox");
-    const verifier: InstanceType<typeof IncrementalScreenVerifier> = (s as any).verifier ?? new IncrementalScreenVerifier();
-    (s as any).verifier = verifier;
-    const result = await verifier.verify(s.generatedFiles);
-    s.bundles = result.bundles;
-    s.generatedScreens = Object.keys(result.bundles);
-    s.sandboxErrors = result.errors;
-    if (result.smoke === "e2b") {
-      emitActivity(runId, `Smoke tests ran in the e2b sandbox (${s.generatedScreens.length} screen(s))`);
-    } else {
-      emitActivity(runId, `Smoke tests unavailable (e2b not configured) — ${s.generatedScreens.length} screen(s) bundled`);
-    }
-    for (const err of result.errors.slice(0, 5)) {
-      emitActivity(s.runId, `Sandbox error — ${err.file ?? "project"}: ${err.message.slice(0, 160)}`);
-    }
-    for (const [name, js] of Object.entries(s.bundles)) {
-      await persistGeneratedFile(s.runId, `.build/${name}.js`, js);
-    }
-    emitActivity(s.runId, `${s.generatedScreens.length} screen(s) verified${s.failedScreens.length ? `, ${s.failedScreens.length} failed` : ""}`);
-
-    // Screenshot + DOM-geometry, all concurrent against the warm pool.
-    const shotResult = await captureScreenshots({
-      bundles: s.bundles,
-      styles: s.styles,
-      fonts: s.fontFamilies,
-      heroScalePx: parseFloat(s.theme?.cssVars?.["--text-4xl"] ?? "36"),
-    });
-    s.screenshots = shotResult.screenshots.map((x) => x.dataUrl);
-    s.screenshotNames = shotResult.screenshots.map((x) => x.name);
-    s.geometryReports = shotResult.geometryReports;
-    s.geometryReportsByViewport = shotResult.geometryReportsByViewport ?? {};
-    if (shotResult.reason) emitActivity(runId, `Render: ${shotResult.reason}`);
-    for (const [name, geo] of Object.entries(s.geometryReports)) {
-      const { ok, reasons } = geometryPasses(geo);
-      if (!ok) emitActivity(runId, `Geometry ${name}: ${reasons.join(", ")}`);
-    }
-    emitActivity(runId, `${s.screenshots.length} screenshot(s) rendered in the sandbox`);
-    t.end(`screens=${s.generatedScreens.length} shots=${s.screenshots.length} sandboxes=${Math.max(1, Number(process.env.MAXI_SANDBOX_POOL_SIZE) || 3)}`);
     setPhase(s, "assemble", "done");
 
-    // Present screens (live before review, unchanged contract).
-    setPhase(s, "present", "running", "Presenting your screens — quality review runs next…");
-    emitEvent(s.runId, { type: "screens", screens: s.generatedScreens });
-    await mergeManifest(s.runId, { screens: s.generatedScreens, failedScreens: s.failedScreens, phases: { present: "done" } });
-    emitActivity(runId, `Presented ${s.generatedScreens.length} screen(s) — starting quality review`);
+    // Present screens (before review, unchanged contract).
+    setPhase(s, "present", "running", "Presenting your screens…");
+    emitEvent(runId, { type: "screens", screens: s.generatedScreens });
+    await mergeManifest(runId, { screens: s.generatedScreens, failedScreens: s.failedScreens, phases: { present: "done" } });
+    emitActivity(runId, `Presented ${s.generatedScreens.length} screen(s)`);
     setPhase(s, "present", "done");
 
-    // Quality floor: no verified screens at all is an error state.
-    if (s.generatedScreens.length === 0 && s.brief && s.brief.screenPurposes.length >= 2) {
-      const msg = `All screens failed sandbox verification — check the builder output for import or syntax errors.`;
-      emitActivity(runId, msg);
+    // Quality floor: zero verified screens is an error state.
+    if (s.generatedScreens.length === 0) {
+      const msg = "No screens verified — every screen failed to author or bundle. Check the builder output.";
       s.status = "error";
       s.error = msg;
-      await updateRun(runId, { status: "error", error: s.error });
-      emitEvent(runId, { type: "error", message: s.error });
+      await updateRun(runId, { status: "error", error: msg });
+      emitEvent(runId, { type: "error", message: msg });
       await settleCredits(s);
       return;
     }
 
-    // ══ WAVE 3b — GATES + REVIEW ══
-    t.begin(3, "gate-review");
-    setPhase(s, "review", "running", "Running the quality gate and visual review…");
-    await runGate(s);
-    await runModelReview(s, onUsage);
-    t.end();
-
-    // ══ WAVE 4 — BOUNDED REPAIR (one targeted pass, flagged failures) ══
-    const needsRepair =
-      (!s.reviewResult?.passed || s.failedScreens.length > 0) && s.repairCycles < MAX_REPAIR_CYCLES;
-    if (needsRepair) {
+    // ══ WAVE 3 — POLISH (bounded repair, hard failures only) ══
+    if ((s.gateSplit?.hard.length ?? 0) > 0 && s.repairCalls < MAX_REPAIR_CALLS) {
       if (ledgerFromUsage(s.costs).totalCredits <= chargeCeiling(s)) {
-        s.repairCycles++;
-        emitActivity(runId, `Repair ${s.repairCycles}/${MAX_REPAIR_CYCLES} — one targeted pass…`);
+        t.begin(3, "repair");
         setPhase(s, "build", "running");
-        // V24 (WS9): repair + re-verify + final review are timed as wave 4
-        // — the ~159s gap between w0-w3 and the v23 wall time is now
-        // visible in TimingReport.json + the manifest + RUN_SUMMARY.
-        t.begin(4, "repair");
-        await runRepairRound(s);
-        t.end();
+        emitActivity(runId, `Polish: up to ${MAX_REPAIR_CALLS - s.repairCalls} repair call(s) for ${s.gateSplit!.hard.length} hard failure(s)…`);
+        const { repairFile } = await import("./agents/repair");
+
+        const targets = new Map<string, string[]>();
+        for (const issue of s.gateSplit!.hard) {
+          const file = issue.file ?? "";
+          if (!s.generatedFiles[file]) continue;
+          targets.set(file, [...(targets.get(file) ?? []), issue.description]);
+        }
+
+        const conceptLine = `${bp.brief.title} — concept "${d.concept.name}": ${d.concept.thesis}`;
+        const screenshotByScreen = new Map<string, string>();
+        for (let i = 0; i < s.screenshotNames.length; i++) {
+          screenshotByScreen.set(s.screenshotNames[i]!, s.screenshots[i]!);
+        }
+
+        for (const [path, issues] of targets) {
+          if (s.repairCalls >= MAX_REPAIR_CALLS) break;
+          const screenName = path.startsWith("src/screens/") ? path.slice("src/screens/".length).replace(/\.jsx$/, "") : null;
+          const screenshot = screenName !== null ? screenshotByScreen.get(screenName) : undefined;
+          try {
+            s.repairCalls++;
+            const repaired = await repairFile({
+              path,
+              code: s.generatedFiles[path]!,
+              issues,
+              theme: d.theme,
+              ...(screenshot ? { screenshotDataUrl: screenshot } : {}),
+              conceptLine,
+              chat: opts?.chat,
+              onUsage,
+            });
+            s.generatedFiles[path] = repaired;
+            await persistGeneratedFile(runId, path, repaired);
+            emitActivity(runId, `Repaired ${path}`);
+          } catch (err) {
+            emitActivity(runId, `Repair of ${path} failed (${err instanceof Error ? err.message : String(err)})`);
+          }
+        }
+
+        // One re-verify round for everything the repairs touched.
         setPhase(s, "build", "done");
         setPhase(s, "assemble", "running", "Re-verifying…");
-        t.begin(4, "reverify");
-        await runVerification(s);
-        t.end();
+        t.begin(3, "reverify");
+        await verifyRun();
+        await shotRun();
+        gateRun();
+        await persistJsonDoc(runId, "docs/review/GateReport.json", "Quality Gate", "gate-report", s.gateReport);
+        t.end(`repairs=${s.repairCalls} hard=${s.gateSplit?.hard.length ?? 0}`);
         setPhase(s, "assemble", "done");
-        setPhase(s, "review", "running", "Re-running the quality gate…");
-        t.begin(4, "final-review");
-        await runGate(s);
-        await runModelReview(s, onUsage);
-        t.end();
       } else {
-        emitActivity(runId, "Budget ceiling reached — skipping repair");
+        emitActivity(runId, "Budget ceiling reached — skipping polish");
       }
+    } else if ((s.gateSplit?.hard.length ?? 0) > 0) {
+      emitActivity(runId, `Polish budget exhausted — ${s.gateSplit!.hard.length} hard failure(s) ship flagged`);
     }
 
-    // V23: a screen that still fails ships with the failure explicitly
-    // flagged in the run report — no silent swallow, no infinite loop.
-    const stillFailed = s.failedScreens.filter((f) => s.generatedScreens.includes(f));
-    if (stillFailed.length > 0) {
-      emitActivity(runId, `Flagged screens that still fail verification: ${stillFailed.join(", ")}`);
-    }
+    // ══ WAVE 4 — ADVISORY REVIEW (non-blocking) + FINALIZE ══
+    t.begin(4, "advisory");
+    setPhase(s, "review", "running", "Scoring the design (advisory — never blocks)…");
+    const { runAdvisoryReview } = await import("./agents/advisory-review");
+    s.advisory = await runAdvisoryReview({
+      contextLine: `${bp.brief.title} — ${bp.brief.productType}. Concept "${d.concept.name}": ${d.concept.thesis}`,
+      screens: s.generatedScreens,
+      fileSummaries: s.generatedScreens.map((name) => ({ path: `src/screens/${name}.jsx`, code: s.generatedFiles[`src/screens/${name}.jsx`] ?? "" })),
+      screenshotNames: s.screenshotNames,
+      screenshots: s.screenshots,
+      gateStats: { hard: s.gateSplit?.hard.length ?? 0, advisory: s.gateSplit?.advisory.length ?? 0 },
+      chat: opts?.chat,
+      onUsage,
+    });
+    emitActivity(runId, `Advisory review: ${s.advisory.score}/100 (${s.advisory.verdict})${s.advisory.estimated ? " — estimated (review model unavailable)" : ""}`);
+    await persistJsonDoc(runId, "docs/review/AdvisoryReview.json", "Advisory Review", "advisory-review", s.advisory);
+    setPhase(s, "review", "done");
+    t.end(`score=${s.advisory.score}`);
 
-    // ══ DONE ══
-    s.status = s.reviewResult?.passed && s.failedScreens.length === 0 ? "done" : "done_needs_review";
+    // ══ DONE — manifest, fingerprint, export docs ══
     const costs = ledgerFromUsage(s.costs);
     const report = t.report();
     s.timing = report;
+    s.fingerprint = uniquenessFingerprint(bp, s.generatedFiles);
+
+    const fileManifest: FileManifest = buildFileManifest(s.generatedFiles, bp);
+    const manifestJson = JSON.stringify(fileManifest, null, 2);
+    s.generatedFiles["manifest.json"] = manifestJson;
+    await persistGeneratedFile(runId, "manifest.json", manifestJson);
+    const readme = composeReadme(bp, s.dataset!, Object.keys(s.generatedFiles).filter((p) => p.startsWith("src/") || p === "package.json"));
+    s.generatedFiles["README.md"] = readme;
+    await persistGeneratedFile(runId, "README.md", readme);
+
+    s.status = (s.gateSplit?.hard.length ?? 0) === 0 && s.failedScreens.length === 0 ? "done" : "done_needs_review";
     emitActivity(runId, `Run cost: $${costs.totalDollars.toFixed(4)} (${costs.totalCredits.toFixed(2)} credits) across ${costs.entries.length} model call(s)`);
     emitActivity(runId, `Waves: w0=${(waveMs(report, 0) / 1000).toFixed(1)}s w1=${(waveMs(report, 1) / 1000).toFixed(1)}s w2=${(waveMs(report, 2) / 1000).toFixed(1)}s w3=${(waveMs(report, 3) / 1000).toFixed(1)}s w4=${(waveMs(report, 4) / 1000).toFixed(1)}s — total ${report.wallSeconds}s`);
-    if (s.status === "done_needs_review") emitActivity(runId, "Review did not pass after the bounded repair pass — run marked done_needs_review (shipped but QA-failed).");
+    emitActivity(runId, `Fingerprint: ${s.fingerprint}`);
+    if (s.status === "done_needs_review") emitActivity(runId, "Hard-gate failures survived polish — run marked done_needs_review (shipped but QA-failed).");
 
     await persistJsonDoc(runId, "docs/timing/TimingReport.json", "Wave Timing Report", "timing-report", report);
     await persistJsonDoc(runId, "docs/timing/CallCounts.json", "Model Call Counts", "call-counts", {
       callsByRole: s.callsByRole,
       totalCalls: s.costs.length,
-      kbSlices: s.kbSlices,
     });
 
     const manifestOut: AgentManifest & Record<string, unknown> = {
       screens: s.generatedScreens,
       docs: [
-        "docs/brief/ProductBrief.json",
+        "docs/brief/Blueprint.json",
         "docs/design/DesignTokens.json",
-        "docs/design/VisualIntent.json",
-        "docs/design/megadesign.md",
-        ...s.attachedCompanies.map((c) => `docs/design/${c}.md`),
-        "docs/planning/Genome.json",
-        "docs/planning/WireframePlan.json",
-        "docs/planning/ComponentInventory.json",
-        "docs/planning/UXDesign.json",
-        "docs/planning/CopyPlan.json",
-        "docs/review/ReviewResult.json",
+        "docs/design/Concepts.md",
+        "docs/planning/ComponentManifest.json",
+        "docs/planning/DataPlan.json",
         "docs/review/GateReport.json",
-        "docs/review/FidelityReport.json",
-        "docs/review/PropContractReport.json",
+        "docs/review/AdvisoryReview.json",
         "docs/timing/TimingReport.json",
       ],
-      brandKit: s.designTokens
-        ? {
-            colors: Object.fromEntries(Object.entries(s.designTokens.colors).filter(([k]) => k !== "chart")) as Record<string, string>,
-            fonts: { ...s.designTokens.fonts },
-            sizes: { sectionPaddingY: String(s.designTokens.sectionPaddingY), sectionGap: String(s.designTokens.sectionGap) },
-            radius: Object.fromEntries(Object.entries(s.designTokens.radius).map(([k, v]) => [k, `${v}px`])) as Record<string, string>,
-          }
-        : null,
-      visualIntent: s.visualIntent,
-      styleSeed: s.designTokens ? JSON.stringify(s.designTokens.rationale ?? s.designTokens.mode) : null,
+      brandKit: {
+        colors: Object.fromEntries(Object.entries(d.tokens.colors).filter(([k]) => k !== "chart")) as Record<string, string>,
+        fonts: { ...d.tokens.fonts },
+        sizes: { sectionPaddingY: String(d.tokens.sectionPaddingY), sectionGap: String(d.tokens.sectionGap) },
+        radius: Object.fromEntries(Object.entries(d.tokens.radius).map(([k, v]) => [k, `${v}px`])) as Record<string, string>,
+      },
+      visualIntent: null,
+      styleSeed: d.concept.name,
       phases: {
         discovery: "done",
         design: "done",
         brief: "done",
         data: "done",
         wireframe: "done",
-        review: s.reviewResult?.passed ? "done" : "error",
+        review: "done",
         build: "done",
         assemble: s.failedScreens.length === 0 ? "done" : "error",
         present: "done",
@@ -898,25 +678,27 @@ export async function startAgentLoop(
       failedScreens: s.failedScreens,
       costs,
       quality: {
-        passed: s.reviewResult?.passed ?? false,
-        score: s.reviewResult?.score ?? 0,
-        repairs: s.repairCycles,
+        passed: s.status === "done",
+        score: s.advisory.score,
+        repairs: s.repairCalls,
       },
-      company: s.brief.inspiration.primary,
-      reviewResult: s.reviewResult,
-      /** V23: real per-wave timing — the regression surface. */
+      company: bp.brief.inspiration.primary,
+      reviewResult: null,
       timing: report,
       callsByRole: s.callsByRole,
-      kbSlices: s.kbSlices,
+      kbSlices: { "wave0-direction": { chars: s.kbChars, files: [] } },
+      // v25 extras
+      concepts: bp.concepts.map((c) => ({ name: c.name, thesis: c.thesis })),
+      chosenConcept: d.concept.name,
+      fingerprint: s.fingerprint,
+      fileManifest: fileManifest.files,
     };
 
-    // V24 (WS8): the final updateRun for a COMPLETED run explicitly clears
-    // the `error` field — cleanupStaleRuns may have stamped "Run interrupted
-    // by server restart" on this row mid-flight, and a completed run must
-    // never carry a stale error in its final state.
+    // The final updateRun clears `error` — a completed run never carries a
+    // stale interruption stamp (v24 WS8).
     await updateRun(runId, {
       status: s.status,
-      title: s.brief.title,
+      title: bp.brief.title,
       manifest: manifestOut,
       error: null,
     });
@@ -942,307 +724,49 @@ export async function startAgentLoop(
   }
 }
 
-// ── Wave 2 helpers ────────────────────────────────────────────────────────
+// ── Helpers ────────────────────────────────────────────────────────────────
 
-async function runPlannerBatch(
-  budgeted: ComponentInventory["components"],
-  s: V6RunState,
-  compositionSummary: string,
+/** The deterministic last resort for a component whose authoring failed. */
+async function fidelityFallbackComponent(
+  name: string,
+  intent: string,
+  theme: ResolvedTheme,
   onUsage: (rec: UsageRecord) => void,
-): Promise<ComponentUISpec[]> {
-  const { runPlanner } = await import("./agents/planner");
-  const size = Math.min(COMPONENT_CONCURRENCY, budgeted.length);
-  const results: ComponentUISpec[] = new Array(budgeted.length);
-  let next = 0;
-  const lanes = Array.from({ length: Math.max(1, size) }, async () => {
-    for (;;) {
-      const i = next++;
-      if (i >= budgeted.length) return;
-      const item = budgeted[i];
-      const out = await runPlanner({ item, theme: s.theme!, wireframe: s.wireframe!, data: s.data!, onUsage, compositionSummary });
-      emitActivity(s.runId, `Planned ${item.name}`);
-      results[i] = out.spec;
-    }
-  });
-  await Promise.all(lanes);
-  return results;
-}
-
-// ── Verification + render (Wave 3/4) ──────────────────────────────────────
-
-async function runVerification(s: V6RunState): Promise<void> {
-  const { IncrementalScreenVerifier } = await import("./sandbox");
-  const verifier: InstanceType<typeof IncrementalScreenVerifier> = (s as any).verifier ?? new IncrementalScreenVerifier();
-  (s as any).verifier = verifier;
-  const result = await verifier.verify(s.generatedFiles);
-  s.bundles = result.bundles;
-  s.generatedScreens = Object.keys(result.bundles);
-  s.sandboxErrors = result.errors;
-  s.failedScreens = s.failedScreens.filter((f) => !s.generatedScreens.includes(f));
-  s.failedScreens.push(...result.errors.map((e) => e.file ?? e.message).filter(Boolean));
-
-  for (const err of result.errors.slice(0, 5)) {
-    emitActivity(s.runId, `Sandbox error — ${err.file ?? "project"}: ${err.message.slice(0, 160)}`);
-  }
-  emitActivity(s.runId, `${s.generatedScreens.length} screen(s) verified${s.failedScreens.length ? `, ${s.failedScreens.length} failed` : ""}`);
-
-  for (const [name, js] of Object.entries(s.bundles)) {
-    await persistGeneratedFile(s.runId, `.build/${name}.js`, js);
-  }
-
-  const { css: runCss, fontFamilies } = compileStylesForRun(s.theme!, s.generatedFiles);
-  s.styles = runCss;
-  s.fontFamilies = fontFamilies;
-  s.generatedFiles["src/styles.css"] = s.styles;
-  await persistGeneratedFile(s.runId, "src/styles.css", s.styles);
-
-  s.screenshots = [];
-  s.screenshotNames = [];
-  const shotResult = await captureScreenshots({
-    bundles: s.bundles,
-    styles: s.styles,
-    fonts: s.fontFamilies,
-    heroScalePx: parseFloat(s.theme?.cssVars?.["--text-4xl"] ?? "36"),
-  });
-  s.screenshots = shotResult.screenshots.map((x) => x.dataUrl);
-  s.screenshotNames = shotResult.screenshots.map((x) => x.name);
-  s.geometryReports = shotResult.geometryReports;
-  s.geometryReportsByViewport = shotResult.geometryReportsByViewport ?? {};
-  if (shotResult.reason) emitActivity(s.runId, `Render: ${shotResult.reason}`);
-}
-
-// ── Gate + model review ────────────────────────────────────────────────────
-
-async function runGate(s: V6RunState): Promise<void> {
-  const codeGate = auditFiles(s.theme!, s.generatedFiles);
-  const issues = [...codeGate.issues];
-
-  if (s.data) {
-    issues.push(...auditContent(s.data, s.generatedFiles));
-  }
-
-  if (s.wireframe && s.inventory) {
-    issues.push(...auditScreenComposition(s.wireframe, s.inventory));
-  }
-
-  if (s.sandboxErrors.length > 0) {
-    for (const e of s.sandboxErrors) {
-      const target = e.file && s.generatedFiles[e.file] ? e.file : s.generatedScreens[0] ?? "project";
-      issues.push({
-        file: target,
-        severity: "high",
-        category: "state",
-        description: `Runtime failure: ${e.message}`,
-      });
-    }
-  }
-
-  if (s.wireframe) {
-    issues.push(...auditV16Review(s.brief!, s.wireframe, s.generatedFiles));
-  }
-
-  // V23: prop-contract violations that survived the auto-fix are gate issues.
-  if (s.propContractReport && s.propContractReport.violations.length > 0) {
-    for (const v of s.propContractReport.violations) {
-      issues.push({
-        file: `src/components/${v.componentId}.jsx`,
-        severity: "high",
-        category: "props",
-        description: `${v.componentName} mounted without required prop(s) ${v.missingRequired.join(", ")} (${v.usageCount} mount(s)) — the composer must pass real data from DATA.`,
-      });
-    }
-  }
-
-  // V23: the layout gate validates the composed output against the V21 plan
-  // DERIVED FROM THE GENOME (genome → wireframe → placement plan), plus the
-  // genome contract itself (mode-scoped vocabulary compliance).
-  if (s.layoutPlan || s.genome) {
-    const { auditGenomeLayout } = await import("./checks/layout");
-    issues.push(...auditGenomeLayout(s.genome, s.layoutPlan, s.generatedFiles, s.generatedFiles));
-  }
-
-  if (s.componentSpecs && Object.keys(s.componentSpecs).length > 0) {
-    const { auditPropBindings } = await import("./checks/props");
-    issues.push(...auditPropBindings(s.componentSpecs, s.generatedFiles));
-    // V23: the taxonomy fidelity audit — structural contract + uniqueness
-    // ceiling per built component. Verdicts persist to the run docs.
-    const { auditComponentFidelity } = await import("./checks/fidelity");
-    const fidelity = auditComponentFidelity(s.componentSpecs, s.generatedFiles);
-    issues.push(...fidelity.issues);
-    await persistJsonDoc(s.runId, "docs/review/FidelityReport.json", "Component Fidelity Report", "fidelity-report", fidelity.report);
-    emitActivity(
-      s.runId,
-      `Fidelity: ${fidelity.report.summary.passed}/${fidelity.report.summary.total} component(s) passed (${fidelity.report.summary.highIssues} issue(s))`,
-    );
-  }
-
-  // V24 (WS6): geometry is a HARD gate at every rendered viewport — the
-  // sandbox renders 1440/768/375 and an overflow at ANY width (mobile
-  // clipping included) is a blocking failure. The v16 standard claimed
-  // geometry checks at 1440px and 375px; this is that standard enforced.
-  {
-    const { geometryIssuesFor } = await import("./checks/geometry");
-    const pushed = new Set<string>();
-    for (const [width, perScreen] of Object.entries(s.geometryReportsByViewport ?? {})) {
-      for (const [name, geo] of Object.entries(perScreen)) {
-        const file = s.generatedFiles[`src/screens/${name}.jsx`] ? `src/screens/${name}.jsx` : name;
-        for (const issue of geometryIssuesFor(name, geo, Number(width))) {
-          const key = `${file}|${issue.description}`;
-          if (pushed.has(key)) continue;
-          pushed.add(key);
-          issues.push({ ...issue, file });
-        }
-      }
-    }
-  }
-
-  const high = issues.filter((i) => i.severity === "high").length;
-  const report: GateReport = {
-    passed: high === 0,
-    score: Math.max(0, 100 - issues.length * 5 - high * 10),
-    issues: issues.slice(0, 40),
+): Promise<string | null> {
+  const anchor = name.toLowerCase();
+  const { loadBaseComponent, maxiTokensFromTheme } = await import("./lib/base-components");
+  const base = loadBaseComponent(anchor);
+  if (!base) return null;
+  const { generateComponentWithFidelity } = await import("./lib/fidelity");
+  const tokens = maxiTokensFromTheme(theme);
+  const entry = {
+    id: name,
+    name,
+    taxonomy: "primitive" as const,
+    baseComponent: base.name,
+    description: intent,
+    props: [],
+    variants: [],
+    states: [],
+    customization: `Adapt the base ${base.name} to this product's theme, density, and purpose: ${intent}`,
   };
-  s.gateReport = report;
-  await persistJsonDoc(s.runId, "docs/review/GateReport.json", "Quality Gate", "gate-report", report);
-  emitActivity(s.runId, `Gate: ${report.score}/100 — ${report.passed ? "PASS" : "fixes required"} (${report.issues.length} issue(s))`);
-}
-
-async function runModelReview(s: V6RunState, onUsage: (rec: UsageRecord) => void): Promise<void> {
-  const { runReview, runVisualReview, mergeReviewResults } = await import("./agents/review");
-  const companyBlock = await compileCompanyBlock(s.brief!.inspiration.primary);
-  const megadesign = await megadesignBlock();
-
-  let codeResult: V6ReviewResult;
-  if (s.generatedScreens.length === 0) {
-    codeResult = {
-      passed: false,
-      score: 20,
-      decision: "RETURN_TO_BUILDER",
-      requiredFixes: [],
-      issues: [{ target: "project", severity: "high", category: "review", description: "No screens verified by the sandbox — static review skipped (gate + runtime issues are ground truth)." }],
-      summary: "No verified screens — model review skipped.",
-    };
-    emitActivity(s.runId, "Static review skipped — no verified screens to judge");
-  } else {
-    codeResult = await runReview({
-      brief: s.brief!,
-      theme: s.theme!,
-      companyBlock,
-      megadesign,
-      generatedFiles: s.generatedFiles,
-      verifiedFiles: s.generatedScreens,
-      verificationErrors: s.sandboxErrors.map((e) => (e.file ? `${e.file}: ${e.message}` : e.message)),
-      copy: s.copy,
-      data: s.data,
-      ux: s.ux,
-      wireframe: s.wireframe,
-      inventory: s.inventory,
-      geometryReports: s.geometryReports,
-      visualReference: s.visualReference,
-      onUsage,
-    });
-  }
-
-  let visualResult: V6ReviewResult | null = null;
-  if (s.screenshots.length > 0) {
-    try {
-      visualResult = await runVisualReview({
-        brief: s.brief!,
-        theme: s.theme!,
-        companyBlock,
-        megadesign,
-        screenshotNames: s.screenshotNames,
-        screenshots: s.screenshots,
-        verifiedFiles: s.generatedScreens,
-        wireframe: s.wireframe,
-        inventory: s.inventory,
-        geometryReports: s.geometryReports,
-        visualReference: s.visualReference,
-        onUsage,
-      });
-      if (visualResult) emitActivity(s.runId, `Visual review: ${visualResult.score}/100 — ${visualResult.decision}`);
-    } catch (err) {
-      emitActivity(s.runId, `Visual review skipped (${err instanceof Error ? err.message : String(err)})`);
-    }
-  } else {
-    emitActivity(s.runId, "Visual review skipped — no rendered screenshots available");
-  }
-  s.visualReviewResult = visualResult;
-
-  const result = mergeReviewResults(codeResult, visualResult, {
-    sandboxErrors: s.sandboxErrors,
-    generatedFiles: s.generatedFiles,
+  const { code } = await generateComponentWithFidelity({
+    entry,
+    tokens,
+    productContext: intent,
+    creativeSeed: name,
+    extraContext: `Repair mode: the from-scratch generation failed. Rewrite the base for this product and ensure a default export named ${name}.`,
+    onUsage,
   });
-  s.reviewResult = result;
-
-  emitActivity(s.runId, `Review: ${result.score}/100 — ${result.decision}`);
-  await persistJsonDoc(s.runId, "docs/review/ReviewResult.json", "Review Result", "review-result", result);
+  let final = code;
+  if (!/export\s+default\b/.test(final)) {
+    const fallbackName = base.name.split("-").map((p) => p[0]!.toUpperCase() + p.slice(1)).join("");
+    final = `${final}\nexport default ${final.includes(`function ${name}`) ? name : fallbackName};\n`;
+  }
+  return final;
 }
 
-// ── Repair ────────────────────────────────────────────────────────────────
-
-function collectRepairTargets(s: V6RunState): Map<string, string[]> {
-  const map = new Map<string, string[]>();
-  for (const issue of s.gateReport?.issues ?? []) {
-    const file = issue.file;
-    if (!s.generatedFiles[file]) continue;
-    map.set(file, [...(map.get(file) ?? []), issue.description]);
-  }
-  for (const e of s.sandboxErrors) {
-    if (!e.file || !s.generatedFiles[e.file]) continue;
-    if (!map.has(e.file)) map.set(e.file, []);
-    map.get(e.file)!.push(`Runtime failure: ${e.message}`);
-  }
-  for (const issue of s.reviewResult?.issues ?? []) {
-    const raw = issue.target;
-    const file = raw.startsWith("src/") ? raw : `src/screens/${raw.replace(/\.(?:jsx|tsx)$/, "")}.jsx`;
-    if (!s.generatedFiles[file]) continue;
-    const evidence = `${issue.category}: ${issue.description}`;
-    map.set(file, [...(map.get(file) ?? []), evidence]);
-  }
-  for (const fix of s.reviewResult?.requiredFixes ?? []) {
-    const m = fix.match(/^(src\/\S+?|[a-z0-9_-]+)\s*:\s*([\s\S]+)$/);
-    if (!m) continue;
-    const raw = m[1].trim();
-    const body = m[2].trim();
-    const file = raw.startsWith("src/") ? raw : `src/screens/${raw.replace(/\.(?:jsx|tsx)$/, "")}.jsx`;
-    if (s.generatedFiles[file]) {
-      map.set(file, [...(map.get(file) ?? []), body]);
-    }
-  }
-  return map;
-}
-
-async function runRepairRound(s: V6RunState): Promise<void> {
-  const targets = collectRepairTargets(s);
-  if (targets.size === 0) {
-    emitActivity(s.runId, "Repair: no fixable targets identified");
-    return;
-  }
-  const { repairGeneratedFile } = await import("./agents/builder");
-  for (const [path, fixes] of targets) {
-    emitActivity(s.runId, `Repairing ${path} (${fixes.length} fix(es))`);
-    try {
-      const repaired = await repairGeneratedFile({
-        path,
-        code: s.generatedFiles[path],
-        fixes,
-        theme: s.theme!,
-        onUsage: usageHook(s),
-      });
-      if (repaired && repaired.trim().length > 0) {
-        s.generatedFiles[path] = repaired;
-        await persistGeneratedFile(s.runId, path, repaired);
-      }
-    } catch (err) {
-      emitActivity(s.runId, `Repair of ${path} failed (${err instanceof Error ? err.message : String(err)})`);
-    }
-  }
-}
-
-// ── Credits ───────────────────────────────────────────────────────────────
-
-async function settleCredits(s: V6RunState): Promise<void> {
+async function settleCredits(s: V25RunState): Promise<void> {
   if (!s.holdId || !s.userId) return;
   try {
     if (s.status !== "done" && s.status !== "done_needs_review") {

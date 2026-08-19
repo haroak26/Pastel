@@ -1,26 +1,59 @@
-import { useEffect, useState } from "react";
-import { Link } from "wouter";
-import { motion, useReducedMotion } from "framer-motion";
+import { Fragment, useEffect, useRef, useState } from "react";
+import { Link, useLocation } from "wouter";
+import { motion, AnimatePresence, useReducedMotion } from "framer-motion";
 import { Layout } from "@/components/Layout";
 import { Button } from "@/components/button";
 import { PricingSection } from "@/components/PricingSection";
 import { HeroWave } from "@/components/HeroWave";
+import { PromptInput, type PromptInputHandle } from "@/components/PromptInput";
 import { Eyebrow } from "@/components/ds";
 import { SectionHeader, FeatureCard, type FeatureVariant } from "@/components/marketing";
 import {
+  Activity,
   ArrowRight,
+  Bike,
+  BookOpen,
+  Calendar,
+  ChefHat,
   ChevronDown,
+  Clapperboard,
   Code2,
   Download,
+  Droplets,
+  Dumbbell,
   FileCode2,
+  Flower2,
+  GraduationCap,
   Grid3X3,
+  Heart,
+  Image,
   Layers,
+  Leaf,
+  ListTodo,
+  Luggage,
+  Map,
   MessageSquare,
+  MessageSquareText,
+  Moon,
   MousePointer2,
+  Music,
+  PawPrint,
   PenTool,
+  PiggyBank,
+  Podcast,
+  Repeat,
   Share2,
+  ShoppingCart,
   Sparkles,
+  StickyNote,
+  Sun,
+  Ticket,
+  TrendingUp,
+  Users,
+  Wallet,
+  WandSparkles,
   Zap,
+  type LucideIcon,
 } from "lucide-react";
 
 /* ─── Data ─── */
@@ -28,18 +61,27 @@ import {
 const steps = [
   {
     num: "01",
+    icon: MessageSquareText,
     title: "Describe it",
     description: "Type a sentence about your product — the audience, the vibe, the screens you need.",
+    chip: "bg-[#0B99FF]/10 text-[#0B99FF]",
+    accent: "text-[#0B99FF]",
   },
   {
     num: "02",
+    icon: WandSparkles,
     title: "Watch it take shape",
     description: "The agent drafts real, editable screens with considered layout, color, and type.",
+    chip: "bg-[#6373E5]/10 text-[#6373E5]",
+    accent: "text-[#6373E5]",
   },
   {
     num: "03",
+    icon: PenTool,
     title: "Make it yours",
     description: "Refine every pixel on the canvas, tune the tokens, and export when it feels right.",
+    chip: "bg-[#FD7476]/10 text-[#FD7476]",
+    accent: "text-[#FD7476]",
   },
 ];
 
@@ -173,6 +215,117 @@ function Reveal({
 
 export default function Landing() {
   const [openFaq, setOpenFaq] = useState<number | null>(null);
+  const [, setLocation] = useLocation();
+
+  /* A prompt typed in the hero pre-fills the home page prompt box. */
+  const handleHeroPrompt = (prompt: string) => {
+    sessionStorage.setItem("pastel-landing-prompt", prompt);
+    setLocation("/home");
+  };
+
+  /* Rotating examples shown in the hero prompt box while it's empty. */
+  const heroExamples = [
+    "A landing page for a plant-based cafe...",
+    "Mobile app for tracking daily habits...",
+    "Dashboard for a fitness coach...",
+    "SaaS pricing page with three tiers...",
+    "Portfolio site for a photographer...",
+    "Onboarding flow for a fintech app...",
+    "Product page for premium sneakers...",
+    "Real estate listings app...",
+    "Music player interface...",
+    "Travel booking app with map view...",
+    "Restaurant menu and ordering screen...",
+    "Newsletter signup page...",
+    "Weather app with weekly forecast...",
+    "Recipe app with step-by-step mode...",
+    "Analytics dashboard for marketing teams...",
+    "Chat app with voice notes...",
+    "Fitness class booking app...",
+    "Charity donation landing page...",
+    "Job board with filters and search...",
+    "Creator profile page...",
+    "Learning platform with video lessons...",
+    "Food delivery tracking screen...",
+    "Banking app with transaction history...",
+    "Hotel booking with reviews...",
+    "Crypto portfolio tracker...",
+    "Event ticketing and check-in flow...",
+    "Pet care booking app...",
+    "Team wiki for a startup...",
+    "Online store checkout flow...",
+    "Community forum for gamers...",
+  ];
+
+  /* Short "try it" idea chips shown under the hero prompt box. */
+  const tryIdeas: { label: string; icon: LucideIcon; prompt: string }[] = [
+    { label: "Meal planner", icon: Calendar, prompt: "Design a weekly meal planner app where I can plan breakfast, lunch, and dinner, and it builds a grocery list from my meals for the week." },
+    { label: "Habit tracker", icon: Repeat, prompt: "Design a habit tracker app where I can add daily habits, mark them complete, and see my streak and weekly progress." },
+    { label: "Workout log", icon: Dumbbell, prompt: "Design a workout log app to track sets, reps, and weights for each exercise and show progress over time." },
+    { label: "Recipe app", icon: ChefHat, prompt: "Design a recipe app with a searchable library, step-by-step cooking mode, and ingredient checklists." },
+    { label: "Budget tracker", icon: Wallet, prompt: "Design a budget tracker app that categorizes expenses, shows monthly spending, and alerts me when I'm over budget." },
+    { label: "Reading list", icon: BookOpen, prompt: "Design a reading list app to save books I want to read, track current progress, and add notes and ratings." },
+    { label: "Sleep tracker", icon: Moon, prompt: "Design a sleep tracker app that logs sleep duration and quality and shows trends in a weekly chart." },
+    { label: "Water reminder", icon: Droplets, prompt: "Design a water reminder app that tracks daily intake, sends nudges, and shows a hydration goal ring." },
+    { label: "Grocery list", icon: ShoppingCart, prompt: "Design a grocery list app with shared lists, item categories, and one-tap add from recipes." },
+    { label: "Study planner", icon: GraduationCap, prompt: "Design a study planner app with a semester calendar, assignment deadlines, and daily study sessions." },
+    { label: "Task board", icon: ListTodo, prompt: "Design a kanban task board with drag-and-drop columns, labels, and due dates." },
+    { label: "Notes app", icon: StickyNote, prompt: "Design a minimal notes app with rich text editing, folders, and a quick search." },
+    { label: "Photo gallery", icon: Image, prompt: "Design a photo gallery app with albums, tags, and a full-screen viewer with swipe gestures." },
+    { label: "Music playlist", icon: Music, prompt: "Design a music playlist app with a library, queue, and a now-playing screen." },
+    { label: "Podcast app", icon: Podcast, prompt: "Design a podcast app with subscribed shows, episode downloads, and a sleep timer." },
+    { label: "Fitness classes", icon: Activity, prompt: "Design a fitness class booking app to browse schedules, reserve spots, and see instructor profiles." },
+    { label: "Meditation timer", icon: Flower2, prompt: "Design a meditation timer app with session lengths, ambient sounds, and daily streaks." },
+    { label: "Plant care tracker", icon: Leaf, prompt: "Design a plant care tracker that reminds me to water and rotate each plant and logs growth." },
+    { label: "Pet care app", icon: PawPrint, prompt: "Design a pet care app to track vet visits, feeding schedules, and vaccination records." },
+    { label: "Travel itinerary", icon: Map, prompt: "Design a travel itinerary app that organizes flights, stays, and activities day by day." },
+    { label: "Packing checklist", icon: Luggage, prompt: "Design a packing checklist app with category-based lists and a one-tap reset for each trip." },
+    { label: "Movie watchlist", icon: Clapperboard, prompt: "Design a movie watchlist app to save films to watch, rate what I've seen, and get recommendations." },
+    { label: "Event invitations", icon: Ticket, prompt: "Design an event invitations app to create invites, track RSVPs, and send reminders." },
+    { label: "Savings goals", icon: PiggyBank, prompt: "Design a savings goals app to set targets, track contributions, and show progress toward each goal." },
+    { label: "Outfit planner", icon: Sun, prompt: "Design an outfit planner app where I can put together looks from my wardrobe and plan outfits by week." },
+    { label: "Date night ideas", icon: Heart, prompt: "Design a date night ideas app that suggests activities, restaurants, and itineraries for an evening." },
+    { label: "Home workouts", icon: Dumbbell, prompt: "Design a home workout app with guided sessions, timers, and a weekly plan with no equipment needed." },
+    { label: "Side hustle tracker", icon: TrendingUp, prompt: "Design a side hustle tracker app to log income, expenses, and hours across multiple gigs." },
+    { label: "Family calendar", icon: Users, prompt: "Design a family calendar app with shared events, color-coded members, and chore reminders." },
+    { label: "Food delivery", icon: Bike, prompt: "Design a food delivery app with a restaurant list, cart, and live order tracking on a map." },
+  ];
+  const promptRef = useRef<PromptInputHandle>(null);
+
+  /* Show 4 idea chips; periodically swap one for a new random idea. */
+  const [shownIdeas, setShownIdeas] = useState<number[]>([]);
+  const lastSlotRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const pickInitial = () => {
+      const pool = tryIdeas.map((_, i) => i);
+      const picks: number[] = [];
+      while (picks.length < 4 && pool.length) {
+        picks.push(pool.splice(Math.floor(Math.random() * pool.length), 1)[0]);
+      }
+      setShownIdeas(picks);
+    };
+    pickInitial();
+    const t = setInterval(() => {
+      setShownIdeas((prev) => {
+        if (prev.length < 2) return prev;
+        let slot = Math.floor(Math.random() * prev.length);
+        if (lastSlotRef.current !== null && prev.length > 1) {
+          while (slot === lastSlotRef.current) {
+            slot = Math.floor(Math.random() * prev.length);
+          }
+        }
+        lastSlotRef.current = slot;
+        const available = tryIdeas.map((_, i) => i).filter((i) => !prev.includes(i));
+        const next = available[Math.floor(Math.random() * available.length)];
+        if (next === undefined) return prev;
+        const copy = [...prev];
+        copy[slot] = next;
+        return copy;
+      });
+    }, 4000);
+    return () => clearInterval(t);
+  }, []);
 
   /* Support /#features navigation from the header on other pages. */
   useEffect(() => {
@@ -183,69 +336,110 @@ export default function Landing() {
   }, []);
 
   return (
-    <Layout fullWidth logo="/PastelLogoNew.svg">
+    <Layout fullWidth logo="/UpdatePastelFull.svg?v=5" logoClassName="h-[38px] md:h-[42px]">
       <div className="landing-grid" />
 
       {/* ── Hero ── */}
-      <section className="relative w-full overflow-hidden pt-20 md:pt-32 pb-36 md:pb-64">
+      <section className="relative w-full overflow-hidden bg-background border-b border-border pt-10 md:pt-16 pb-36 md:pb-48">
         <div className="relative px-6 md:px-10">
           <div className="relative mx-auto max-w-4xl text-center">
             <Reveal>
               <div className="mb-8 flex justify-center">
                 <Eyebrow label="NEW">Export design code for free</Eyebrow>
               </div>
+            </Reveal>
 
-              <h1 className="text-[40px] sm:text-[50px] md:text-[58px] lg:text-[66px] text-foreground font-medium leading-[1.04] tracking-[-0.04em] mb-8 text-pretty">
+            <Reveal delay={0.06}>
+              <h1 className="text-[24px] sm:text-[34px] md:text-[40px] lg:text-[46px] text-foreground font-[550] leading-[1.12] tracking-[-0.02em] text-balance">
                 Describe your idea.
                 <br />
-                Design your product.
+                <span className="bg-gradient-to-r from-[#0B99FF] via-[#6373E5] to-[#FD7476] bg-clip-text text-transparent">
+                  Design your product.
+                </span>
               </h1>
+            </Reveal>
 
-              <p className="mx-auto mb-10 max-w-[560px] text-[15.5px] md:text-[17px] text-fg-secondary font-normal leading-[1.7] text-pretty">
-                One sentence is all it takes to get real, editable screens. Then refine
-                every pixel on a real canvas, with components, vectors, and your whole team.
-              </p>
-
-              <div className="flex items-center justify-center gap-6">
-                <Link href="/auth/signup">
-                  <Button design="pill" size="md" className="h-[46px] px-6 text-[15px]">
-                    Start designing free
-                  </Button>
-                </Link>
-                <button
-                  onClick={() => document.getElementById("features")?.scrollIntoView({ behavior: "smooth", block: "start" })}
-                  className="group flex items-center gap-1.5 text-[15px] font-medium text-fg-muted hover:text-foreground transition-colors border-none bg-transparent cursor-pointer"
-                >
-                  See it in action
-                  <ArrowRight size={15} strokeWidth={2} className="transition-transform duration-200 group-hover:translate-x-0.5" />
-                </button>
+            <Reveal delay={0.18}>
+              <div className="mx-auto mt-8 md:mt-9 max-w-xl">
+                <PromptInput ref={promptRef} onSubmit={handleHeroPrompt} compact examples={heroExamples} />
               </div>
+
+              <div className="mt-6 flex items-center justify-center gap-2 max-w-[640px] mx-auto relative">
+                <AnimatePresence mode="popLayout">
+                  {shownIdeas.map((i) => {
+                    const { label, icon: Icon, prompt } = tryIdeas[i];
+                    return (
+                      <motion.button
+                        key={label}
+                        layout
+                        initial={{ opacity: 0, y: 8, scale: 0.94 }}
+                        animate={{ opacity: 1, y: 0, scale: 1 }}
+                        exit={{ opacity: 0, y: -8, scale: 0.96 }}
+                        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+                        onClick={() => promptRef.current?.typePrompt(prompt)}
+                        className="group flex min-w-0 flex-1 items-center justify-center gap-1.5 rounded-full bg-surface-subtle px-3 h-[30px] text-[12.5px] font-medium leading-[1.2] transition-colors cursor-pointer hover:bg-surface-hover"
+                      >
+                        <Icon size={13} strokeWidth={1.75} className="shrink-0 text-fg-faint group-hover:text-foreground" />
+                        <span className="truncate text-fg-muted group-hover:text-foreground">{label}</span>
+                      </motion.button>
+                    );
+                  })}
+                </AnimatePresence>
+              </div>
+
+              <p className="mt-5 text-center text-[13px] font-normal text-fg-muted">
+                Get Started Free &middot; 50 credits per day
+              </p>
             </Reveal>
           </div>
         </div>
-
-        <HeroWave variant="hero" className="h-[150px] md:h-[190px]" />
       </section>
 
-      {/* ── Features ── */}
+      {/* ── How it works ── */}
       <section id="features" className="relative w-full scroll-mt-[64px] py-20 md:py-28">
         <div className="mx-auto max-w-[1280px] px-6 md:px-10">
           <Reveal>
             <SectionHeader
-              label="Features"
+              centered
+              label="How it works"
               title="From sentence to shipped design."
               subtitle="No blank canvas anxiety. No wrestling with tools before the idea is clear."
             />
           </Reveal>
-          <div className="mt-14 md:mt-20 grid md:grid-cols-3 gap-x-12 gap-y-10">
+
+          <div className="mt-14 md:mt-20 flex flex-col gap-y-12 md:flex-row md:items-start md:gap-x-10 lg:gap-x-16">
             {steps.map((step, i) => (
-              <Reveal key={step.num} delay={i * 0.1}>
-                <div className="border-t border-border pt-6">
-                  <p className="text-[13px] font-semibold text-[#FF7A6E] tracking-[0.06em]">{step.num}</p>
-                  <h3 className="mt-3 text-[18px] font-semibold text-foreground tracking-[-0.01em]">{step.title}</h3>
-                  <p className="mt-2 text-[14px] text-fg-muted leading-[1.65] font-medium">{step.description}</p>
-                </div>
-              </Reveal>
+              <Fragment key={step.num}>
+                {i > 0 && (
+                  <div className="flex justify-center md:block md:shrink-0 md:pt-[14px]" aria-hidden>
+                    <ArrowRight
+                      className={"h-5 w-5 rotate-90 md:rotate-0 " + step.accent}
+                      strokeWidth={1.5}
+                    />
+                  </div>
+                )}
+                <Reveal delay={i * 0.1} className="flex-1">
+                  <div className="flex flex-col items-center text-center">
+                    <span
+                      className={
+                        "relative flex items-center justify-center w-12 h-12 rounded-2xl shadow-sm ring-1 ring-inset ring-black/[0.05] " +
+                        step.chip
+                      }
+                    >
+                      <step.icon className="h-[22px] w-[22px]" strokeWidth={1.75} />
+                    </span>
+                    <p className={"mt-5 text-[11px] font-bold tracking-[0.18em] " + step.accent}>
+                      {step.num}
+                    </p>
+                    <h3 className="mt-2 text-[19px] font-semibold text-foreground tracking-[-0.01em]">
+                      {step.title}
+                    </h3>
+                    <p className="mt-2.5 max-w-[300px] text-[14px] text-fg-muted font-medium leading-[1.65]">
+                      {step.description}
+                    </p>
+                  </div>
+                </Reveal>
+              </Fragment>
             ))}
           </div>
         </div>
@@ -276,18 +470,18 @@ export default function Landing() {
             </Reveal>
 
             <Reveal delay={0.12}>
-              <div className="relative rounded-2xl border border-border bg-white shadow-[0_20px_60px_-24px_rgba(0,0,0,0.15)] overflow-hidden">
+              <div className="relative rounded-2xl border border-border bg-surface shadow-[0_20px_60px_-24px_rgba(0,0,0,0.15)] overflow-hidden">
                 <div className="flex items-center justify-between px-4 h-11 border-b border-border">
                   <span className="text-[13px] font-semibold text-foreground tracking-[-0.01em]">Marketing site — Home</span>
                   <span className="flex -space-x-1.5">
                     {["bg-sky-400", "bg-fuchsia-400", "bg-amber-400", "bg-emerald-400"].map((c, i) => (
-                      <span key={i} className={`w-5 h-5 rounded-full ${c} border-2 border-white`} />
+                      <span key={i} className={`w-5 h-5 rounded-full ${c} border-2 border-background`} />
                     ))}
                   </span>
                 </div>
 
                 <div className="relative p-5 md:p-7 bg-[radial-gradient(80%_70%_at_30%_0%,hsl(var(--brand)/0.07),transparent_70%)]">
-                  <div className="mx-auto max-w-[300px] rounded-lg border border-border bg-white p-3 shadow-sm">
+                  <div className="mx-auto max-w-[300px] rounded-lg border border-border bg-surface p-3 shadow-sm">
                     <div className="h-2 w-3/5 rounded-full bg-[linear-gradient(90deg,#2a77f8,#fa778c)] mb-2" />
                     <div className="h-1.5 w-full rounded-full bg-border/70 mb-1.5" />
                     <div className="h-1.5 w-11/12 rounded-full bg-border/70 mb-1.5" />
@@ -296,19 +490,19 @@ export default function Landing() {
                   </div>
 
                   <div className="absolute left-[18%] top-[22%]">
-                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-border shadow-sm">
+                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-border shadow-sm">
                       <MousePointer2 size={12} className="text-fuchsia-500" />
                       <span className="text-[11px] font-semibold text-foreground">Ava</span>
                     </span>
                   </div>
                   <div className="absolute right-[16%] top-[48%]">
-                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-white border border-border shadow-sm">
+                    <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-surface border border-border shadow-sm">
                       <MousePointer2 size={12} className="text-sky-500" />
                       <span className="text-[11px] font-semibold text-foreground">Liam</span>
                     </span>
                   </div>
                   <div className="absolute right-[8%] bottom-[16%] max-w-[190px]">
-                    <div className="rounded-xl rounded-br-sm bg-white border border-border shadow-md px-3 py-2">
+                    <div className="rounded-xl rounded-br-sm bg-surface border border-border shadow-md px-3 py-2">
                       <p className="text-[11.5px] text-foreground font-medium leading-snug">Love this gradient — let's use it on the pricing cards too</p>
                       <p className="mt-1 text-[10.5px] text-fg-muted font-medium">Ava · just now</p>
                     </div>
@@ -357,7 +551,7 @@ export default function Landing() {
             </Reveal>
 
             <Reveal delay={0.12}>
-              <div className="rounded-2xl bg-white border border-border shadow-[0_20px_60px_-24px_rgba(0,0,0,0.18)] overflow-hidden">
+              <div className="rounded-2xl bg-surface border border-border shadow-[0_20px_60px_-24px_rgba(0,0,0,0.18)] overflow-hidden">
                 <div className="flex items-center gap-2.5 px-4 h-11 border-b border-border">
                   <span className="flex items-center justify-center w-6 h-6 rounded-full bg-brand/10 text-brand">
                     <Sparkles size={13} strokeWidth={2} />
@@ -501,7 +695,7 @@ export default function Landing() {
       </section>
 
       {/* ── Final CTA ── */}
-      <section className="w-full py-20 md:py-28">
+      <section className="relative w-full py-20 md:py-28 pb-36 md:pb-48">
         <div className="mx-auto max-w-[1280px] px-6 md:px-10">
           <Reveal>
             <div className="mx-auto max-w-3xl text-center">
@@ -526,6 +720,8 @@ export default function Landing() {
             </div>
           </Reveal>
         </div>
+
+        <HeroWave variant="cta" className="h-[130px] md:h-[170px]" />
       </section>
     </Layout>
   );

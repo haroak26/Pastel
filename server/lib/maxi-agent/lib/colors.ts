@@ -85,6 +85,12 @@ export function darken(hex: string, amount: number): string {
   return hslToHex(h, s, Math.max(0, Math.round(l * (1 - amount))));
 }
 
+/** Lighten a hex color by `amount` in [0..1] (moves lightness toward white). */
+export function lighten(hex: string, amount: number): string {
+  const { h, s, l } = hexToHsl(hex);
+  return hslToHex(h, s, Math.min(100, Math.round(l + (100 - l) * amount)));
+}
+
 /** WCAG relative luminance (0..1). */
 export function relativeLuminance(hex: string): number {
   const { r, g, b } = hexToRgb(hex);

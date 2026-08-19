@@ -1,0 +1,33 @@
+{
+  "runId": "6e23bdc2-4632-4a00-94ce-94c21b4292ce",
+  "brief": "A running tracker for competitive runners that logs sessions and shows coach-grade pace metrics",
+  "title": "A Running Tracker For",
+  "status": "error",
+  "wallSeconds": 85.9,
+  "models": {
+    "clarify": null,
+    "direction": null,
+    "author": null,
+    "review": null,
+    "repair": null
+  },
+  "cost": null,
+  "screens": [],
+  "failedScreens": [],
+  "gate": {
+    "passed": false
+  },
+  "advisory": null,
+  "calls": null,
+  "fingerprint": null,
+  "waves": {
+    "w0": 0,
+    "w1": 0,
+    "w2": 0,
+    "w3": 0,
+    "w4": 0
+  },
+  "fileCount": 14,
+  "docCount": 6,
+  "screenshotFiles": []
+}

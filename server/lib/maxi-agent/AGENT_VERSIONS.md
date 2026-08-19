@@ -2,10 +2,138 @@
 
 This document records the agent's architecture rather than only its release
 labels. Version names are historical milestones; the active implementation is
-the **Maxi Agent v24** described below. Everything before v24 is historical
-record — v23 and earlier pipelines were retired in the v24 rebuild.
+the **Maxi Agent v25 ("Auteur")** described below. Everything before v25 is
+historical record — v24 and earlier pipelines were retired in the v25 rebuild.
+The full v25 design document is `V25_DESIGN.md`.
 
-## Maxi Agent V24 (Active)
+## Maxi Agent V25 — "Auteur" (Active)
+
+V25 is the speed + taste rebuild, built against the v24 test evidence
+(`agenttests/agentv24`): 43 model calls, 7 sequential JSON handoffs, 320s
+wall for a two-screen app, and review scores of 58–62 caused by the
+scaffolding itself (54 layout templates, a 2-component cap, mandatory
+SectionHeaders, accent quotas — the model was never allowed to design).
+
+**The inversion: v20–v24 were a deterministic framework the model filled in;
+v25 is a model that designs, verified by a deterministic framework.**
+
+### New
+
+- **One Direction call** (`agents/direction.ts`, Wave 0): the strong model
+  emits the whole **DesignBlueprint** — brief, THREE distinct named design
+  concepts (palette, real font pairing, density/corner/motion axes,
+  signature moves), a chosen direction, 2–4 screen intents, the component
+  API manifest (name/props/intent/usedBy — the contract Wave-1 authors code
+  against), and the dataSchema with exemplar content. Replaces v24's plan →
+  genome → planner → data → copy chain (five stages, seven handoffs).
+- **Deterministic derive** (`lib/blueprint-derive.ts`): WCAG repair on every
+  concept palette, the **sibling veto** (a chosen concept that is a
+  near-twin of another is swapped for the most divergent one —
+  `conceptDivergence` across hue/type/density/corner axes), token expansion
+  (the 11-color concept palette grows into the full 23-token system with
+  status/chart ramps and density-driven scales), manifest lint (identifier
+  safety, usedBy reconciliation, the Button-primitive floor), and a total-
+  failure fallback blueprint derived from the inspiration manifest.
+- **Deterministic dataset generation** (`lib/data-gen.ts`): the Direction
+  call authors 2–3 exemplar rows; the generator expands them to 6–8 dense
+  rows with seeded variation. The v24 failure class "schema declared
+  minRows ≥ 3, composer shipped 2 rows" is dead — density is solved at the
+  source. Unit/currency/date conformance (the v24 Wave-5 lesson) is by
+  construction.
+- **Parallel synthesis** (`agents/author.ts`, Wave 1): components AND
+  screens author in ONE parallel batch (screens code against the manifest
+  API, not built code). Every call writes ONE complete self-contained file
+  (src/components/<Name>.jsx, src/screens/<id>.jsx). The prompts carry craft
+  PRINCIPLES (one visual idea, display-scale dominant moment, asymmetry,
+  real data, the concept's signature moves) — the v24 rulebook is deleted.
+  Deterministic validation (default export, legal imports, no hex, screens
+  mount their planned components + NavAdapter + DATA) with one corrective
+  retry; persistent failures flag into repair or converge through the
+  deterministic fidelity fallback.
+- **Deterministic shared files** (`lib/shell-gen.ts`): the NavAdapter chrome
+  (locked prop contract — the v24 WS1 lesson, kept), IconOf, src/data.js,
+  src/App.jsx, package.json, README.md, and manifest.json.
+- **Hard/advisory gate split** (`checks/hard-gate.ts`): HARD = runtime
+  failures, esbuild errors, overflow at any viewport, prop violations,
+  illegal imports, hex, missing exports, unidentified inputs. ADVISORY =
+  density, rhythm, hero-scale, alt-text. Repair chases ONLY hard failures
+  (0–3 calls, one per failing file, with the rendered screenshot attached);
+  density notes feed the review instead of blocking.
+- **Advisory review** (`agents/advisory-review.ts`, Wave 4): a scorecard
+  (score/verdict/strengths/improvements), persisted and surfaced in the UI,
+  NEVER blocking and NEVER triggering repair. The v24 118s wave-4
+  re-review tail is structurally gone.
+- **Export manifest + fingerprint** (`lib/file-manifest.ts`): per-file
+  entries with resolved dependency edges and component APIs (drives the
+  client's per-file copy buttons and copy-with-dependency chips), plus the
+  run's uniqueness fingerprint — the anti-slop regression metric.
+- **Injectable model chat** (`lib/model-chat.ts`): every v25 agent takes a
+  `chat` function (production: the gateway; tests: a stub). "Test without
+  real model calls" is an architectural property — the FULL pipeline runs
+  end-to-end in the deterministic suite with zero network.
+
+### Changed
+
+- `gateway.ts`: roles are now `clarify` (cheap) + `direction` / `author` /
+  `repair` / `review` (strong default — the "strong model everywhere"
+  decision). All v24 stage roles are gone.
+- `orchestrator.ts`: the four-wave v25 executor (direction → synthesis →
+  verify → polish → advisory) preserving the SSE phase-event, run-store,
+  credits, and manifest wire contracts. File/doc SSE events flow even when
+  DB persistence fails — the event stream is the delivery path, the DB is
+  durability.
+- `run-store.ts`: the db module is imported lazily; manifest merges degrade
+  gracefully without a database.
+- `agents/design.ts`: trimmed to the pure deterministic helpers
+  (validateDesignTokens, enforceRadiusFloor, enforceCardContrast,
+  designTokensFromManifest, visualIntentFromTokens).
+- `lib/fidelity.ts`: the base-anchored generation path (the repair
+  last-resort) runs on the author role.
+- `wireframe-gate.ts`: a wire-compatible no-op (v25 has no blocking
+  checkpoints; the route + client panel stay wired but inert).
+- `lib/sandbox-render.ts`: `MAXI_DISABLE_E2B=1` forces the sandboxed stages
+  to skip — the deterministic suite never touches external quota.
+
+### Deleted (retired with v24)
+
+agents/{plan,genome,planner,builder,data,copy,screen-composer,review,
+review-merge,brief}.ts, lib/{genome,genome-reconcile,layout-plan,
+layout-templates/,ux-design,content,domain-contract,composition,brand-kit,
+navigation,density,scenes,layout}.ts, compose.ts, contract.ts,
+checks/{content,review,layout,props}.ts — and their tests. The verification
+stack they lived alongside (sandbox.ts, sandbox-render, screenshots,
+compile.ts, checks/{audit,geometry,lint,fidelity}, lib/prop-validation,
+lib/fidelity, knowledge/) is kept and carries into v25.
+
+### Acceptance
+
+The deterministic suite (`npm test`) covers: blueprint schema + derive
+(WCAG repair, sibling veto, token expansion, manifest lint, fallback),
+dataset generation (density, determinism, conformance), authoring against
+a stubbed chat (validation, corrective retry, convergence fallback), the
+a11y/density gates, and the FULL pipeline end-to-end (stubbed chat,
+esbuild-only verification — no network, no keys, no DB). The release gate
+is `MAXI_E2E=1 node --import tsx --test server/tests/maxi-e2e-v25.test.ts`
+(real models + e2b): wall ≤ 180s (target < 120s), ≤ 22 model calls, ≥ 2
+verified screens, zero hard-gate failures, advisory + fingerprint recorded.
+The `agenttests/agentv25/run-e2e.ts` harness writes the RUN_SUMMARY /
+ISSUES_AND_ERRORS artifact protocol for cross-version quality tracking.
+
+### Active Files
+
+- `orchestrator.ts` is the wave executor; `engine.ts` the production entry.
+- `agents/direction.ts` (Wave 0) + `lib/blueprint.ts` (schemas) +
+  `lib/blueprint-derive.ts` (deterministic derive + fallback).
+- `agents/author.ts` (Wave 1) + `lib/shell-gen.ts` (shared files) +
+  `lib/data-gen.ts` (dataset).
+- `checks/hard-gate.ts` (the split) + the kept verification stack
+  (`sandbox.ts`, `screenshots.ts`, `compile.ts`, `checks/`).
+- `agents/repair.ts` (Wave 3) + `agents/advisory-review.ts` (Wave 4).
+- `lib/file-manifest.ts` (export manifest + fingerprint).
+
+---
+
+## Maxi Agent V24 (Historical)
 
 V24 is the correctness + speed rebuild of v23 ("Endgame"), built against the
 reproduced `agenttests/agentv23` e2e failure (37 issues, 62/100 review,

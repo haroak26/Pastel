@@ -50,6 +50,10 @@ interface E2BSandboxLike {
 }
 
 function e2bConfigured(): boolean {
+  // MAXI_DISABLE_E2B=1 forces the sandboxed stages to skip — the
+  // deterministic test suite runs the pipeline end-to-end without any
+  // external dependency (model calls are injected stubs; e2b is off).
+  if (process.env.MAXI_DISABLE_E2B === "1") return false;
   return !!process.env.E2B_API_KEY;
 }
 

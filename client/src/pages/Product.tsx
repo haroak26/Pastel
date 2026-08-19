@@ -154,7 +154,7 @@ function AppPreview() {
 
 export default function Product() {
   return (
-    <Layout fullWidth logo="/PastelLogoNew.svg">
+    <Layout fullWidth logo="/UpdatePastel.svg?v=2">
       <div className="landing-grid" />
 
       {/* ── Hero ── */}

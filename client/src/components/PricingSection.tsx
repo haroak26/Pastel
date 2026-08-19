@@ -7,18 +7,7 @@ import { useUser } from "@/hooks/use-user";
 import { useToast } from "@/hooks/use-toast";
 import { CanvasDropdown } from "@/components/CanvasDropdown";
 import { PLAN_LIMITS, type PlanTier, type BillingPeriod } from "@shared/schema";
-
-type CurrencyCode = "USD" | "AUD" | "GBP" | "CAD" | "EUR";
-
-// Display-only currency conversion. Rates: USD per 1 unit of currency.
-// Actual charges are always billed in USD.
-const CURRENCIES: Record<CurrencyCode, { symbol: string; label: string; usdPerUnit: number }> = {
-  USD: { symbol: "$", label: "US Dollar", usdPerUnit: 1 },
-  AUD: { symbol: "$", label: "Australian Dollar", usdPerUnit: 0.65 },
-  GBP: { symbol: "£", label: "British Pound", usdPerUnit: 1.27 },
-  CAD: { symbol: "$", label: "Canadian Dollar", usdPerUnit: 0.73 },
-  EUR: { symbol: "€", label: "Euro", usdPerUnit: 1.08 },
-};
+import { CURRENCIES, CURRENCY_CODES, type CurrencyCode } from "@/lib/billing";
 
 type CurrentPlan = PlanTier;
 
@@ -87,12 +76,12 @@ export function PricingSection() {
   const currentPlan: CurrentPlan = planInfo?.plan ?? "free";
 
   const checkoutMutation = useMutation({
-    mutationFn: async ({ plan, billingPeriod: bp }: { plan: PlanTier; billingPeriod: BillingPeriod }) => {
+    mutationFn: async ({ plan, billingPeriod: bp, currency: cur }: { plan: PlanTier; billingPeriod: BillingPeriod; currency: CurrencyCode }) => {
       const res = await fetch("/api/billing/checkout", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
-        body: JSON.stringify({ plan, billingPeriod: bp }),
+        body: JSON.stringify({ plan, billingPeriod: bp, currency: cur.toLowerCase() }),
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: "Failed to create checkout session" }));
@@ -134,7 +123,7 @@ export function PricingSection() {
           <CanvasDropdown
             value={currency}
             onChange={(code) => setCurrency(code as CurrencyCode)}
-            options={(Object.keys(CURRENCIES) as CurrencyCode[]).map((code) => ({
+            options={CURRENCY_CODES.map((code) => ({
               value: code,
               label: (
                 <span className="flex w-full items-center justify-between gap-3">
@@ -215,7 +204,7 @@ export function PricingSection() {
                         {user ? (
                           <Button
                             className="flex-1"
-                            onClick={() => checkoutMutation.mutate({ plan: key, billingPeriod })}
+                            onClick={() => checkoutMutation.mutate({ plan: key, billingPeriod, currency })}
                             disabled={key === currentPlan || checkoutMutation.isPending}
                             data-testid={`button-pricing-${key}`}
                           >
@@ -237,7 +226,7 @@ export function PricingSection() {
                     ) : user ? (
                       <Button
                         className="w-full"
-                        onClick={() => checkoutMutation.mutate({ plan: key, billingPeriod })}
+                        onClick={() => checkoutMutation.mutate({ plan: key, billingPeriod, currency })}
                         disabled={key === currentPlan || checkoutMutation.isPending}
                         data-testid={`button-pricing-${key}`}
                       >

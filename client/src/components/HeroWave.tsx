@@ -1,143 +1,94 @@
 import { cn } from "@/lib/utils";
 
 /*
- * The Pastel wave divider — a soft, filled echo of the Pastel mark used to
- * separate hero / CTA sections. Each variant lays out the same brand
- * gradient differently (direction, stops, band colors, phases) so every
- * wave on the site reads as its own, unique shape.
+ * The Pastel streak divider — a line of tapered streak ribbons that mirror
+ * the streak burst of the Pastel mark. Each streak has a domed top and
+ * leans away from the centre (up-left on the left, up-right on the right),
+ * with streaks biggest at the outer edges and shortest in the middle.
+ * Colours sweep in muted steps from brand blue to coral so both brand
+ * colours anchor the divider without the candy pastels.
  *
- * The wave renders into whatever height you give it via `className`
+ * The divider renders into whatever height you give it via `className`
  * (e.g. "h-[150px] md:h-[190px]"). Use `flip` to mirror it vertically for
- * dividers that sit above a section instead of below it.
+ * dividers that sit above a section instead of below it. On small screens
+ * the streak line is pulled lower into the divider.
  */
 
 export type WaveVariant = "hero" | "cta" | "contact";
 
 const WAVE_W = 1440;
 const WAVE_H = 240;
-const WAVE_BASE = 30;
-const WAVE_DIP = 56;
+const STREAK_COUNT = 18;
+const STREAK_BASE_W = WAVE_W / STREAK_COUNT;
+const STREAK_TIP_W = 20;
+const MAX_H = 195; /* tallest at the outer edges */
+const MIN_H = 150; /* shortest in the middle */
+const LEAN = 18;
 
-const WAVE_HARMONICS: Array<[number, number, number]> = [
-  [7, 760, 0.3],
-  [4, 470, 3.1],
-  [2.5, 290, 1.3],
+const HERO_COLORS = [
+  "#0B99FF",
+  "#1997F7",
+  "#2895EF",
+  "#3692E7",
+  "#4490DF",
+  "#528ED7",
+  "#608CCF",
+  "#6F8AC7",
+  "#7D88BF",
+  "#8B85B6",
+  "#9983AE",
+  "#A881A6",
+  "#B67F9E",
+  "#C47D96",
+  "#D27A8E",
+  "#E07886",
+  "#EF767E",
+  "#FD7476",
 ];
 
-interface WaveStyle {
-  gradientId: string;
-  x1: number;
-  y1: number;
-  x2: number;
-  y2: number;
-  stops: Array<{ offset: string; color: string }>;
-  bands: Array<{ offset: number; thickness: number; color: string; opacity: number; phase: number }>;
-}
+const STREAK_COLORS: Record<WaveVariant, string[]> = {
+  /* Brand blue sweeping to coral. */
+  hero: HERO_COLORS,
 
-const WAVE_STYLES: Record<WaveVariant, WaveStyle> = {
-  /* Landing hero — cool blue sweeping up through purple into warm pink. */
-  hero: {
-    gradientId: "hero-wave-grad",
-    x1: 0,
-    y1: 1,
-    x2: 1,
-    y2: 0,
-    stops: [
-      { offset: "0", color: "#2a77f8" },
-      { offset: "0.27", color: "#5088f6" },
-      { offset: "0.48", color: "#6373e5" },
-      { offset: "0.66", color: "#9a71ce" },
-      { offset: "0.81", color: "#dc71aa" },
-      { offset: "0.93", color: "#fa778c" },
-      { offset: "1", color: "#fd7476" },
-    ],
-    bands: [
-      { offset: -10, thickness: 58, color: "#71a7f9", opacity: 0.15, phase: 0.2 },
-      { offset: 27, thickness: 63, color: "#a7c9fa", opacity: 0.12, phase: 2.7 },
-      { offset: 66, thickness: 59, color: "#9f8de6", opacity: 0.13, phase: 5.0 },
-      { offset: 104, thickness: 64, color: "#d48ccf", opacity: 0.12, phase: 1.4 },
-      { offset: 144, thickness: 61, color: "#f486b0", opacity: 0.11, phase: 4.3 },
-      { offset: 182, thickness: 58, color: "#fc859a", opacity: 0.10, phase: 2.0 },
-    ],
-  },
+  /* Footer CTA divider — the same streak line, swept the other way. */
+  cta: [...HERO_COLORS].reverse(),
 
-  /* Footer CTA divider — warm pink fading to periwinkle on a mirrored axis. */
-  cta: {
-    gradientId: "cta-wave-grad",
-    x1: 1,
-    y1: 1,
-    x2: 0,
-    y2: 0,
-    stops: [
-      { offset: "0", color: "#fd7476" },
-      { offset: "0.2", color: "#fa778c" },
-      { offset: "0.42", color: "#dc71aa" },
-      { offset: "0.64", color: "#9a71ce" },
-      { offset: "0.84", color: "#6373e5" },
-      { offset: "1", color: "#5088f6" },
-    ],
-    bands: [
-      { offset: -12, thickness: 60, color: "#fc859a", opacity: 0.15, phase: 3.2 },
-      { offset: 26, thickness: 62, color: "#f486b0", opacity: 0.12, phase: 0.9 },
-      { offset: 66, thickness: 60, color: "#d48ccf", opacity: 0.13, phase: 4.6 },
-      { offset: 104, thickness: 64, color: "#9f8de6", opacity: 0.12, phase: 2.1 },
-      { offset: 144, thickness: 60, color: "#a7c9fa", opacity: 0.11, phase: 5.7 },
-      { offset: 182, thickness: 58, color: "#71a7f9", opacity: 0.10, phase: 2.8 },
-    ],
-  },
-
-  /* Contact footer — bright sweep, blues concentrated at the leading edge. */
-  contact: {
-    gradientId: "contact-wave-grad",
-    x1: 0,
-    y1: 0,
-    x2: 1,
-    y2: 1,
-    stops: [
-      { offset: "0", color: "#5088f6" },
-      { offset: "0.28", color: "#2a77f8" },
-      { offset: "0.52", color: "#9f8de6" },
-      { offset: "0.76", color: "#fa778c" },
-      { offset: "1", color: "#fd7476" },
-    ],
-    bands: [
-      { offset: -8, thickness: 58, color: "#71a7f9", opacity: 0.14, phase: 1.1 },
-      { offset: 32, thickness: 62, color: "#9f8de6", opacity: 0.11, phase: 3.8 },
-      { offset: 70, thickness: 60, color: "#d48ccf", opacity: 0.12, phase: 0.5 },
-      { offset: 108, thickness: 64, color: "#fc859a", opacity: 0.11, phase: 5.9 },
-      { offset: 148, thickness: 60, color: "#a7c9fa", opacity: 0.10, phase: 2.2 },
-    ],
-  },
+  /* Contact footer — same sweep as the hero. */
+  contact: HERO_COLORS,
 };
 
-function waveHeight(x: number, offset = 0, phase = 0) {
-  let y = WAVE_BASE + offset + WAVE_DIP * Math.sin((Math.PI * x) / WAVE_W) ** 2;
-  for (const [a, l, p] of WAVE_HARMONICS) {
-    y += a * Math.sin((2 * Math.PI * x) / l + p + phase);
-  }
-  return y;
+function streakHeight(x: number) {
+  const t = Math.sin((Math.PI * x) / WAVE_W);
+  return MAX_H - (MAX_H - MIN_H) * t;
 }
 
-function wavePath(offset: number, phase = 0) {
-  const n = 160;
-  const pts: string[] = [];
-  for (let i = 0; i <= n; i++) {
-    const x = (WAVE_W * i) / n;
-    pts.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${waveHeight(x, offset, phase).toFixed(1)}`);
-  }
-  return `${pts.join(" ")} L ${WAVE_W} ${WAVE_H} L 0 ${WAVE_H} Z`;
-}
+function streakPath(i: number) {
+  const xi = (i + 0.5) * STREAK_BASE_W;
+  const h = streakHeight(xi);
+  const dir = xi < WAVE_W / 2 ? -1 : 1;
+  const tipX = xi + dir * LEAN;
+  const tipY = WAVE_H - h;
+  const tipL = tipX - STREAK_TIP_W / 2;
+  const tipR = tipX + STREAK_TIP_W / 2;
+  const x0 = i * STREAK_BASE_W - 0.5;
+  const x1 = (i + 1) * STREAK_BASE_W + 0.5;
+  const r = STREAK_TIP_W / 2;
 
-function waveRibbonPath(band: WaveStyle["bands"][number]) {
-  const n = 160;
-  const top: string[] = [];
-  const bottom: string[] = [];
-  for (let i = 0; i <= n; i++) {
-    const x = (WAVE_W * i) / n;
-    top.push(`${i === 0 ? "M" : "L"} ${x.toFixed(1)} ${waveHeight(x, band.offset, band.phase).toFixed(1)}`);
-    bottom.unshift(`L ${x.toFixed(1)} ${waveHeight(x, band.offset + band.thickness, band.phase + 0.7).toFixed(1)}`);
-  }
-  return `${top.join(" ")} ${bottom.join(" ")} Z`;
+  /* Domed top: two quarter arcs meet at the tip centre so the top edge is
+     one continuous rounded cap with no flat run between the corners. */
+  const rdx = x1 - tipR;
+  const rdy = WAVE_H - tipY;
+  const rlen = Math.hypot(rdx, rdy);
+  const rbX = tipR + (rdx / rlen) * r;
+  const rbY = tipY + (rdy / rlen) * r;
+
+  const ldx = x0 - tipL;
+  const ldy = WAVE_H - tipY;
+  const llen = Math.hypot(ldx, ldy);
+  const lbX = tipL + (ldx / llen) * r;
+  const lbY = tipY + (ldy / llen) * r;
+
+  return `M ${x0} ${WAVE_H} L ${x1} ${WAVE_H} L ${rbX.toFixed(1)} ${rbY.toFixed(1)} Q ${tipR.toFixed(1)} ${tipY.toFixed(1)} ${tipX.toFixed(1)} ${tipY.toFixed(1)} Q ${tipL.toFixed(1)} ${tipY.toFixed(1)} ${lbX.toFixed(1)} ${lbY.toFixed(1)} Z`;
 }
 
 export function HeroWave({
@@ -150,7 +101,7 @@ export function HeroWave({
   flip?: boolean;
   className?: string;
 }) {
-  const style = WAVE_STYLES[variant];
+  const colors = STREAK_COLORS[variant];
   return (
     <div
       className={cn(
@@ -161,20 +112,16 @@ export function HeroWave({
       aria-hidden
     >
       <svg
-        className={cn("block h-full w-full", flip && "-scale-y-100")}
+        className={cn(
+          "block h-full w-full",
+          flip && "-scale-y-100",
+          !flip && "max-md:origin-bottom max-md:scale-y-[0.72]",
+        )}
         viewBox={`0 0 ${WAVE_W} ${WAVE_H}`}
         preserveAspectRatio="none"
       >
-        <defs>
-          <linearGradient id={style.gradientId} x1={style.x1} y1={style.y1} x2={style.x2} y2={style.y2}>
-            {style.stops.map((s) => (
-              <stop key={s.offset} offset={s.offset} stopColor={s.color} />
-            ))}
-          </linearGradient>
-        </defs>
-        <path d={wavePath(0)} fill={`url(#${style.gradientId})`} />
-        {style.bands.map((band) => (
-          <path key={band.offset} d={waveRibbonPath(band)} fill={band.color} opacity={band.opacity} />
+        {colors.map((color, i) => (
+          <path key={color + i} d={streakPath(i)} fill={color} />
         ))}
       </svg>
     </div>

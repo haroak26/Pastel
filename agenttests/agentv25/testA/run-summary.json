@@ -1,0 +1,66 @@
+{
+  "runId": "2f603159-21dd-4a93-9cef-7b7c1611b080",
+  "brief": "A running tracker for competitive runners that logs sessions and shows coach-grade pace metrics",
+  "title": "A Running Tracker For",
+  "status": "done",
+  "wallSeconds": 115.6,
+  "models": {
+    "clarify": null,
+    "direction": null,
+    "author": null,
+    "review": null,
+    "repair": null
+  },
+  "cost": null,
+  "screens": [
+    "detail",
+    "home"
+  ],
+  "failedScreens": [],
+  "gate": {
+    "passed": true
+  },
+  "advisory": {
+    "score": 86,
+    "verdict": "polish",
+    "strengths": [
+      "Distinct Nike-inspired point of view with restrained surfaces and one confident accent.",
+      "Oversized weekly metric and custom motion illustration create a clear dominant moment.",
+      "Typography, scale, and tight tracking establish a confident editorial hierarchy.",
+      "Hero bands, metric strips, and lists avoid a repetitive card-grid composition."
+    ],
+    "improvements": [
+      "Differentiate home and detail more; both currently rely on a similar oversized hero treatment.",
+      "Add believable running data such as pace, distance, elevation, routes, and populated activity rows.",
+      "Connect the runner illustration more directly to actual run data or a meaningful activity state.",
+      "Refine supporting control spacing, contrast, and density to match the quality of the hero."
+    ],
+    "summary": "This is a strong, opinionated tracker with a convincing Nike-like visual language and a clear home-screen focal point. It needs more screen-to-screen differentiation and denser running content before it is ready to ship.",
+    "estimated": false
+  },
+  "calls": {
+    "callsByRole": {
+      "direction": 2,
+      "author": 8,
+      "review": 2
+    },
+    "totalCalls": 12
+  },
+  "fingerprint": null,
+  "waves": {
+    "w0": 57.834,
+    "w1": 28.943,
+    "w2": 17.486,
+    "w3": 0,
+    "w4": 8.911
+  },
+  "fileCount": 11,
+  "docCount": 9,
+  "screenshotFiles": [
+    "detail-desktop.png",
+    "detail-mobile.png",
+    "home-desktop.png",
+    "home-mobile.png"
+  ],
+  "recovered": "reconstructed from DB after run.log/summary were overwritten by an accidental run"
+}

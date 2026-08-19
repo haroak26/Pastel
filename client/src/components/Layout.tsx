@@ -16,6 +16,8 @@ interface LayoutProps {
   fullWidth?: boolean;
   /** Custom logo asset for the header/footer (e.g. the new Pastel mark). */
   logo?: string;
+  /** Extra classes for the header logo image (e.g. to override its height). */
+  logoClassName?: string;
 }
 
 const navDropdowns = [
@@ -51,7 +53,7 @@ const navDropdowns = [
   },
 ];
 
-export function Layout({ children, showFooter = true, panel = false, fullWidth = false, logo }: LayoutProps) {
+export function Layout({ children, showFooter = true, panel = false, fullWidth = false, logo, logoClassName }: LayoutProps) {
   const { data: user, isLoading: userLoading } = useUser();
   const logout = useLogout();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -79,14 +81,14 @@ export function Layout({ children, showFooter = true, panel = false, fullWidth =
     clearTimeout(hoverTimeout.current);
   };
 
-  const logoSrc = logo ?? "/PastelLogo.svg";
+  const logoSrc = logo ?? "/UpdatePastel.svg?v=2";
 
   const headerContent = (
     <header className={cn("w-full h-16 md:h-[72px] bg-background z-40 sticky top-0 flex items-center border-b transition-[border-color] duration-200", panel && "border-border")} style={panel ? { borderColor: 'transparent' } : { borderColor: scrolled ? 'hsl(var(--border))' : 'transparent' }}>
       <div className={cn("w-full px-6 md:px-10 overflow-x-hidden flex items-center justify-between", !fullWidth && "max-w-[1280px] mx-auto")}>
         <Link href="/" className="flex items-center">
           {logo ? (
-            <img src={logoSrc} alt="Pastel" height={32} className="h-[32px] w-auto shrink-0" />
+            <img src={logoSrc} alt="Pastel" height={32} className={cn("h-[32px] w-auto shrink-0", logoClassName)} />
           ) : (
             <img src={logoSrc} alt="Pastel" width={100} className="h-auto shrink-0" />
           )}
@@ -223,9 +225,9 @@ export function Layout({ children, showFooter = true, panel = false, fullWidth =
   );
 
   return (
-    <div className="min-h-screen flex flex-col bg-white">
+    <div className="min-h-screen flex flex-col bg-background">
       {panel || fullWidth ? (
-        <div className={cn("flex-1 flex flex-col w-full bg-white", !fullWidth && "max-w-[1280px] mx-auto")}>
+        <div className={cn("flex-1 flex flex-col w-full bg-background", !fullWidth && "max-w-[1280px] mx-auto")}>
           {headerContent}
           {mobileMenuContent}
           <main className="flex-1 w-full lds-marketing-main">
@@ -236,14 +238,14 @@ export function Layout({ children, showFooter = true, panel = false, fullWidth =
         <>
           {headerContent}
           {mobileMenuContent}
-          <main className="flex-1 w-full bg-white lds-marketing-main">
+          <main className="flex-1 w-full bg-background lds-marketing-main">
             {children}
           </main>
         </>
       )}
 
       {showFooter && (
-        <footer className="mt-auto bg-white">
+        <footer className="mt-auto bg-background">
           <div className={cn("w-full px-6 md:px-10 border-t", !fullWidth && "max-w-[1280px] mx-auto")} style={{ borderColor: 'hsl(var(--border))' }}>
             <div className="pt-16 md:pt-20 pb-8">
               {/* ── Top: brand + link columns ── */}
@@ -253,7 +255,7 @@ export function Layout({ children, showFooter = true, panel = false, fullWidth =
                     {logo ? (
                       <img src={logoSrc} alt="Pastel" height={36} className="h-9 w-auto shrink-0" />
                     ) : (
-                      <img src="/PastelLogo.svg" alt="Pastel" width={110} className="h-auto shrink-0" />
+                      <img src="/UpdatePastel.svg?v=2" alt="Pastel" height={36} className="h-9 w-auto shrink-0" />
                     )}
                   </Link>
                   <p className="mt-6 max-w-sm text-[13.5px] text-fg-muted font-medium leading-[1.75]">
