@@ -2,6 +2,7 @@ import { z } from "zod";
 import { MAX_TOKENS_PER_CALL, type OnUsage } from "../gateway";
 import type { ChatMessage } from "../gateway";
 import { callJSON, gatewayModelChat, type ModelChat } from "../lib/model-chat";
+import { imageBlockFromDataUrl } from "../lib/model-adapter";
 
 /**
  * Maxi Agent v25 — Wave 4 · ADVISORY REVIEW.
@@ -77,13 +78,13 @@ export async function runAdvisoryReview(input: AdvisoryReviewInput): Promise<Adv
     },
   ];
   for (let i = 0; i < input.screenshots.length && i < input.screenshotNames.length; i++) {
-    const m = input.screenshots[i]!.match(/^data:(image\/[a-z+]+);base64,(.+)$/);
-    if (!m) continue;
+    const screenshot = input.screenshots[i]!;
+    if (!screenshot.startsWith("data:image/")) continue;
     messages.push({
       role: "user",
       content: [
         { type: "text", text: `Screenshot: ${input.screenshotNames[i]}` },
-        { type: "image", source: { type: "base64", media_type: m[1]!, data: m[2]! } },
+        imageBlockFromDataUrl(screenshot),
       ] as Array<Record<string, unknown>>,
     });
   }

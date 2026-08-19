@@ -1,7 +1,7 @@
-import { MAX_TOKENS_PER_CALL, type OnUsage } from "../gateway";
+import { MAX_TOKENS_PER_CALL, MODELS, type OnUsage } from "../gateway";
 import type { ChatMessage } from "../gateway";
 import type { CompanyManifest } from "../knowledge/manifest-schema";
-import { compileCompanyBlock, listCatalog, megadesignBlock, visualMoodBlock } from "../knowledge/index";
+import { compileCompanyBlock, compositionBlock, listCatalog, megadesignBlock, visualMoodBlock } from "../knowledge/index";
 import { blueprintSchema } from "../lib/blueprint";
 import {
   deriveBlueprint,
@@ -9,6 +9,7 @@ import {
   type BlueprintDerivation,
 } from "../lib/blueprint-derive";
 import { callJSON, gatewayModelChat, type ModelChat } from "../lib/model-chat";
+import { directionPromptSuffix, tuneTemperature } from "../lib/model-adapter";
 import type { VisualReference } from "../types";
 
 /**
@@ -70,9 +71,17 @@ THE THREE CONCEPTS MUST BE GENUINELY DIFFERENT: different hue family for primary
 Pick the one that fits THIS product and THIS audience best — the one you would defend in a design review.
 
 ### 4. screens — 2 to 4 screens (you decide the set)
-The minimum viable surface: usually home + detail; add a third or fourth ONLY when the product genuinely needs it (a library, a calendar, a settings surface). Each screen: id (slug), intent (2-3 sentences — what the user does here, what matters most), nav (sidebar|topbar|sidebar+topbar|none), dominantMoment (the ONE display-scale visual idea this screen is built around).
+The minimum viable surface: usually home + detail; add a third or fourth ONLY when the product genuinely needs it (a library, a calendar, a settings surface). Each screen: id (slug), intent (2-3 sentences — what the user does here, what matters most), nav (sidebar|topbar|sidebar+topbar|none), dominantMoment (the ONE display-scale visual idea this screen is built around), composition (the structural blueprint — see below).
 
-### 5. componentManifest — the API contract (6-14 entries)
+### 4b. screen composition — the structural blueprint
+For each screen, specify a "composition" object:
+- heroSurface: the dominant moment's surface type (band|card|table|feed|grid)
+- sections: 2-4 sections in order, each with: purpose (what content lives here, 4-120 chars) and surface (band|rows|card|table|grid|feed|inset)
+- screenDifferentiator: what makes this screen visually distinct from the OTHER screens — not the content difference, the COMPOSITIONAL difference (8-160 chars)
+
+The sections describe the screen's layout structure top-to-bottom. This is a blueprint the author adapts — not a rigid template.
+
+### 5. componentManifest — the API contract (4-14 entries)
 Components are coded against this manifest IN PARALLEL with each other, so it must be complete and self-consistent:
 - Include 2-4 primitives (Button, plus what this product needs: Input, Badge, Avatar, Select…) — primitives carry the concept's corner/weight language.
 - Include 3-8 product components with names that belong to THIS product (PaceWall, InvoiceLedger, CabinGallery — never Widget3).
@@ -177,6 +186,7 @@ export function directionUserMessage(args: {
   primarySlug: string;
   moodBlock: string;
   megadesign: string;
+  composition: string;
 }): string {
   const answersBlock = Object.keys(args.answers).length > 0
     ? `\nCLARIFICATION ANSWERS:\n${Object.entries(args.answers).map(([k, v]) => `- ${k}: ${v}`).join("\n")}`
@@ -190,6 +200,8 @@ export function directionUserMessage(args: {
     `INSPIRATION MOOD (adapt the approach — never the brand):\n${args.moodBlock}`,
     "",
     `UNIVERSAL DESIGN LAW:\n${args.megadesign}`,
+    "",
+    `VISUAL COMPOSITION LAW (how to arrange components into screens):\n${args.composition}`,
     "",
     "Emit the complete DesignBlueprint as ONE JSON object.",
   ].join("\n");
@@ -208,11 +220,15 @@ export async function runDirectionAgent(input: DirectionInput): Promise<Directio
   const primarySlug = userPick && availableSlugs.includes(userPick) ? userPick : input.hintManifest.slug;
 
   const megadesign = await megadesignBlock();
+  const composition = await compositionBlock();
   const companyBlock = await compileCompanyBlock(primarySlug);
   const moodBlock = `${companyBlock}\n\nVISUAL MOOD SUMMARY:\n${visualMoodBlock(input.hintManifest)}`;
 
+  const model = MODELS.direction;
+  const systemPrompt = SYSTEM + directionPromptSuffix(model);
+
   const messages: ChatMessage[] = [
-    { role: "system", content: SYSTEM },
+    { role: "system", content: systemPrompt },
     {
       role: "user",
       content: directionUserMessage({
@@ -223,6 +239,7 @@ export async function runDirectionAgent(input: DirectionInput): Promise<Directio
         primarySlug,
         moodBlock,
         megadesign,
+        composition,
       }),
     },
   ];
@@ -241,7 +258,7 @@ export async function runDirectionAgent(input: DirectionInput): Promise<Directio
     const raw = await callJSON(chatFn, messages, {
       model: "direction",
       maxTokens: MAX_TOKENS_PER_CALL.direction,
-      temperature: 0.7,
+      temperature: tuneTemperature(model, "direction"),
       onUsage: input.onUsage,
       validate: (v: unknown) => {
         const cleaned = sanitizeBlueprintValue(v);

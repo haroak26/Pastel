@@ -1,0 +1,58 @@
+{
+  "runId": "v26-gemini-1787161321328",
+  "brief": "Build a premium Airbnb-style cabin rental marketplace. The app should have:\n\nHOME SCREEN:\n- A hero section with a large search input and location/date/guests filters\n- A grid of cabin listings with photo thumbnails, location, price per night, rating, and host name\n- A \"Featured Cabins\" section with 3 highlighted premium properties\n- Quick filter chips for cabin types: \"Lakefront\", \"Mountain\", \"Forest\", \"Beach\"\n\nDETAIL SCREEN:\n- A large hero photo gallery of one specific cabin (the Tahoe Lakefront Retreat)\n- Cabin name, location, host info with avatar, and price per night prominently displayed\n- An amenities grid showing: WiFi, Kitchen, Hot Tub, Parking, Fireplace, Pet Friendly\n- A reviews section with 4-5 guest reviews showing name, date, rating, and comment\n- A booking summary card with check-in/out dates, guest count, and total price\n- A \"Reserve\" primary CTA button\n\nDesign direction: Think Airbnb's actual design language — clean, warm, photography-first, with soft neutrals and one warm accent. The UI should feel like a real product, not a template. Use real cabin names, real locations (Lake Tahoe, Big Sur, Aspen, etc.), real prices ($180-$450/night), and real guest names.",
+  "title": "Build a premium Airbnb-style",
+  "status": "done",
+  "wallSeconds": 83.8,
+  "models": {
+    "clarify": "anthropic/claude-haiku-4-5",
+    "direction": "google/gemini-3.7-flash",
+    "author": "google/gemini-3.7-flash",
+    "review": "google/gemini-3.7-flash",
+    "repair": "google/gemini-3.7-flash"
+  },
+  "screens": [
+    "home"
+  ],
+  "failedScreens": [],
+  "gate": {
+    "passed": true,
+    "issues": 0
+  },
+  "advisory": {
+    "score": 90,
+    "verdict": "ship",
+    "strengths": [
+      "Confident dominant hero metric card paired with a clean, bespoke SVG sparkline",
+      "Faithful execution of the Airbnb visual language with pill search controls and subtle surface borders",
+      "Excellent layout hierarchy balancing high-level portfolio velocity with granular property rows",
+      "Strong accessibility foundations including screen-reader labels and descriptive aria attributes"
+    ],
+    "improvements": [
+      "Consider adding subtle date range or filter badges directly underneath the sparkline for deeper context",
+      "The search bar could include a quick keyboard shortcut hint (e.g. ⌘K) to elevate desktop utility"
+    ],
+    "summary": "A polished, restrained dashboard that captures the signature Airbnb product feel. Spacing rhythm, typography scale, and accent color usage are exceptionally well-judged.",
+    "estimated": false
+  },
+  "calls": {
+    "callsByRole": {
+      "direction": 2,
+      "author": 10,
+      "repair": 1,
+      "review": 1
+    },
+    "totalCalls": 14
+  },
+  "waves": {
+    "w0": 22.161,
+    "w1": 20.269,
+    "w2": 17.539,
+    "w3": 12.362,
+    "w4": 4.16
+  },
+  "fileCount": 15,
+  "docCount": 9,
+  "screenshotFiles": [],
+  "error": null
+}

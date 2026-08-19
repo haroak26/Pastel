@@ -93,6 +93,9 @@ export const blueprintBriefSchema = z.object({
 
 export const SCREEN_NAV = ["sidebar", "topbar", "sidebar+topbar", "none"] as const;
 
+const SCREEN_HERO_SURFACE = ["band", "card", "table", "feed", "grid"] as const;
+const SCREEN_SECTION_SURFACE = ["band", "rows", "card", "table", "grid", "feed", "inset"] as const;
+
 export const blueprintScreenSchema = z.object({
   id: slug,
   /** What this screen is for — the intent paragraph the author designs against. */
@@ -100,6 +103,18 @@ export const blueprintScreenSchema = z.object({
   nav: z.enum(SCREEN_NAV),
   /** The ONE display-scale moment this screen is built around. */
   dominantMoment: z.string().trim().min(8).max(240),
+  /** V26: structural composition blueprint — the direction agent's layout plan. */
+  composition: z.object({
+    /** The dominant moment's surface type. */
+    heroSurface: z.enum(SCREEN_HERO_SURFACE),
+    /** 2-4 section descriptions in order. */
+    sections: z.array(z.object({
+      purpose: z.string().trim().min(4).max(120),
+      surface: z.enum(SCREEN_SECTION_SURFACE),
+    })).min(2).max(4),
+    /** What makes this screen visually distinct from the others. */
+    screenDifferentiator: z.string().trim().min(8).max(160),
+  }).optional(),
 });
 
 export type BlueprintScreen = z.infer<typeof blueprintScreenSchema>;
@@ -190,7 +205,7 @@ export const blueprintSchema = z
     /** The model's pick — the deterministic divergence scorer may override. */
     chosenConcept: z.number().int().min(0).max(2),
     screens: z.array(blueprintScreenSchema).min(2).max(4),
-    componentManifest: z.array(manifestComponentSchema).min(6).max(14),
+    componentManifest: z.array(manifestComponentSchema).min(4).max(14),
     dataSchema: dataSchemaSchema,
   })
   .superRefine((bp, ctx) => {

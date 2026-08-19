@@ -1,20 +1,13 @@
 import { MergeGateway, type ThinkingConfig } from "merge-gateway-sdk";
+import { detectProvider, tuneTemperature, tuneMaxTokens } from "./lib/model-adapter";
 
 /**
- * Maxi Agent v25 — hybrid model gateway.
+ * Maxi Agent v26 — unified model gateway.
  *
- * V25 strategy (the "Auteur" decision: strong model everywhere): the STRONG
- * default (gpt-5.6-luna) carries every DESIGN call — direction (the concept
- * blueprint) and author (components + screens + repair). The CHEAP default
- * remains only for `clarify` (pre-run Q&A). Rationale: ~10–15 strong calls
- * cost no more than v24's 43 mixed calls, and components are where the
- * visible design quality lives.
- *
- * History: v14 introduced the two-model split (cheap mechanical / mid
- * judgment); v23/v24 kept it while adding schema+gate enforcement so cheap
- * models could do constrained fill-in work. v25 removes the constrained
- * fill-in stages entirely — what remains is design work, and design work
- * runs on the strong model.
+ * V26 extends v25's "strong model everywhere" strategy with per-provider
+ * tuning. The MergeGateway SDK handles wire-format translation internally;
+ * v26 adds model-aware temperature/tuning, image-block normalization, and
+ * Gemini-specific budget scaling at the prompt level.
  *
  * Override any role via env: PASTEL_MODEL_{ROLE}.
  */
@@ -24,9 +17,7 @@ export const MID_DEFAULT = "openai/gpt-5.6-luna";
 
 export const MODELS = {
   clarify:      process.env.PASTEL_MODEL_CLARIFY      || CHEAP_DEFAULT,
-  /** V25: the Wave-0 Direction call — the concept blueprint. Strong model. */
   direction:    process.env.PASTEL_MODEL_DIRECTION    || MID_DEFAULT,
-  /** V25: Wave-1 component + screen authoring and Wave-3 repair. Strong model. */
   author:       process.env.PASTEL_MODEL_AUTHOR       || MID_DEFAULT,
   review:       process.env.PASTEL_MODEL_REVIEW       || MID_DEFAULT,
   repair:       process.env.PASTEL_MODEL_REPAIR       || MID_DEFAULT,
@@ -36,15 +27,26 @@ export type ModelRole = keyof typeof MODELS;
 
 export const MAX_TOKENS_PER_CALL: Record<ModelRole, number> = {
   clarify:      Number(process.env.PASTEL_MAX_TOKENS_CLARIFY)      || 2500,
-  /** V25: the blueprint is the largest structured output in the pipeline —
+  /** V26: the blueprint is the largest structured output in the pipeline —
    * three concepts + tokens + manifest + data schema in one JSON document. */
   direction:    Number(process.env.PASTEL_MAX_TOKENS_DIRECTION)    || 16000,
-  /** V25: one complete component or screen file per call. */
+  /** V26: one complete component or screen file per call. */
   author:       Number(process.env.PASTEL_MAX_TOKENS_AUTHOR)       || 9000,
   review:       Number(process.env.PASTEL_MAX_TOKENS_REVIEW)       || 4000,
-  /** V25: a full-file targeted rewrite (same budget as author). */
+  /** V26: a full-file targeted rewrite (same budget as author). */
   repair:       Number(process.env.PASTEL_MAX_TOKENS_REPAIR)       || 9000,
 } as const;
+
+/**
+ * V26: get the model-aware token budget for a role.
+ * Gemini 3.7 Flash has a smaller effective output window, so budgets are
+ * scaled down by ~25%. Luna uses the full base budget.
+ */
+export function maxTokensForRole(role: ModelRole, model?: string): number {
+  const base = MAX_TOKENS_PER_CALL[role];
+  if (!model) return base;
+  return tuneMaxTokens(model, base);
+}
 
 const TRUNCATION_SCALE = 2.5;
 const MAX_TRUNCATION_RETRIES = 2;
@@ -277,12 +279,14 @@ export async function chat(
   let withThinking = true;
   let attempts = 0;
 
+  const temperature = opts.temperature ?? tuneTemperature(model, opts.model);
+
   for (let escalations = 0; ; ) {
     try {
       response = (await client.responses.create({
         model,
         input: messages.map((m) => ({ type: "message" as const, ...m })),
-        temperature: opts.temperature ?? 0.5,
+        temperature,
         max_tokens: budget,
         thinking: withThinking ? thinkingConfig(opts.model) : { type: "disabled" },
         response_format:

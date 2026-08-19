@@ -1,29 +1,20 @@
-import { MAX_TOKENS_PER_CALL, type OnUsage } from "../gateway";
+import { MAX_TOKENS_PER_CALL, MODELS, type OnUsage } from "../gateway";
 import type { ChatMessage } from "../gateway";
 import { sanitizeFileContent } from "../sandbox";
 import type { ResolvedTheme } from "../schemas";
 import type { BlueprintScreen, Concept, DesignBlueprint, ManifestComponent } from "../lib/blueprint";
 import { callText, gatewayModelChat, type ModelChat } from "../lib/model-chat";
 import { SHELL_ICON_NAMES } from "../lib/shell-gen";
+import { authorPromptSuffix, HARD_CONSTRAINTS } from "../lib/model-adapter";
 
 /**
- * Maxi Agent v25 — Wave 1 · SYNTHESIS.
+ * Maxi Agent v26 — Wave 1 · SYNTHESIS.
  *
- * Components and screens are authored in ONE parallel batch — screens code
- * against the manifest API contract, not against built code, so nothing
- * waits on anything. Each call writes ONE complete, self-contained file on
- * the strong model.
- *
- * The prompts carry craft PRINCIPLES (one visual idea, display-scale
- * dominant moment, asymmetry, real data, the concept's signature moves) —
- * not the v24 rulebook (templates, caps, quotas, mandatory headers). The
- * concept thesis is the art direction; uniqueness is the goal, not the
- * violation.
- *
- * Deterministic validation after every call (export present, legal imports,
- * no hex literals, screen mounts its manifest components) with ONE
- * corrective retry naming the exact errors. Persistent failures surface to
- * the orchestrator, which flags them into Wave 3 repair.
+ * v26 adds model-aware prompts (Luna gets creative bias, Gemini gets
+ * simplicity bias) and a HARD CONSTRAINTS block that moves anti-slop rules
+ * from post-hoc lint into the prompt itself. The text-4xl cap, hex ban,
+ * TypeScript ban, and gradient ban are now explicit "violation = rejection"
+ * constraints that models see before they write a single line.
  */
 
 // ── Shared context ─────────────────────────────────────────────────────────
@@ -64,15 +55,20 @@ function tokensBlock(theme: ResolvedTheme): string {
   return lines.join("\n");
 }
 
-const CRAFT_PRINCIPLES = `CRAFT PRINCIPLES (this is the job — a human design team should be proud to ship this):
+function craftPrinciples(model: string): string {
+  return `${HARD_CONSTRAINTS}
+
+CRAFT PRINCIPLES (this is the job — a human design team should be proud to ship this):
 - ONE VISUAL IDEA. Decide the single thing this surface is about and make it unmistakable. Everything else supports it.
 - THE BAR: "could this ship in a different product unchanged?" If yes, redesign — it's generic. Anchor to THIS product's data, units, and actions.
-- The dominant moment is DISPLAY-SCALE — the largest element on the screen by far (tabular numerals for data). If the screen works without it, it's a template.
+- The dominant moment is DISPLAY-SCALE — the largest element on the screen by far (tabular numerals for data). Use text-4xl + font-black + tracking-tight for maximum impact. NEVER exceed text-4xl.
 - Real product UIs are rarely grids of identical cards. Divided rows, tonal bands, asymmetric clusters, inset panels — vary the composition; at most one card-like container per section.
 - Density reads as designed, not empty: populate with real DATA rows; no placeholder dashes, no lorem, no invented values.
 - Responsive by construction: it must render beautifully at 375px (stack, wrap, hide) and 1440px.
 - A11y is craft: visible labels on inputs, aria-labels on icon controls, :focus-visible rings on every interactive element.
-- No drop shadows on static panels (reserved for overlays + the one dominant surface). No gradients. No decorative blobs.`;
+- No drop shadows on static panels (reserved for overlays + the one dominant surface). No gradients. No decorative blobs.
+${authorPromptSuffix(model)}`;
+}
 
 const CODE_CONTRACT = `CODE CONTRACT (hard — verified after you write):
 - Self-contained: import ONLY from "react" and "lucide-react" (plus nothing else).
@@ -130,7 +126,7 @@ const COMPONENT_SYSTEM = `You are a senior product designer + React engineer at 
 
 You write ONE complete component file per request: original, self-contained, unmistakably THIS product's.`;
 
-function componentUserMessage(ctx: AuthorContext, spec: ManifestComponent, neighbors: string[]): string {
+function componentUserMessage(ctx: AuthorContext, spec: ManifestComponent, neighbors: string[], model: string): string {
   return [
     conceptBlock(ctx.concept),
     "",
@@ -149,7 +145,7 @@ function componentUserMessage(ctx: AuthorContext, spec: ManifestComponent, neigh
     "THE DATA components render (pass real values through props in screens — never hardcode):",
     ctx.dataJs,
     "",
-    CRAFT_PRINCIPLES,
+    craftPrinciples(model),
     "",
     spec.kind === "primitive"
       ? "PRIMITIVE NOTE: you carry the concept's corner language and weight. A pill concept gets pill controls; a sharp editorial concept gets 2px squared controls. Controls feel deliberate at h-[var(--control-sm|md|lg)]."
@@ -168,13 +164,14 @@ export interface AuthoredFile {
 
 export async function authorComponent(ctx: AuthorContext, spec: ManifestComponent): Promise<AuthoredFile> {
   const chatFn = ctx.chat ?? gatewayModelChat();
+  const model = MODELS.author;
   const neighbors = ctx.blueprint.componentManifest
     .filter((c) => c.name !== spec.name && c.usedBy.some((sid) => spec.usedBy.includes(sid)))
     .map((c) => `- ${c.name}: ${c.intent}`);
 
   const messages: ChatMessage[] = [
     { role: "system", content: COMPONENT_SYSTEM },
-    { role: "user", content: componentUserMessage(ctx, spec, neighbors) },
+    { role: "user", content: componentUserMessage(ctx, spec, neighbors, model) },
   ];
 
   let code = sanitizeFileContent(await callText(chatFn, messages, {
@@ -218,7 +215,7 @@ function manifestApiBlock(manifest: ManifestComponent[], screenId: string): stri
   ].join("\n");
 }
 
-function screenUserMessage(ctx: AuthorContext, screen: BlueprintScreen): string {
+function screenUserMessage(ctx: AuthorContext, screen: BlueprintScreen, model: string): string {
   return [
     conceptBlock(ctx.concept),
     "",
@@ -230,6 +227,13 @@ function screenUserMessage(ctx: AuthorContext, screen: BlueprintScreen): string 
     `YOUR SCREEN — "${screen.id}"`,
     `Intent: ${screen.intent}`,
     `Dominant moment: ${screen.dominantMoment}`,
+    "",
+    screen.composition ? [
+      "SCREEN COMPOSITION (the structural blueprint — adapt freely but keep the spirit):",
+      `Hero: ${screen.composition.heroSurface} — ${screen.dominantMoment}`,
+      ...screen.composition.sections.map((s, i) => `Section ${i + 1}: ${s.surface} — ${s.purpose}`),
+      `Distinct because: ${screen.composition.screenDifferentiator}`,
+    ].join("\n") : "",
     "",
     manifestApiBlock(ctx.blueprint.componentManifest, screen.id),
     "",
@@ -250,7 +254,7 @@ export default function ${screenName(screen.id)}() {
 }
 ${screen.nav === "none" ? "This screen declares nav \"none\": do NOT mount NavAdapter — the body is the whole screen." : "Mount NavAdapter EXACTLY as shown — it is the only chrome. IconOf names: " + SHELL_ICON_NAMES.join(", ") + ". (You may also import lucide-react icons directly.)"}`,
     "",
-    CRAFT_PRINCIPLES,
+    craftPrinciples(model),
     "",
     "SCREEN NOTES: this is an APP screen, not a landing page — no marketing hero, no footer, no pricing. One dominant moment, everything else supporting it. Every list region renders the full DATA.list.rows (all of them). One clear primary action using DATA.primaryCta.",
     "",
@@ -287,9 +291,10 @@ function validateScreen(code: string, screen: BlueprintScreen, manifest: Manifes
 
 export async function authorScreen(ctx: AuthorContext, screen: BlueprintScreen): Promise<AuthoredFile> {
   const chatFn = ctx.chat ?? gatewayModelChat();
+  const model = MODELS.author;
   const messages: ChatMessage[] = [
     { role: "system", content: SCREEN_SYSTEM },
-    { role: "user", content: screenUserMessage(ctx, screen) },
+    { role: "user", content: screenUserMessage(ctx, screen, model) },
   ];
 
   let code = sanitizeFileContent(await callText(chatFn, messages, {

@@ -82,6 +82,12 @@ export function sanitizeFileContent(raw: string): string {
   // Remove leading prose before the first import/const/export
   const codeStart = s.search(/^(import |const |export |function |\/\/)/m);
   if (codeStart > 0) s = s.slice(codeStart);
+  // V26: strip empty-path imports (Gemini emits `import ... from ""`)
+  s = s.replace(/^import\s[^\n]*from\s+["']["'];?\s*$/gm, "");
+  // V26: strip TypeScript syntax from .jsx output (Gemini emits TS in JSX)
+  s = s.replace(/^\s*(export\s+)?(interface|type)\s+\w+[\s\S]*?[{;]\s*$/gm, "");
+  s = s.replace(/\b(useState|useRef|useMemo|useCallback|useContext|useReducer)<[^>]+>/g, "$1");
+  s = s.replace(/\s+as\s+(string|number|boolean|any|HTMLElement|Element|unknown)\b/g, "");
   return s;
 }
 

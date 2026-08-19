@@ -1,0 +1,198 @@
+{
+  "generatedAt": "2026-08-19T17:43:22.505Z",
+  "entry": "src/App.jsx",
+  "files": [
+    {
+      "path": "package.json",
+      "kind": "project",
+      "bytes": 453,
+      "deps": []
+    },
+    {
+      "path": "src/App.jsx",
+      "kind": "project",
+      "bytes": 1277,
+      "deps": [
+        "src/screens/home.jsx"
+      ]
+    },
+    {
+      "path": "src/components/ActivityFeed.jsx",
+      "kind": "component",
+      "bytes": 7225,
+      "deps": [],
+      "api": {
+        "props": [
+          {
+            "name": "items",
+            "type": "array",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "path": "src/components/Badge.jsx",
+      "kind": "component",
+      "bytes": 2325,
+      "deps": [],
+      "api": {
+        "props": [
+          {
+            "name": "label",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "tone",
+            "type": "string",
+            "required": false
+          }
+        ]
+      }
+    },
+    {
+      "path": "src/components/Button.jsx",
+      "kind": "component",
+      "bytes": 1792,
+      "deps": [],
+      "api": {
+        "props": [
+          {
+            "name": "label",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "variant",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "size",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "onClick",
+            "type": "func",
+            "required": false
+          }
+        ]
+      }
+    },
+    {
+      "path": "src/components/DetailPanel.jsx",
+      "kind": "component",
+      "bytes": 5622,
+      "deps": [],
+      "api": {
+        "props": [
+          {
+            "name": "title",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "fields",
+            "type": "array",
+            "required": true
+          },
+          {
+            "name": "status",
+            "type": "string",
+            "required": true
+          }
+        ]
+      }
+    },
+    {
+      "path": "src/components/MetricCard.jsx",
+      "kind": "component",
+      "bytes": 2575,
+      "deps": [],
+      "api": {
+        "props": [
+          {
+            "name": "label",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "value",
+            "type": "string",
+            "required": true
+          },
+          {
+            "name": "unit",
+            "type": "string",
+            "required": false
+          },
+          {
+            "name": "delta",
+            "type": "number",
+            "required": false
+          },
+          {
+            "name": "positive",
+            "type": "boolean",
+            "required": false
+          }
+        ]
+      }
+    },
+    {
+      "path": "src/components/RecordList.jsx",
+      "kind": "component",
+      "bytes": 5117,
+      "deps": [],
+      "api": {
+        "props": [
+          {
+            "name": "rows",
+            "type": "array",
+            "required": true
+          },
+          {
+            "name": "onSelect",
+            "type": "func",
+            "required": false
+          }
+        ]
+      }
+    },
+    {
+      "path": "src/data.js",
+      "kind": "data",
+      "bytes": 3286,
+      "deps": []
+    },
+    {
+      "path": "src/lib/shell.jsx",
+      "kind": "shell",
+      "bytes": 5769,
+      "deps": [
+        "src/data.js"
+      ]
+    },
+    {
+      "path": "src/screens/home.jsx",
+      "kind": "screen",
+      "bytes": 12713,
+      "deps": [
+        "src/components/Badge.jsx",
+        "src/components/Button.jsx",
+        "src/components/MetricCard.jsx",
+        "src/components/RecordList.jsx",
+        "src/data.js",
+        "src/lib/shell.jsx"
+      ]
+    },
+    {
+      "path": "src/styles.css",
+      "kind": "style",
+      "bytes": 9217,
+      "deps": []
+    }
+  ]
+}

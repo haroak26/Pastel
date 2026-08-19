@@ -3,20 +3,15 @@ import type { ChatMessage } from "../gateway";
 import { sanitizeFileContent } from "../sandbox";
 import type { ResolvedTheme } from "../schemas";
 import { callText, gatewayModelChat, type ModelChat } from "../lib/model-chat";
+import { imageBlockFromDataUrl } from "../lib/model-adapter";
 import { validateAuthoredFile } from "./author";
 
 /**
- * Maxi Agent v25 — Wave 3 · POLISH.
+ * Maxi Agent v26 — Wave 3 · POLISH.
  *
- * One repair call per failing FILE with the file + the exact gate errors +
- * the rendered screenshot when one exists (the v24 lesson the hard way:
- * strong models fix overflow instantly when shown the render, and slowly or
- * never when only told about it). The orchestrator caps TOTAL repair calls
- * (default 3) — this module never loops on its own.
- *
- * Also carries the v24 convergence fallback verbatim in spirit:
- * `correctThemeViolations` — two same-class failures converge through a
- * deterministic path rather than shipping the violation.
+ * v26 normalises image blocks to the MergeGateway SDK's ImageContent format
+ * (`{ type: "image", source_type: "base64", media_type, data }`) so
+ * screenshot attachment works for all providers, including Gemini.
  */
 
 export interface RepairInput {
@@ -65,7 +60,7 @@ export async function repairFile(input: RepairInput): Promise<string> {
       role: "user",
       content: [
         { type: "text", text: "The rendered screenshot of a screen using this file (the failure may be visible — e.g. horizontal overflow, clipped text, an empty region). Fix what you see." },
-        { type: "image", source: dataUrlToImageSource(input.screenshotDataUrl) },
+        imageBlockFromDataUrl(input.screenshotDataUrl),
       ] as Array<Record<string, unknown>>,
     });
   }
@@ -82,12 +77,6 @@ export async function repairFile(input: RepairInput): Promise<string> {
     throw new Error(`repair of ${input.path} introduced violations: ${errors.join("; ")}`);
   }
   return code;
-}
-
-function dataUrlToImageSource(dataUrl: string): { type: "base64"; media_type: string; data: string } {
-  const m = dataUrl.match(/^data:(image\/[a-z+]+);base64,(.+)$/);
-  if (!m) throw new Error("screenshot is not a base64 image data URL");
-  return { type: "base64", media_type: m[1]!, data: m[2]! };
 }
 
 // ── Convergence fallback (v24 WS7, ported) ────────────────────────────────

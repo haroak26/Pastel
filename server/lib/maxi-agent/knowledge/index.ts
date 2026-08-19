@@ -232,6 +232,16 @@ export async function megadesignBlock(): Promise<string> {
   return megadesignCache;
 }
 
+let compositionCache: string | null = null;
+
+/** V26: visual composition law — how to arrange components into screens. */
+export async function compositionBlock(): Promise<string> {
+  if (compositionCache) return compositionCache;
+  const p = path.join(maxiAssetRoot(), "knowledge", "design-laws", "composition.md");
+  compositionCache = fs.existsSync(p) ? fs.readFileSync(p, "utf8") : "";
+  return compositionCache;
+}
+
 // ── Catalog (gallery UI) ─────────────────────────────────────────────────
 
 export async function listCatalog(): Promise<CompanyCatalog[]> {

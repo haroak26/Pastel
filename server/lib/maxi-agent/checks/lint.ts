@@ -33,6 +33,16 @@ const AI_SLOP_RE = /\b(Get started|Learn more|Unlock your potential|Enterprise-g
 const GRADIENT_RE = /\b(bg-gradient-to|from-(blue|indigo|purple)|via-(blue|indigo|purple)|to-(blue|indigo|purple))\b/g;
 const BLOB_DOTS_RE = /\b(h-64\s+w-64\s+rounded-full\s+(bg|opacity|blur))|(absolute\s+-top-\d+\s+-right-\d+)|(floating\s+blob)|(geometric\s+blob)\b/gi;
 
+// V26: oversized text classes — the most common anti-slop violation
+const OVERSIZE_TEXT_RE = /\btext-(5xl|6xl|7xl|8xl|9xl)\b/g;
+
+// V26: TypeScript syntax in .jsx files (Gemini emits TS in JSX)
+const TS_INTERFACE_RE = /^\s*(export\s+)?interface\s+\w+\s*\{[^}]*\}\s*$/gm;
+const TS_TYPE_ALIAS_RE = /^\s*(export\s+)?type\s+\w+\s*=\s*[^;]+;\s*$/gm;
+const TS_GENERIC_RE = /\b(useState|useRef|useMemo|useCallback|useContext|useReducer)<[^>]+>/g;
+const TS_TYPE_ANNOTATION_RE = /(\w+)\s*:\s*(string|number|boolean|any|void|never|unknown|object|React\.\w+)(\s*[=;,)])/g;
+const TS_AS_CAST_RE = /\s+as\s+(string|number|boolean|any|HTMLElement|Element|unknown)\b/g;
+
 const RULES: LintRule[] = [
   {
     name: "hardcoded-hex-colors",
@@ -180,6 +190,57 @@ const RULES: LintRule[] = [
         category: "lint",
         description: `${matches.length} AI-slop phrase(s) detected: ${matches.map((m) => m[0]).join(", ")}`,
       }];
+    },
+  },
+  // V26: oversized text — the single most common anti-slop violation
+  {
+    name: "oversized-text-classes",
+    scan: (code) => {
+      const matches = [...code.matchAll(OVERSIZE_TEXT_RE)];
+      if (matches.length === 0) return [];
+      return [{
+        severity: "high" as const,
+        category: "anti-slop",
+        description: `Oversized text class(es) found (${matches.map((m) => m[0]).join(", ")}) — maximum allowed is text-4xl. Use font-black + tracking-tight for impact instead.`,
+      }];
+    },
+    fix: (code) => {
+      const fixed = code.replace(/\btext-(5xl|6xl|7xl|8xl|9xl)\b/g, "text-4xl");
+      return { fixed, changed: fixed !== code };
+    },
+  },
+  // V26: TypeScript syntax in .jsx files — Gemini emits TS syntax that breaks esbuild
+  {
+    name: "typescript-in-jsx",
+    scan: (code) => {
+      const issues: Array<{ severity: "high"; category: "lint"; description: string }> = [];
+      const interfaces = [...code.matchAll(TS_INTERFACE_RE)];
+      const types = [...code.matchAll(TS_TYPE_ALIAS_RE)];
+      const generics = [...code.matchAll(TS_GENERIC_RE)];
+      const parts: string[] = [];
+      if (interfaces.length > 0) parts.push(`${interfaces.length} interface declaration(s)`);
+      if (types.length > 0) parts.push(`${types.length} type alias(es)`);
+      if (generics.length > 0) parts.push(`${generics.length} generic type parameter(s)`);
+      if (parts.length > 0) {
+        issues.push({
+          severity: "high",
+          category: "lint",
+          description: `TypeScript syntax in .jsx file: ${parts.join(", ")} — write plain JSX only, no TypeScript`,
+        });
+      }
+      return issues;
+    },
+    fix: (code) => {
+      let fixed = code;
+      // Remove interface declarations (handle multi-line with brace matching)
+      fixed = fixed.replace(/^\s*(export\s+)?interface\s+\w+\s*\{[\s\S]*?\}\s*$/gm, "");
+      // Remove type alias declarations
+      fixed = fixed.replace(/^\s*(export\s+)?type\s+\w+\s*=\s*[^;]+;\s*$/gm, "");
+      // Remove generic type parameters from React hooks
+      fixed = fixed.replace(/\b(useState|useRef|useMemo|useCallback|useContext|useReducer)<[^>]+>/g, "$1");
+      // Remove simple 'as Type' casts
+      fixed = fixed.replace(/\s+as\s+(string|number|boolean|any|HTMLElement|Element|unknown)\b/g, "");
+      return { fixed, changed: fixed !== code };
     },
   },
 ];
